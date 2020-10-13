@@ -9254,13 +9254,15 @@ stream
 			.AppKey('111111')
 		.bigPanda()
 			.AppKey('222222')
+		.bigPanda()
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 
 		c := bigpanda.NewConfig()
 		c.Enabled = true
-		c.AppKey = "1111111"
+		c.AppKey = "XXXXXXX"
 		c.Token = "testtoken1231234"
+		c.Url = ts.URL + "/test/bigpanda/url"
 
 		d := diagService.NewBigPandaHandler().WithContext(keyvalue.KV("test", "111"))
 		sl, err := bigpanda.NewService(c, d)
@@ -9275,15 +9277,33 @@ stream
 
 	exp := []interface{}{
 		bigpandatest.Request{
-			URL: "/data/v2/alerts",
+			URL: "/test/bigpanda/url",
 			PostData: bigpandatest.PostData{
-				Description: "kapacitor/cpu/serverA is CRITICAL",
+				Check:     "kapacitor/cpu/serverA is CRITICAL",
+				AppKey:    "111111",
+				Status:    "critical",
+				Host:      "serverA",
+				Timestamp: "1971-01-01T00:00:10.000000000Z",
 			},
 		},
 		bigpandatest.Request{
-			URL: "/data/v2/alerts",
+			URL: "/test/bigpanda/url",
 			PostData: bigpandatest.PostData{
-				Description: "kapacitor/cpu/serverA is CRITICAL",
+				Check:     "kapacitor/cpu/serverA is CRITICAL",
+				AppKey:    "222222",
+				Status:    "critical",
+				Host:      "serverA",
+				Timestamp: "1971-01-01T00:00:10.000000000Z",
+			},
+		},
+		bigpandatest.Request{
+			URL: "/test/bigpanda/url",
+			PostData: bigpandatest.PostData{
+				Check:     "kapacitor/cpu/serverA is CRITICAL",
+				AppKey:    "XXXXXXX",
+				Status:    "critical",
+				Host:      "serverA",
+				Timestamp: "1971-01-01T00:00:10.000000000Z",
 			},
 		},
 	}

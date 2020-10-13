@@ -1619,8 +1619,55 @@ type DiscordHandler struct {
 	EmbedTitle string `json:"embedTitle"`
 }
 
-//TODO documentation
-// Send the alert to BigPanda
+// To allow Kapacitor to post to BigPanda,
+// follow this guide https://docs.bigpanda.io/docs/api-key-management
+// and create a new api key
+// in the 'bigpanda' configuration section.
+//
+// Example:
+//    [bigpanda]
+//      enabled = true
+//      app-key = "my-app-key"
+//      token = "your-api-key"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the channel.
+//
+// Example:
+//    stream
+//         |alert()
+//             .bigPanda()
+//
+// Send alerts with default app key
+//
+// Example:
+// stream
+//      |alert()
+//          .bigPanda()
+//          .appKey('my-application')
+//
+// send alerts with custom appKey
+//
+// If the 'bigpanda' section in the configuration has the option: global = true
+// then all alerts are sent to BigpPanda without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [bigpanda]
+//      enabled = true
+//      default = true
+//      app-key = examplecorp
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to BigPanda.
+// tick:property
+
 func (n *AlertNodeData) BigPanda() *BigPandaHandler {
 	bigPanda := &BigPandaHandler{
 		AlertNodeData: n,

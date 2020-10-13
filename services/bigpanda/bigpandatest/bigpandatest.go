@@ -26,6 +26,7 @@ func NewServer() *Server {
 		s.mu.Lock()
 		s.requests = append(s.requests, pr)
 		s.mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
 
 	}))
 	s.ts = ts
@@ -53,6 +54,13 @@ type Request struct {
 }
 
 // PostData is the default struct to send an element through to PagerDuty
+
 type PostData struct {
+	AppKey      string `json:"app_key"`
+	Status      string `json:"status"`
+	Host        string `json:"host"`
+	Timestamp   string `json:"timestamp"`
+	Check       string `json:"check"`
 	Description string `json:"description"`
+	Cluster     string `json:"cluster"`
 }

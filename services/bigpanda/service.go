@@ -81,6 +81,7 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
+	AppKey     string          `json:"app_key"`
 	AlertTopic string          `json:"alert_topic"`
 	AlertID    string          `json:"alert_id"`
 	Message    string          `json:"message"`
@@ -116,12 +117,12 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	//c := s.config()
-	return s.Alert(o.AlertTopic, o.AlertID, o.Message, o.Level, o.Timestamp, o.Data)
+	return s.Alert(o.AppKey, o.AlertTopic, o.AlertID, o.Message, o.Level, o.Timestamp, o.Data)
 }
 
-func (s *Service) Alert(alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+func (s *Service) Alert(appKey, alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
 
-	req, err := s.preparePost(alertTopic, alertID, message, level, timestamp, data)
+	req, err := s.preparePost(appKey, alertTopic, alertID, message, level, timestamp, data)
 
 	if err != nil {
 		return err
@@ -152,7 +153,7 @@ func (s *Service) Alert(alertTopic, alertID, message string, level alert.Level, 
 	return nil
 }
 
-// BPAlert
+// BigPanda alert
 // See https://docs.bigpanda.io/reference#alerts
 /*
 
@@ -177,40 +178,7 @@ curl -X POST -H "Content-Type: application/json" \
   "primary_property": "application",
   "secondary_property": "host"
 */
-type BPAlert struct {
-	AppKey      string                 `json:"app_key"`
-	Status      string                 `json:"status"`
-	Host        string                 `json:"host"`
-	Timestamp   string                 `json:"timestamp"`
-	Check       string                 `json:"check"`
-	Description string                 `json:"description"`
-	Cluster     string                 `json:"cluster"`
-	Attributes  map[string]interface{} `json:"-"`
-}
-
-// append additional properties `Attributes` as extra attributes
-func (o BPAlert) MarshalJSON() ([]byte, error) {
-	type Object_ BPAlert
-	b, err := json.Marshal(Object_(o))
-	if err != nil {
-		return nil, err
-	}
-	if o.Attributes == nil || len(o.Attributes) == 0 {
-		return b, nil
-	}
-	m, err := json.Marshal(o.Attributes)
-	if err != nil {
-		return nil, err
-	}
-	if len(b) == 2 {
-		return m, nil
-	} else {
-		b[len(b)-1] = ','
-		return append(b, m[1:]...), nil
-	}
-}
-
-func (s *Service) preparePost(alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
+func (s *Service) preparePost(appKey, alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -230,24 +198,34 @@ func (s *Service) preparePost(alertTopic, alertID, message string, level alert.L
 		status = "critical"
 	}
 
-	payload := &BPAlert{}
-	payload.Description = message
-	payload.Timestamp = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
-	payload.Status = status
-	payload.AppKey = c.AppKey
+	bpData := make(map[string]interface{})
+	bpData["check"] = message
+	bpData["timestamp"] = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
+	bpData["status"] = status
 
-	postBytes, err := payload.MarshalJSON()
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling card struct")
+	if appKey == "" {
+		appKey = c.AppKey
+	}
+	bpData["app_key"] = appKey
+
+	if len(data.Tags) > 0 {
+		for k, v := range data.Tags {
+			bpData[k] = v
+		}
 	}
 
-	post := bytes.NewBuffer(postBytes)
+	var post bytes.Buffer
+	enc := json.NewEncoder(&post)
+	if err := enc.Encode(bpData); err != nil {
+		return nil, err
+	}
+
 	alertUrl, err := url.Parse(c.Url)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", alertUrl.String(), post)
+	req, err := http.NewRequest("POST", alertUrl.String(), &post)
 	req.Header.Add("Authorization", defaultTokenPrefix+" "+c.Token)
 	req.Header.Add("Content-Type", "application/json")
 	if err != nil {
@@ -259,7 +237,6 @@ func (s *Service) preparePost(alertTopic, alertID, message string, level alert.L
 // HandlerConfig defines the high-level struct required to connect to BigPanda
 type HandlerConfig struct {
 	AppKey string `mapstructure:"app-key"`
-	ApiUrl string `mapstructure:"api-url"`
 }
 
 type handler struct {
@@ -278,6 +255,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
+		h.c.AppKey,
 		event.Topic,
 		event.State.ID,
 		event.State.Message,
