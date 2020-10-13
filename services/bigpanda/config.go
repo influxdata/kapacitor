@@ -29,7 +29,7 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 
 	//Optional alert api URL, if not specified https://api.bigpanda.io/data/v2/alerts is used
-	Url string `toml: "url" override: "url"`
+	Url string `toml:"url" override:"url"`
 }
 
 func NewConfig() Config {
