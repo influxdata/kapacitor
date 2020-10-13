@@ -4,7 +4,6 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/bigpanda"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"

@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/bigpanda"
 	"log"
 	"sync"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
 	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/hipchat"

@@ -3,7 +3,6 @@ package server
 import (
 	"encoding"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/bigpanda"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
