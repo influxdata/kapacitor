@@ -771,17 +771,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		keyvalue.KV("topic", spec.Topic),
 	}
 	switch spec.Kind {
-	case "bigpanda":
-		c := bigpanda.HandlerConfig{}
+	case "aggregate":
+		c := newDefaultAggregateHandlerConfig(s.EventCollector)
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = s.BigPandaService.Handler(c, ctx...)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h, err = NewAggregateHandler(c, handlerDiag)
 		if err != nil {
 			return handler{}, err
 		}
-		h = newExternalHandler(h)
 	case "alerta":
 		c := s.AlertaService.DefaultHandlerConfig()
 		err = decodeOptions(spec.Options, &c)
@@ -789,6 +789,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h, err = s.AlertaService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
+		h = newExternalHandler(h)
+	case "bigpanda":
+		c := bigpanda.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err = s.BigPandaService.Handler(c, ctx...)
 		if err != nil {
 			return handler{}, err
 		}
