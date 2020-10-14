@@ -9262,7 +9262,7 @@ stream
 		c.Enabled = true
 		c.AppKey = "XXXXXXX"
 		c.Token = "testtoken1231234"
-		c.Url = ts.URL + "/test/bigpanda/url"
+		c.URL = ts.URL + "/test/bigpanda/url"
 
 		d := diagService.NewBigPandaHandler().WithContext(keyvalue.KV("test", "111"))
 		sl, err := bigpanda.NewService(c, d)

@@ -215,7 +215,7 @@ func (s *Service) preparePost(appKey, message string, level alert.Level, timesta
 		return nil, err
 	}
 
-	alertUrl, err := url.Parse(c.Url)
+	alertUrl, err := url.Parse(c.URL)
 	if err != nil {
 		return nil, err
 	}

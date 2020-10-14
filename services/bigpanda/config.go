@@ -19,7 +19,7 @@ type Config struct {
 	AppKey string `toml:"app-key" override:"app-key"`
 
 	//Each integration must have an App Key in BigPanda to identify it as a unique source.
-	Token string `toml:"token" override:"token"`
+	Token string `toml:"token" override:"token,redact"`
 
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.
@@ -29,18 +29,22 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 
 	//Optional alert api URL, if not specified https://api.bigpanda.io/data/v2/alerts is used
-	Url string `toml:"url" override:"url"`
+	URL string `toml:"url" override:"url"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Url: defaultBigPandaAlertApi,
+		URL: defaultBigPandaAlertApi,
 	}
 }
 
 func (c Config) Validate() error {
 	if c.Enabled && c.AppKey == "" {
-		return errors.New("must specify BigPanda AppKey")
+		return errors.New("must specify BigPanda app-key")
 	}
+	if c.Enabled && c.Token == "" {
+		return errors.New("must specify BigPanda token")
+	}
+
 	return nil
 }

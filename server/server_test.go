@@ -9829,7 +9829,9 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ctxt := context.WithValue(nil, "server", ts)
 
 				c.BigPanda.Enabled = true
-				c.BigPanda.Url = ts.URL + "/test/bigpanda/alert"
+				c.BigPanda.Token = "my-token-123"
+				c.BigPanda.AppKey = "my-app-key"
+				c.BigPanda.URL = ts.URL + "/test/bigpanda/alert"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
