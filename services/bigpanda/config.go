@@ -2,6 +2,7 @@ package bigpanda
 
 import (
 	"github.com/pkg/errors"
+	"net/url"
 )
 
 const (
@@ -41,6 +42,9 @@ func NewConfig() Config {
 func (c Config) Validate() error {
 	if c.Enabled && c.AppKey == "" {
 		return errors.New("must specify BigPanda app-key")
+	}
+	if _, err := url.Parse(c.URL); err != nil {
+		return errors.Wrapf(err, "invalid url %q", c.URL)
 	}
 	if c.Enabled && c.Token == "" {
 		return errors.New("must specify BigPanda token")
