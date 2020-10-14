@@ -9841,7 +9841,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 				exp := []bigpandatest.Request{{
 					URL: "/test/bigpanda/alert",
 					PostData: bigpandatest.PostData{
-						AppKey: "my-app-key-123456",
+						AppKey:    "my-app-key-123456",
+						Status:    "critical",
+						Timestamp: "1970-01-01T00:00:00.000000000Z",
+						Check:     "message",
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {
