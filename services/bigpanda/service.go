@@ -81,27 +81,22 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	AppKey     string          `json:"app_key"`
-	AlertTopic string          `json:"alert_topic"`
-	AlertID    string          `json:"alert_id"`
-	Message    string          `json:"message"`
-	Level      alert.Level     `json:"level"`
-	Data       alert.EventData `json:"event_data"`
-	Timestamp  time.Time       `json:"timestamp"`
+	AppKey    string          `json:"app_key"`
+	Message   string          `json:"message"`
+	Level     alert.Level     `json:"level"`
+	Data      alert.EventData `json:"event_data"`
+	Timestamp time.Time       `json:"timestamp"`
 }
 
 func (s *Service) TestOptions() interface{} {
-	layout := "2006-01-02T15:04:05.000Z"
-	str := "2014-11-12T11:45:26.371Z"
-	t, _ := time.Parse(layout, str)
+	t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:01Z")
 
 	return &testOptions{
-		AlertTopic: "test kapacitor alert topic",
-		AlertID:    "foo/bar/bat",
-		Message:    "test teams message",
-		Level:      alert.Critical,
+		AppKey:  "my-app-key-123456",
+		Message: "test bigpanda message",
+		Level:   alert.Critical,
 		Data: alert.EventData{
-			Name:   "testBugPanda",
+			Name:   "testBigPanda",
 			Tags:   make(map[string]string),
 			Fields: make(map[string]interface{}),
 			Result: models.Result{},
@@ -117,12 +112,12 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	//c := s.config()
-	return s.Alert(o.AppKey, o.AlertTopic, o.AlertID, o.Message, o.Level, o.Timestamp, o.Data)
+	return s.Alert(o.AppKey, o.Message, o.Level, o.Timestamp, o.Data)
 }
 
-func (s *Service) Alert(appKey, alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+func (s *Service) Alert(appKey, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
 
-	req, err := s.preparePost(appKey, alertTopic, alertID, message, level, timestamp, data)
+	req, err := s.preparePost(appKey, message, level, timestamp, data)
 
 	if err != nil {
 		return err
@@ -178,7 +173,7 @@ curl -X POST -H "Content-Type: application/json" \
   "primary_property": "application",
   "secondary_property": "host"
 */
-func (s *Service) preparePost(appKey, alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
+func (s *Service) preparePost(appKey, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -256,8 +251,6 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
 		h.c.AppKey,
-		event.Topic,
-		event.State.ID,
 		event.State.Message,
 		event.State.Level,
 		event.State.Time,

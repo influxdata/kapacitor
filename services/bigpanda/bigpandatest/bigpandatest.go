@@ -53,8 +53,7 @@ type Request struct {
 	PostData PostData
 }
 
-// PostData is the default struct to send an element through to PagerDuty
-
+// PostData is the default struct to send an element through to BigPanda
 type PostData struct {
 	AppKey      string `json:"app_key"`
 	Status      string `json:"status"`
