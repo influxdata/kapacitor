@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -515,6 +516,30 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if et.tm.DiscordService != nil &&
 		et.tm.DiscordService.Global() &&
 		et.tm.DiscordService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	for _, s := range n.ServiceNowHandlers {
+		c := servicenow.HandlerConfig{
+			URL:        s.URL,
+			Source:     s.Source,
+			Node:       s.Node,
+			Type:       s.Type,
+			Resource:   s.Resource,
+			MetricName: s.MetricName,
+			MessageKey: s.MessageKey,
+		}
+		h := et.tm.ServiceNowService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.ServiceNowHandlers) == 0 && (et.tm.ServiceNowService != nil && et.tm.ServiceNowService.Global()) {
+		h := et.tm.ServiceNowService.Handler(servicenow.HandlerConfig{}, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	// If servicenow has been configured with state changes only set it.
+	if et.tm.ServiceNowService != nil &&
+		et.tm.ServiceNowService.Global() &&
+		et.tm.ServiceNowService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 

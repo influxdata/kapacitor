@@ -82,7 +82,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "mqtt": null,
     "snmpTrap": null,
     "kafka": null,
-    "teams": null
+    "teams": null,
+    "serviceNow": null
 }`,
 		},
 	}

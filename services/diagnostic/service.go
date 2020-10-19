@@ -478,3 +478,9 @@ func (s *Service) NewTeamsHandler() *TeamsHandler {
 		l: s.Logger.With(String("service", "teams")),
 	}
 }
+
+func (s *Service) NewServiceNowHandler() *ServiceNowHandler {
+	return &ServiceNowHandler{
+		l: s.Logger.With(String("service", "serviceNow")),
+	}
+}

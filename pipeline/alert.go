@@ -56,7 +56,8 @@ type AlertNode struct{ *AlertNodeData }
 //    * Telegram -- Post alert message to Telegram client.
 //    * MQTT -- Post alert message to MQTT.
 //    * Teams -- Post alert message to Microsoft Teams.
-//	  * Discord -- Post alert message to Discord webhook.
+//    * Discord -- Post alert message to Discord webhook.
+//    * ServiceNow -- Post alert message to ServiceNow.
 //
 // See below for more details on configuring each handler.
 //
@@ -395,6 +396,10 @@ type AlertNodeData struct {
 	// Send alert to Microsoft Teams channel.
 	// tick:ignore
 	TeamsHandlers []*TeamsHandler `tick:"Teams" json:"teams"`
+
+	// Send alert to ServiceNow.
+	// tick:ignore
+	ServiceNowHandlers []*ServiceNowHandler `tick:"ServiceNow" json:"serviceNow"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -2118,4 +2123,81 @@ type TeamsHandler struct {
 	// Teams channel webhook URL to post messages.
 	// If empty uses the URL from the configuration.
 	ChannelURL string `json:"channel_url"`
+}
+
+// Send the alert to ServiceNow.
+//
+// Example:
+//    [serviceNow]
+//      enabled = true
+//      url = "https://instance.service-now.com/api/now/v1/table/em_alert"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the room.
+//
+// Example:
+//    stream
+//         |alert()
+//             .serviceNow()
+//
+// If the 'serviceNow' section in the configuration has the option: global = true
+// then all alerts are sent to ServiceNow without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [serviceNow]
+//      enabled = true
+//      url = "https://instance.service-now.com/api/now/v1/table/em_alert"
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to ServiceNow using default url.
+// tick:property
+func (n *AlertNodeData) ServiceNow() *ServiceNowHandler {
+	serviceNow := &ServiceNowHandler{
+		AlertNodeData: n,
+	}
+	n.ServiceNowHandlers = append(n.ServiceNowHandlers, serviceNow)
+	return serviceNow
+}
+
+// tick:embedded:AlertNode.ServiceNow
+type ServiceNowHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// ServiceNow API URL to post alerts.
+	// If empty uses the URL from the configuration.
+	URL string `json:"url"`
+
+	// Username for BASIC authentication.
+	// If empty uses username from the configuration.
+	Username string `json:"username"`
+
+	// Password for BASIC authentication.
+	// If empty uses password from the configuration.
+	Password string `json:"password"`
+
+	// Event source identification (event monitoring software).
+	// If empty uses the URL from the configuration.
+	Source string `json:"source"`
+
+	// Node name.
+	Node string `json:"node"`
+
+	// Metric type.
+	Type string `json:"type"`
+
+	// Node resource relevant to the event.
+	Resource string `json:"resource"`
+
+	// Metric name for which event has been created..
+	MetricName string `json:"metric_name"`
+
+	// Message key.
+	MessageKey string `json:"messageKey"`
 }

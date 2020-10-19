@@ -56,6 +56,8 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/servicenow"
+	"github.com/influxdata/kapacitor/services/servicenow/servicenowtest"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
@@ -7733,6 +7735,93 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "servicenow",
+			setDefaults: func(c *server.Config) {
+				c.ServiceNow.URL = "https://instance.service-now.com/api/now/v1/table/em_alert"
+				c.ServiceNow.Source = "Kapacitor"
+				c.ServiceNow.Username = ""
+				c.ServiceNow.Password = ""
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"global":             false,
+						"state-changes-only": false,
+						"url":                "https://instance.service-now.com/api/now/v1/table/em_alert",
+						"source":             "Kapacitor",
+						"username":           "",
+						"password":           false,
+					},
+					Redacted: []string{
+						"password",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"global":             false,
+					"state-changes-only": false,
+					"url":                "https://instance.service-now.com/api/now/v1/table/em_alert",
+					"source":             "Kapacitor",
+					"username":           "",
+					"password":           false,
+				},
+				Redacted: []string{
+					"password",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled":  true,
+							"url":      "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+							"username": "dev",
+							"password": "12345",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+							Options: map[string]interface{}{
+								"enabled":            true,
+								"global":             false,
+								"state-changes-only": false,
+								"url":                "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+								"source":             "Kapacitor",
+								"username":           "dev",
+								"password":           true,
+							},
+							Redacted: []string{
+								"password",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+						Options: map[string]interface{}{
+							"enabled":            true,
+							"global":             false,
+							"state-changes-only": false,
+							"url":                "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+							"source":             "Kapacitor",
+							"username":           "dev",
+							"password":           true,
+						},
+						Redacted: []string{
+							"password",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "slack",
 			setDefaults: func(c *server.Config) {
 				cfg := &slack.Config{
@@ -8982,6 +9071,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
+				Name: "servicenow",
+				Options: client.ServiceTestOptions{
+					"alert_id": "id",
+					"source":   "Kapacitor",
+					"level":    "CRITICAL",
+					"message":  "test servicenow alert",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
@@ -9130,6 +9229,16 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Name: "serverset",
 				Options: client.ServiceTestOptions{
 					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
+				Name: "servicenow",
+				Options: client.ServiceTestOptions{
+					"alert_id": "id",
+					"source":   "Kapacitor",
+					"level":    "CRITICAL",
+					"message":  "test servicenow alert",
 				},
 			},
 			{
@@ -9313,6 +9422,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "sensu",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "servicenow",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -10316,6 +10433,41 @@ func TestServer_AlertHandlers(t *testing.T) {
 				got := ts.Requests()
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected sensu request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "servicenow",
+				Options: map[string]interface{}{
+					"source": "Kapacitor",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := servicenowtest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.ServiceNow.Enabled = true
+				c.ServiceNow.URL = ts.URL
+				c.ServiceNow.Source = "Kapacitor"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*servicenowtest.Server)
+				ts.Close()
+				exp := []servicenowtest.Request{{
+					URL: "/",
+					Alert: servicenow.Alert{
+						Source:      "Kapacitor",
+						Severity:    "1",
+						Description: "message",
+						MessageKey:  "id",
+					},
+				}}
+				got := ts.Requests()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected servicenow request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

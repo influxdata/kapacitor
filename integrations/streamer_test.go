@@ -62,6 +62,8 @@ import (
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/servicenow"
+	"github.com/influxdata/kapacitor/services/servicenow/servicenowtest"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
@@ -10248,6 +10250,81 @@ stream
 				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
 				Text:     "kapacitor/cpu/serverA is CRITICAL",
 				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertServiceNow(t *testing.T) {
+	ts := servicenowtest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host', 'type')
+	|window()
+		.period(10s)
+		.every(10s)
+	|mean('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "mean" > 15.0)
+		.warn(lambda: "mean" > 50.0)
+		.crit(lambda: "mean" > 90.0)
+		.serviceNow()
+		.serviceNow()
+			.node('{{ index .Tags "host" }}')
+			.type('CPU')
+			.resource('CPU-Total')
+			.metricName('{{ index .Tags "type" }}')
+			.messageKey('Alert: {{ .ID }}')
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := servicenow.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Source = "Kapacitor"
+		sl := servicenow.NewService(c, diagService.NewServiceNowHandler())
+		tm.ServiceNowService = sl
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		servicenowtest.Request{
+			URL: "/",
+			Alert: servicenow.Alert{
+				Source:      "Kapacitor",
+				Node:        "serverA",
+				Type:        "CPU", // literal since there is no tag for this in the testdata
+				Resource:    "CPU-Total", // literal since there is no tag for this in the testdata
+				MetricName:  "idle",
+				MessageKey:  "Alert: kapacitor/cpu/serverA",
+				Severity:    "1",
+				Description: "kapacitor/cpu/serverA is CRITICAL",
+			},
+		},
+		servicenowtest.Request{
+			URL: "/",
+			Alert: servicenow.Alert{
+				Source:      "Kapacitor",
+				MessageKey:  "kapacitor/cpu/serverA",
+				Severity:    "1",
+				Description: "kapacitor/cpu/serverA is CRITICAL",
 			},
 		},
 	}

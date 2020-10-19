@@ -33,6 +33,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
@@ -209,6 +210,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
+	ServiceNowService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(servicenow.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
 
 	Commander command.Commander
 
@@ -305,6 +311,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.Commander = tm.Commander
 	n.SideloadService = tm.SideloadService
 	n.TeamsService = tm.TeamsService
+	n.ServiceNowService = tm.ServiceNowService
 	return n
 }
 
