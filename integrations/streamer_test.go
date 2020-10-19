@@ -10310,7 +10310,7 @@ stream
 			Alert: servicenow.Alert{
 				Source:      "Kapacitor",
 				Node:        "serverA",
-				Type:        "CPU", // literal since there is no tag for this in the testdata
+				Type:        "CPU",       // literal since there is no tag for this in the testdata
 				Resource:    "CPU-Total", // literal since there is no tag for this in the testdata
 				MetricName:  "idle",
 				MessageKey:  "Alert: kapacitor/cpu/serverA",
