@@ -123,6 +123,9 @@ func (s *Service) Alert(url, alertID string, message string, level alert.Level, 
 	}
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
