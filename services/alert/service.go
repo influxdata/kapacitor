@@ -26,6 +26,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -139,6 +140,9 @@ type Service struct {
 	}
 	TeamsService interface {
 		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	ServiceNowService interface {
+		Handler(servicenow.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 }
 
@@ -923,6 +927,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
+		h = newExternalHandler(h)
+	case "servicenow":
+		c := servicenow.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.ServiceNowService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "slack":
 		c := slack.HandlerConfig{}

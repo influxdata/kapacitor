@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
@@ -1354,5 +1355,22 @@ func (h *TeamsHandler) WithContext(ctx ...keyvalue.T) teams.Diagnostic {
 }
 
 func (h *TeamsHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+// ServiceNow handler
+type ServiceNowHandler struct {
+	l Logger
+}
+
+func (h *ServiceNowHandler) WithContext(ctx ...keyvalue.T) servicenow.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &ServiceNowHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *ServiceNowHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }

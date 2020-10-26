@@ -261,7 +261,8 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "mqtt": null,
             "snmpTrap": null,
             "kafka": null,
-            "teams": null
+            "teams": null,
+            "serviceNow": null
         },
         {
             "typeOf": "httpOut",

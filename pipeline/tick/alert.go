@@ -157,6 +157,16 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		}
 	}
 
+	for _, h := range a.ServiceNowHandlers {
+		n.Dot("servicenow").
+			Dot("source", h.Source).
+			Dot("node", h.Node).
+			Dot("type", h.Type).
+			Dot("resource", h.Resource).
+			Dot("metricName", h.MetricName).
+			Dot("messageKey", h.MessageKey)
+	}
+
 	for _, h := range a.SlackHandlers {
 		n.Dot("slack").
 			Dot("workspace", h.Workspace).

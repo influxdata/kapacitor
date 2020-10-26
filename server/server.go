@@ -55,6 +55,7 @@ import (
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/serverset"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/servicetest"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -258,6 +259,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	if err := s.appendHTTPPostService(); err != nil {
 		return nil, errors.Wrap(err, "httppost service")
 	}
+	s.appendServiceNowService()
 	s.appendSMTPService()
 	s.appendTeamsService()
 	s.appendTelegramService()
@@ -999,6 +1001,18 @@ func (s *Server) appendTeamsService() {
 
 	s.SetDynamicService("teams", srv)
 	s.AppendService("teams", srv)
+}
+
+func (s *Server) appendServiceNowService() {
+	c := s.config.ServiceNow
+	d := s.DiagService.NewServiceNowHandler()
+	srv := servicenow.NewService(c, d)
+
+	s.TaskMaster.ServiceNowService = srv
+	s.AlertService.ServiceNowService = srv
+
+	s.SetDynamicService("servicenow", srv)
+	s.AppendService("servicenow", srv)
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.
