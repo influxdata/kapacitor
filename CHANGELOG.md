@@ -6,6 +6,7 @@
 - [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT, thanks @zabullet!
 - [#2388](https://github.com/influxdata/kapacitor/pull/2388): Added templating for the url in the `httpPost` node and the `alert().post()` node.
 - [#2351](https://github.com/influxdata/kapacitor/pull/2351): Upgraded github.com/gorhill/cronexpr, thanks @wuguanyu!
+- [#2416](https://github.com/influxdata/kapacitor/pull/2416): Added a ServiceNow event handler.
 ### Bugfixes
 - [#2201](https://github.com/influxdata/kapacitor/pull/2201): Added missing err check of a buf scanner, thanks @johncming!
 - [#2395](http://github.com/influxdata/kapacitor/pull/2395): Added missing .Details to AlertTemplate.
