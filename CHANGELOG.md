@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## v1.5.6 [2020-10-27]
 
 ### Features
 - [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT, thanks @zabullet!
