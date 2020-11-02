@@ -9765,7 +9765,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alertatest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Alerta.Enabled = true
 				c.Alerta.URL = ts.URL
@@ -9806,7 +9806,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := discordtest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Discord[0].Enabled = true
 				c.Discord[0].URL = ts.URL + "/test/discord/url"
@@ -9847,7 +9847,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				te := alerttest.NewExec()
-				ctxt := context.WithValue(nil, "exec", te)
+				ctxt := context.WithValue(context.Background(), "exec", te)
 				c.Commander = te.Commander
 				return ctxt, nil
 			},
@@ -9885,7 +9885,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := hipchattest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.HipChat.Enabled = true
 				c.HipChat.URL = ts.URL
@@ -9923,7 +9923,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Kafka = kafka.Configs{{
 					Enabled: true,
@@ -9982,7 +9982,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				l := alerttest.NewLog(p)
 
-				ctxt := context.WithValue(nil, "tdir", tdir)
+				ctxt := context.WithValue(context.Background(), "tdir", tdir)
 				ctxt = context.WithValue(ctxt, "log", l)
 				return ctxt, nil
 			},
@@ -10021,7 +10021,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
-				ctxt := context.WithValue(nil, "clientCreator", cc)
+				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
 				cfg := &mqtt.Config{
 					Enabled: true,
 					Name:    "test",
@@ -10068,7 +10068,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
-				ctxt := context.WithValue(nil, "clientCreator", cc)
+				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
 				cfg := &mqtt.Config{
 					Enabled: true,
 					Name:    "test",
@@ -10114,7 +10114,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenietest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.OpsGenie.Enabled = true
 				c.OpsGenie.URL = ts.URL
@@ -10158,7 +10158,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenie2test.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.OpsGenie2.Enabled = true
 				c.OpsGenie2.URL = ts.URL
@@ -10208,7 +10208,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerdutytest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.PagerDuty.Enabled = true
 				c.PagerDuty.URL = ts.URL
@@ -10255,7 +10255,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerduty2test.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.PagerDuty2.Enabled = true
 				c.PagerDuty2.URL = ts.URL
@@ -10317,7 +10317,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"url": ts.URL}
 
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -10340,7 +10340,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := httpposttest.NewAlertServer(nil, true)
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				c.HTTPPost = httppost.Configs{{
 					Endpoint:      "test",
 					URLTemplate:   ts.URL,
@@ -10368,7 +10368,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pushovertest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Pushover.Enabled = true
 				c.Pushover.URL = ts.URL
@@ -10410,7 +10410,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Sensu.Enabled = true
 				c.Sensu.Addr = ts.Addr
@@ -10446,7 +10446,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := servicenowtest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.ServiceNow.Enabled = true
 				c.ServiceNow.URL = ts.URL
@@ -10481,7 +10481,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := slacktest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Slack[0].Enabled = true
 				c.Slack[0].URL = ts.URL + "/test/slack/url"
@@ -10525,7 +10525,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.SMTP.Enabled = true
 				c.SMTP.Host = ts.Host
@@ -10590,7 +10590,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.SNMPTrap.Enabled = true
 				c.SNMPTrap.Addr = ts.Addr
@@ -10642,7 +10642,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := talktest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Talk.Enabled = true
 				c.Talk.URL = ts.URL
@@ -10679,7 +10679,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"address": ts.Addr}
 
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -10699,7 +10699,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := teamstest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Teams.Enabled = true
 				c.Teams.ChannelURL = ts.URL
@@ -10735,7 +10735,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := telegramtest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Telegram.Enabled = true
 				c.Telegram.URL = ts.URL + "/bot"
@@ -10771,7 +10771,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := victoropstest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.VictorOps.Enabled = true
 				c.VictorOps.URL = ts.URL
