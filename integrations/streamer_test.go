@@ -11187,7 +11187,7 @@ func TestStream_Autoscale(t *testing.T) {
 			},
 			setup: func(tm *kapacitor.TaskMaster) context.Context {
 				scaleUpdates := make(chan k8s.Scale, 100)
-				ctx := context.WithValue(nil, "updates", scaleUpdates)
+				ctx := context.WithValue(context.Background(), "updates", scaleUpdates)
 				k8sAutoscale := k8stest.Client{}
 				k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
 					var replicas int32
@@ -11283,7 +11283,7 @@ func TestStream_Autoscale(t *testing.T) {
 			},
 			setup: func(tm *kapacitor.TaskMaster) context.Context {
 				serviceUpdates := make(chan swarm.Service, 100)
-				ctx := context.WithValue(nil, "updates", serviceUpdates)
+				ctx := context.WithValue(context.Background(), "updates", serviceUpdates)
 				swarmAutoscale := swarmtest.Client{}
 				swarmAutoscale.ServiceFunc = func(name string) (*swarm.Service, error) {
 					var replicas uint64
