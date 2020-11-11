@@ -24,11 +24,10 @@ func NewServer() *Server {
 			URL: r.URL.String(),
 		}
 		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pr.Alert)
+		dec.Decode(&pr.Alerts)
 		s.mu.Lock()
 		s.requests = append(s.requests, pr)
 		s.mu.Unlock()
-		w.WriteHeader(http.StatusCreated)
 	}))
 	s.ts = ts
 	s.URL = ts.URL
@@ -50,6 +49,6 @@ func (s *Server) Close() {
 }
 
 type Request struct {
-	URL   string
-	Alert servicenow.Alert
+	URL    string
+	Alerts servicenow.Events
 }

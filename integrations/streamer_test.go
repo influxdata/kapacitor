@@ -10296,7 +10296,7 @@ stream
 
 		c := servicenow.NewConfig()
 		c.Enabled = true
-		c.URL = ts.URL
+		c.URL = ts.URL + "/api/global/em/jsonv2"
 		c.Source = "Kapacitor"
 		sl := servicenow.NewService(c, diagService.NewServiceNowHandler())
 		tm.ServiceNowService = sl
@@ -10306,25 +10306,33 @@ stream
 
 	exp := []interface{}{
 		servicenowtest.Request{
-			URL: "/",
-			Alert: servicenow.Alert{
-				Source:      "Kapacitor",
-				Node:        "serverA",
-				Type:        "CPU",       // literal since there is no tag for this in the testdata
-				Resource:    "CPU-Total", // literal since there is no tag for this in the testdata
-				MetricName:  "idle",
-				MessageKey:  "Alert: kapacitor/cpu/serverA",
-				Severity:    "1",
-				Description: "kapacitor/cpu/serverA is CRITICAL",
+			URL: "/api/global/em/jsonv2",
+			Alerts: servicenow.Events{
+				Records: []servicenow.Event{
+					{
+						Source:      "Kapacitor",
+						Node:        "serverA",
+						Type:        "CPU",       // literal since there is no tag for this in the testdata
+						Resource:    "CPU-Total", // literal since there is no tag for this in the testdata
+						MetricName:  "idle",
+						MessageKey:  "Alert: kapacitor/cpu/serverA",
+						Severity:    "1",
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+					},
+				},
 			},
 		},
 		servicenowtest.Request{
-			URL: "/",
-			Alert: servicenow.Alert{
-				Source:      "Kapacitor",
-				MessageKey:  "kapacitor/cpu/serverA",
-				Severity:    "1",
-				Description: "kapacitor/cpu/serverA is CRITICAL",
+			URL: "/api/global/em/jsonv2",
+			Alerts: servicenow.Events{
+				Records: []servicenow.Event{
+					{
+						Source:      "Kapacitor",
+						MessageKey:  "kapacitor/cpu/serverA",
+						Severity:    "1",
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+					},
+				},
 			},
 		},
 	}

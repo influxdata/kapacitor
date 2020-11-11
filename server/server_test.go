@@ -7737,7 +7737,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "servicenow",
 			setDefaults: func(c *server.Config) {
-				c.ServiceNow.URL = "https://instance.service-now.com/api/now/v1/table/em_alert"
+				c.ServiceNow.URL = "https://instance.service-now.com/api/global/em/jsonv2"
 				c.ServiceNow.Source = "Kapacitor"
 				c.ServiceNow.Username = ""
 				c.ServiceNow.Password = ""
@@ -7750,7 +7750,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"enabled":            false,
 						"global":             false,
 						"state-changes-only": false,
-						"url":                "https://instance.service-now.com/api/now/v1/table/em_alert",
+						"url":                "https://instance.service-now.com/api/global/em/jsonv2",
 						"source":             "Kapacitor",
 						"username":           "",
 						"password":           false,
@@ -7766,7 +7766,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"enabled":            false,
 					"global":             false,
 					"state-changes-only": false,
-					"url":                "https://instance.service-now.com/api/now/v1/table/em_alert",
+					"url":                "https://instance.service-now.com/api/global/em/jsonv2",
 					"source":             "Kapacitor",
 					"username":           "",
 					"password":           false,
@@ -7780,7 +7780,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
 							"enabled":  true,
-							"url":      "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+							"url":      "https://dev12345.service-now.com/api/global/em/jsonv2",
 							"username": "dev",
 							"password": "12345",
 						},
@@ -7793,7 +7793,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"enabled":            true,
 								"global":             false,
 								"state-changes-only": false,
-								"url":                "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+								"url":                "https://dev12345.service-now.com/api/global/em/jsonv2",
 								"source":             "Kapacitor",
 								"username":           "dev",
 								"password":           true,
@@ -7809,7 +7809,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"enabled":            true,
 							"global":             false,
 							"state-changes-only": false,
-							"url":                "https://dev12345.service-now.com/api/now/v1/table/em_alert",
+							"url":                "https://dev12345.service-now.com/api/global/em/jsonv2",
 							"source":             "Kapacitor",
 							"username":           "dev",
 							"password":           true,
@@ -10449,7 +10449,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.ServiceNow.Enabled = true
-				c.ServiceNow.URL = ts.URL
+				c.ServiceNow.URL = ts.URL + "/api/global/em/jsonv2"
 				c.ServiceNow.Source = "Kapacitor"
 				return ctxt, nil
 			},
@@ -10457,12 +10457,16 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ts := ctxt.Value("server").(*servicenowtest.Server)
 				ts.Close()
 				exp := []servicenowtest.Request{{
-					URL: "/",
-					Alert: servicenow.Alert{
-						Source:      "Kapacitor",
-						Severity:    "1",
-						Description: "message",
-						MessageKey:  "id",
+					URL: "/api/global/em/jsonv2",
+					Alerts: servicenow.Events{
+						Records: []servicenow.Event{
+							{
+								Source:      "Kapacitor",
+								Severity:    "1",
+								Description: "message",
+								MessageKey:  "id",
+							},
+						},
 					},
 				}}
 				got := ts.Requests()

@@ -2130,7 +2130,7 @@ type TeamsHandler struct {
 // Example:
 //    [serviceNow]
 //      enabled = true
-//      url = "https://instance.service-now.com/api/now/v1/table/em_alert"
+//      url = "https://instance.service-now.com/api/global/em/jsonv2"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
@@ -2148,7 +2148,7 @@ type TeamsHandler struct {
 // Example:
 //    [serviceNow]
 //      enabled = true
-//      url = "https://instance.service-now.com/api/now/v1/table/em_alert"
+//      url = "https://instance.service-now.com/api/global/em/jsonv2"
 //      global = true
 //      state-changes-only = true
 //

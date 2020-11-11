@@ -128,7 +128,7 @@ func (s *Service) Alert(url, alertID string, message string, level alert.Level, 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -148,11 +148,8 @@ func (s *Service) Alert(url, alertID string, message string, level alert.Level, 
 	return nil
 }
 
-// Alert is a structure representing ServiceNow alert. It can also represent an Event.
-// See:
-// https://docs.servicenow.com/bundle/paris-it-operations-management/page/product/event-management/task/t_EMViewAlert.html
-// https://docs.servicenow.com/bundle/paris-it-operations-management/page/product/event-management/task/t_EMManageEvent.html
-type Alert struct {
+// Event is a structure representing ServiceNow event. It can also represent an alert.
+type Event struct {
 	Source      string `json:"source"`
 	Node        string `json:"node"`
 	Type        string `json:"type"`
@@ -161,6 +158,12 @@ type Alert struct {
 	MessageKey  string `json:"message_key"`
 	Severity    string `json:"severity"`
 	Description string `json:"description"`
+}
+
+// ServiceNow provides web service API which is recommended for publishing events. Multiple events can be published in a single call.
+// https://docs.servicenow.com/bundle/paris-it-operations-management/page/product/event-management/task/send-events-via-web-service.html
+type Events struct {
+	Records []Event `json:"records"`
 }
 
 func (s *Service) preparePost(url, alertID, message string, level alert.Level, data *alert.EventData, hc *HandlerConfig) (string, io.Reader, error) {
@@ -248,18 +251,22 @@ func (s *Service) preparePost(url, alertID, message string, level alert.Level, d
 		severity = 1
 	}
 
-	instance := &Alert{
-		Source:      cutoff(source, usualCutoff),
-		Node:        cutoff(node, usualCutoff),
-		Type:        cutoff(metricType, usualCutoff),
-		Resource:    cutoff(resource, usualCutoff),
-		MetricName:  cutoff(metricName, usualCutoff),
-		MessageKey:  cutoff(messageKey, 1024),
-		Severity:    strconv.Itoa(severity),
-		Description: cutoff(message, 4000),
+	payload := &Events{
+		Records: []Event{
+			{
+				Source:      cutoff(source, usualCutoff),
+				Node:        cutoff(node, usualCutoff),
+				Type:        cutoff(metricType, usualCutoff),
+				Resource:    cutoff(resource, usualCutoff),
+				MetricName:  cutoff(metricName, usualCutoff),
+				MessageKey:  cutoff(messageKey, 1024),
+				Severity:    strconv.Itoa(severity),
+				Description: cutoff(message, 4000),
+			},
+		},
 	}
 
-	postBytes, err := json.Marshal(instance)
+	postBytes, err := json.Marshal(payload)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "error marshaling alert struct")
 	}
@@ -276,8 +283,8 @@ type dataInfo struct {
 }
 
 type HandlerConfig struct {
-	// Alerts API URL used to post messages.
-	// If empty uses the alerts API URL from the configuration.
+	// web service URL used to post messages.
+	// If empty uses the service URL from the configuration.
 	URL string `mapstructure:"url"`
 
 	// Username for BASIC authentication.
