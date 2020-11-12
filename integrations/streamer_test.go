@@ -9283,7 +9283,7 @@ stream
 				AppKey:    "111111",
 				Status:    "critical",
 				Host:      "serverA",
-				Timestamp: "1971-01-01T00:00:10.000000000Z",
+				Timestamp: 31536010,
 			},
 		},
 		bigpandatest.Request{
@@ -9293,7 +9293,7 @@ stream
 				AppKey:    "222222",
 				Status:    "critical",
 				Host:      "serverA",
-				Timestamp: "1971-01-01T00:00:10.000000000Z",
+				Timestamp: 31536010,
 			},
 		},
 		bigpandatest.Request{
@@ -9303,7 +9303,7 @@ stream
 				AppKey:    "XXXXXXX",
 				Status:    "critical",
 				Host:      "serverA",
-				Timestamp: "1971-01-01T00:00:10.000000000Z",
+				Timestamp: 31536010,
 			},
 		},
 	}

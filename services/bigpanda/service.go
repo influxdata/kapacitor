@@ -195,7 +195,7 @@ func (s *Service) preparePost(appKey, message string, level alert.Level, timesta
 
 	bpData := make(map[string]interface{})
 	bpData["check"] = message
-	bpData["timestamp"] = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
+	bpData["timestamp"] = timestamp.Unix()
 	bpData["status"] = status
 
 	if appKey == "" {

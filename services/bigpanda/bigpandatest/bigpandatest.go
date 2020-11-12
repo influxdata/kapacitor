@@ -58,7 +58,7 @@ type PostData struct {
 	AppKey      string `json:"app_key"`
 	Status      string `json:"status"`
 	Host        string `json:"host"`
-	Timestamp   string `json:"timestamp"`
+	Timestamp   int64  `json:"timestamp"`
 	Check       string `json:"check"`
 	Description string `json:"description"`
 	Cluster     string `json:"cluster"`

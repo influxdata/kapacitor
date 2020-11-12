@@ -9843,7 +9843,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					PostData: bigpandatest.PostData{
 						AppKey:    "my-app-key-123456",
 						Status:    "critical",
-						Timestamp: "1970-01-01T00:00:00.000000000Z",
+						Timestamp: 0,
 						Check:     "message",
 					},
 				}}
