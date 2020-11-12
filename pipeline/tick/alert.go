@@ -165,6 +165,16 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("resource", h.Resource).
 			Dot("metricName", h.MetricName).
 			Dot("messageKey", h.MessageKey)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.AdditionalInfoMap))
+		for k := range h.AdditionalInfoMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("additionalInfo", k, h.AdditionalInfoMap[k])
+		}
 	}
 
 	for _, h := range a.SlackHandlers {

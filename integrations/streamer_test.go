@@ -10291,6 +10291,8 @@ stream
 			.resource('CPU-Total')
 			.metricName('{{ index .Tags "type" }}')
 			.messageKey('Alert: {{ .ID }}')
+			.additionalInfo('link', 'http://push/alert?id={{ .ID }}')
+			.additionalInfo('ticks', 666)
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 
@@ -10310,14 +10312,15 @@ stream
 			Alerts: servicenow.Events{
 				Records: []servicenow.Event{
 					{
-						Source:      "Kapacitor",
-						Node:        "serverA",
-						Type:        "CPU",       // literal since there is no tag for this in the testdata
-						Resource:    "CPU-Total", // literal since there is no tag for this in the testdata
-						MetricName:  "idle",
-						MessageKey:  "Alert: kapacitor/cpu/serverA",
-						Severity:    "1",
-						Description: "kapacitor/cpu/serverA is CRITICAL",
+						Source:         "Kapacitor",
+						Node:           "serverA",
+						Type:           "CPU",       // literal since there is no tag for this in the testdata
+						Resource:       "CPU-Total", // literal since there is no tag for this in the testdata
+						MetricName:     "idle",
+						MessageKey:     "Alert: kapacitor/cpu/serverA",
+						Severity:       "1",
+						Description:    "kapacitor/cpu/serverA is CRITICAL",
+						AdditionalInfo: "{\"link\":\"http://push/alert?id=kapacitor/cpu/serverA\",\"ticks\":\"666\"}",
 					},
 				},
 			},

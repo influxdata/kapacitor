@@ -150,14 +150,15 @@ func (s *Service) Alert(url, alertID string, message string, level alert.Level, 
 
 // Event is a structure representing ServiceNow event. It can also represent an alert.
 type Event struct {
-	Source      string `json:"source"`
-	Node        string `json:"node"`
-	Type        string `json:"type"`
-	Resource    string `json:"resource"`
-	MetricName  string `json:"metric_name"`
-	MessageKey  string `json:"message_key"`
-	Severity    string `json:"severity"`
-	Description string `json:"description"`
+	Source         string `json:"source"`
+	Node           string `json:"node,omitempty"`
+	Type           string `json:"type,omitempty"`
+	Resource       string `json:"resource,omitempty"`
+	MetricName     string `json:"metric_name,omitempty"`
+	MessageKey     string `json:"message_key,omitempty"`
+	Severity       string `json:"severity,omitempty"`
+	Description    string `json:"description,omitempty"`
+	AdditionalInfo string `json:"additional_info,omitempty"`
 }
 
 // ServiceNow provides web service API which is recommended for publishing events. Multiple events can be published in a single call.
@@ -234,6 +235,26 @@ func (s *Service) preparePost(url, alertID, message string, level alert.Level, d
 	if err != nil {
 		return "", nil, err
 	}
+	aiBytes := []byte("")
+	if len(hc.AdditionalInfo) > 0 {
+		additionalInfo := make(map[string]string, 0)
+		for key, value := range hc.AdditionalInfo {
+			switch v := value.(type) {
+			case string:
+				rv, err := render("additional_info."+key, v)
+				if err != nil {
+					return "", nil, err
+				}
+				additionalInfo[key] = rv
+			default:
+				additionalInfo[key] = fmt.Sprintf("%v", v)
+			}
+		}
+		aiBytes, err = json.Marshal(additionalInfo)
+		if err != nil {
+			return "", nil, errors.Wrap(err, "error marshaling additional_info map")
+		}
+	}
 	if messageKey == "" { // fallback to alert ID if empty
 		messageKey = alertID
 	}
@@ -254,21 +275,22 @@ func (s *Service) preparePost(url, alertID, message string, level alert.Level, d
 	payload := &Events{
 		Records: []Event{
 			{
-				Source:      cutoff(source, usualCutoff),
-				Node:        cutoff(node, usualCutoff),
-				Type:        cutoff(metricType, usualCutoff),
-				Resource:    cutoff(resource, usualCutoff),
-				MetricName:  cutoff(metricName, usualCutoff),
-				MessageKey:  cutoff(messageKey, 1024),
-				Severity:    strconv.Itoa(severity),
-				Description: cutoff(message, 4000),
+				Source:         cutoff(source, usualCutoff),
+				Node:           cutoff(node, usualCutoff),
+				Type:           cutoff(metricType, usualCutoff),
+				Resource:       cutoff(resource, usualCutoff),
+				MetricName:     cutoff(metricName, usualCutoff),
+				MessageKey:     cutoff(messageKey, 1024),
+				Severity:       strconv.Itoa(severity),
+				Description:    cutoff(message, 4000),
+				AdditionalInfo: string(aiBytes),
 			},
 		},
 	}
 
 	postBytes, err := json.Marshal(payload)
 	if err != nil {
-		return "", nil, errors.Wrap(err, "error marshaling alert struct")
+		return "", nil, errors.Wrap(err, "error marshaling event struct")
 	}
 
 	return u.String(), bytes.NewBuffer(postBytes), nil
@@ -308,11 +330,14 @@ type HandlerConfig struct {
 	// Node resource relevant to the event.
 	Resource string `json:"resource"`
 
-	// Metric name for which event has been created..
+	// Metric name for which event has been created.
 	MetricName string `json:"metric_name"`
 
-	// Message key that identifies related event..
-	MessageKey string `json:"messageKey"`
+	// Message key that identifies related event.
+	MessageKey string `json:"message_key"`
+
+	// Addition info is a map of key value pairs.
+	AdditionalInfo map[string]interface{} `mapstructure:"additional_info"`
 }
 
 type handler struct {

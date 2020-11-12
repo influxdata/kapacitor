@@ -2199,5 +2199,19 @@ type ServiceNowHandler struct {
 	MetricName string `json:"metric_name"`
 
 	// Message key.
-	MessageKey string `json:"messageKey"`
+	MessageKey string `json:"message_key"`
+
+	// Addition info.
+	// tick:ignore
+	AdditionalInfoMap map[string]interface{} `tick:"AdditionalInfo" json:"additional_info"`
+}
+
+// AdditionalInfo adds key values pairs to the request.
+// tick:property
+func (s *ServiceNowHandler) AdditionalInfo(key string, value interface{}) *ServiceNowHandler {
+	if s.AdditionalInfoMap == nil {
+		s.AdditionalInfoMap = make(map[string]interface{})
+	}
+	s.AdditionalInfoMap[key] = value
+	return s
 }
