@@ -62,4 +62,6 @@ type PostData struct {
 	Check       string `json:"check"`
 	Description string `json:"description"`
 	Cluster     string `json:"cluster"`
+	Task        string `json:"task"`
+	Details     string `json:"details"`
 }

@@ -7,9 +7,11 @@ import (
 	"fmt"
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/models"
+	"html"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -112,12 +114,11 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	//c := s.config()
-	return s.Alert(o.AppKey, o.Message, o.Level, o.Timestamp, o.Data)
+	return s.Alert(o.AppKey, "", o.Message, "", o.Level, o.Timestamp, o.Data)
 }
 
-func (s *Service) Alert(appKey, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-
-	req, err := s.preparePost(appKey, message, level, timestamp, data)
+func (s *Service) Alert(appKey, id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+	req, err := s.preparePost(appKey, id, message, details, level, timestamp, data)
 
 	if err != nil {
 		return err
@@ -173,7 +174,7 @@ curl -X POST -H "Content-Type: application/json" \
   "primary_property": "application",
   "secondary_property": "host"
 */
-func (s *Service) preparePost(appKey, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
+func (s *Service) preparePost(appKey, id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -194,7 +195,24 @@ func (s *Service) preparePost(appKey, message string, level alert.Level, timesta
 	}
 
 	bpData := make(map[string]interface{})
-	bpData["check"] = message
+
+	if message != "" {
+		bpData["description"] = message
+	}
+
+	//ignore default details containing full json event
+	if details != "" {
+		unescapeString := html.UnescapeString(details)
+		if !strings.HasPrefix(unescapeString, "{") {
+			bpData["details"] = unescapeString
+		}
+	}
+
+	if id != "" {
+		bpData["check"] = id
+	}
+
+	bpData["task"] = fmt.Sprintf("%s:%s", data.TaskName, data.Name)
 	bpData["timestamp"] = timestamp.Unix()
 	bpData["status"] = status
 
@@ -251,7 +269,9 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
 		h.c.AppKey,
+		event.State.ID,
 		event.State.Message,
+		event.State.Details,
 		event.State.Level,
 		event.State.Time,
 		event.Data,

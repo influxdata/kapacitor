@@ -9247,6 +9247,8 @@ stream
 	|count('value')
 	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }} @{{.Time}}')
+		.details('https://example.org/link')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
@@ -9279,31 +9281,40 @@ stream
 		bigpandatest.Request{
 			URL: "/test/bigpanda/url",
 			PostData: bigpandatest.PostData{
-				Check:     "kapacitor/cpu/serverA is CRITICAL",
-				AppKey:    "111111",
-				Status:    "critical",
-				Host:      "serverA",
-				Timestamp: 31536010,
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "111111",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
 			},
 		},
 		bigpandatest.Request{
 			URL: "/test/bigpanda/url",
 			PostData: bigpandatest.PostData{
-				Check:     "kapacitor/cpu/serverA is CRITICAL",
-				AppKey:    "222222",
-				Status:    "critical",
-				Host:      "serverA",
-				Timestamp: 31536010,
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "222222",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
 			},
 		},
 		bigpandatest.Request{
 			URL: "/test/bigpanda/url",
 			PostData: bigpandatest.PostData{
-				Check:     "kapacitor/cpu/serverA is CRITICAL",
-				AppKey:    "XXXXXXX",
-				Status:    "critical",
-				Host:      "serverA",
-				Timestamp: 31536010,
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "XXXXXXX",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
 			},
 		},
 	}
