@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
@@ -243,6 +244,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 
 	// Append Alert integration services
 	s.appendAlertaService()
+	if err := s.appendBigPandaService(); err != nil {
+		return nil, errors.Wrap(err, "bigpanda service")
+	}
 	if err := s.appendDiscordService(); err != nil {
 		return nil, errors.Wrap(err, "discord service")
 	}
@@ -774,6 +778,22 @@ func (s *Server) appendAlertaService() {
 
 	s.SetDynamicService("alerta", srv)
 	s.AppendService("alerta", srv)
+}
+
+func (s *Server) appendBigPandaService() error {
+	c := s.config.BigPanda
+	d := s.DiagService.NewBigPandaHandler()
+	srv, err := bigpanda.NewService(c, d)
+	if err != nil {
+		return err
+	}
+
+	s.TaskMaster.BigPandaService = srv
+	s.AlertService.BigPandaService = srv
+
+	s.SetDynamicService("bigpanda", srv)
+	s.AppendService("bigpanda", srv)
+	return nil
 }
 
 func (s *Server) appendDiscordService() error {

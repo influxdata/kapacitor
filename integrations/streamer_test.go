@@ -41,6 +41,8 @@ import (
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/bigpanda"
+	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
@@ -9214,6 +9216,105 @@ stream
 						Timestamp:   "",
 					},
 				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertBigPanda(t *testing.T) {
+	ts := bigpandatest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }} @{{.Time}}')
+		.details('https://example.org/link')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.bigPanda()
+			.AppKey('111111')
+		.bigPanda()
+			.AppKey('222222')
+		.bigPanda()
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := bigpanda.NewConfig()
+		c.Enabled = true
+		c.AppKey = "XXXXXXX"
+		c.Token = "testtoken1231234"
+		c.URL = ts.URL + "/test/bigpanda/url"
+
+		d := diagService.NewBigPandaHandler().WithContext(keyvalue.KV("test", "111"))
+		sl, err := bigpanda.NewService(c, d)
+		if err != nil {
+			t.Error(err)
+		}
+
+		tm.BigPandaService = sl
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		bigpandatest.Request{
+			URL: "/test/bigpanda/url",
+			PostData: bigpandatest.PostData{
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "111111",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
+			},
+		},
+		bigpandatest.Request{
+			URL: "/test/bigpanda/url",
+			PostData: bigpandatest.PostData{
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "222222",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
+			},
+		},
+		bigpandatest.Request{
+			URL: "/test/bigpanda/url",
+			PostData: bigpandatest.PostData{
+				Check:       "kapacitor/cpu/serverA",
+				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				AppKey:      "XXXXXXX",
+				Status:      "critical",
+				Host:        "serverA",
+				Timestamp:   31536010,
+				Task:        "TestStream_Alert:cpu",
+				Details:     "https://example.org/link",
 			},
 		},
 	}

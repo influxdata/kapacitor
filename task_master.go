@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
 	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/hipchat"
@@ -156,6 +157,11 @@ type TaskMaster struct {
 		Global() bool
 		StateChangesOnly() bool
 		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
+	BigPandaService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(bigpanda.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SlackService interface {
 		Global() bool
@@ -299,6 +305,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PushoverService = tm.PushoverService
 	n.HTTPPostService = tm.HTTPPostService
 	n.DiscordService = tm.DiscordService
+	n.BigPandaService = tm.BigPandaService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService

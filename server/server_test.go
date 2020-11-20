@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/discord/discordtest"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
@@ -39,6 +37,8 @@ import (
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
@@ -8851,6 +8851,28 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
+				Name: "bigpanda",
+				Options: client.ServiceTestOptions{
+					"app_key":   "my-app-key-123456",
+					"level":     "CRITICAL",
+					"message":   "test bigpanda message",
+					"timestamp": "1970-01-01T00:00:01Z",
+					"event_data": map[string]interface{}{
+						"Fields": map[string]interface{}{},
+						"Result": map[string]interface{}{
+							"series": interface{}(nil),
+						},
+						"Name":        "testBigPanda",
+						"TaskName":    "",
+						"Group":       "",
+						"Tags":        map[string]interface{}{},
+						"Recoverable": false,
+						"Category":    "",
+					},
+				},
+			},
+			{
 				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/consul"},
 				Name: "consul",
 				Options: client.ServiceTestOptions{
@@ -9791,6 +9813,45 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "bigpanda",
+				Options: map[string]interface{}{
+					"app-key": "my-app-key-123456",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := bigpandatest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.BigPanda.Enabled = true
+				c.BigPanda.Token = "my-token-123"
+				c.BigPanda.AppKey = "my-app-key"
+				c.BigPanda.URL = ts.URL + "/test/bigpanda/alert"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*bigpandatest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []bigpandatest.Request{{
+					URL: "/test/bigpanda/alert",
+					PostData: bigpandatest.PostData{
+						AppKey:      "my-app-key-123456",
+						Check:       "id",
+						Status:      "critical",
+						Timestamp:   0,
+						Task:        "testAlertHandlers:alert",
+						Description: "message",
+						Details:     "details",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected bigpanda request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},
