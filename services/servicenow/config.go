@@ -9,7 +9,7 @@ import (
 type Config struct {
 	// Whether ServiceNow integration is enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
-	// ServiceNow alerts API URL.
+	// ServiceNow events API URL.
 	URL string `toml:"url" override:"url"`
 	// Event source.
 	Source string `toml:"source" override:"source"`
@@ -25,12 +25,14 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		URL: "https://instance.service-now.com/api/global/em/jsonv2", // dummy default
+	}
 }
 
 func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
-		return errors.New("must specify Alerts URL")
+		return errors.New("must specify events URL")
 	}
 	if _, err := url.Parse(c.URL); err != nil {
 		return errors.Wrapf(err, "invalid url %q", c.URL)
