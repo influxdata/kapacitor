@@ -113,7 +113,6 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	//c := s.config()
 	return s.Alert(o.AppKey, "", o.Message, "", o.Level, o.Timestamp, o.Data)
 }
 
