@@ -160,6 +160,30 @@ func TestAlertHTTPPostEmptyURL(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertHTTPPostSkipSSLVerify(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Post("http://coinop.com", "http://polybius.gov")
+	handler.Endpoint = "CIA"
+	handler.Header("publisher", "Sinneslöschen")
+	handler.CaptureResponseFlag = true
+	handler.SkipSSLVerificationFlag = true
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .post('http://coinop.com')
+        .endpoint('CIA')
+        .captureResponse()
+        .skipSSLVerification()
+        .header('publisher', 'Sinneslöschen')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertTCP(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Tcp("echo:7")
@@ -200,6 +224,7 @@ func TestAlertTCPJSON(t *testing.T) {
         "pushover": null,
         "sensu": null,
         "slack": null,
+		"discord": null,
         "telegram": null,
         "hipChat": null,
         "alerta": null,
@@ -314,6 +339,7 @@ func TestAlertPagerDuty2(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().PagerDuty2()
 	handler.RoutingKey = "LeafsNation"
+	handler.Link("https://example.com/chart", "some chart")
 
 	want := `stream
     |from()
@@ -324,6 +350,49 @@ func TestAlertPagerDuty2(t *testing.T) {
         .history(21)
         .pagerDuty2()
         .routingKey('LeafsNation')
+        .link('https://example.com/chart', 'some chart')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertPagerDuty2MissingLinkText(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().PagerDuty2()
+	handler.RoutingKey = "LeafsNation"
+	handler.Link("https://example.com/chart")
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .pagerDuty2()
+        .routingKey('LeafsNation')
+        .link('https://example.com/chart')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertPagerDuty2MultipleLinks(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().PagerDuty2()
+	handler.RoutingKey = "LeafsNation"
+	handler.Link("https://example.com/chart", "some chart")
+	handler.Link("https://example.com/details", "details")
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .pagerDuty2()
+        .routingKey('LeafsNation')
+        .link('https://example.com/chart', 'some chart')
+        .link('https://example.com/details', 'details')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
@@ -379,6 +448,11 @@ func TestAlertSensu(t *testing.T) {
 	handler := from.Alert().Sensu()
 	handler.Source = "Henry Hill"
 	handler.Handlers("FBI", "Witness", "Protection")
+	handler.MetadataMap = map[string]interface{}{
+		"k1": "v1",
+		"k2": int64(5),
+		"k3": float64(5),
+	}
 
 	want := `stream
     |from()
@@ -390,6 +464,9 @@ func TestAlertSensu(t *testing.T) {
         .sensu()
         .source('Henry Hill')
         .handlers('FBI', 'Witness', 'Protection')
+        .metadata('k1', 'v1')
+        .metadata('k2', 5)
+        .metadata('k3', 5.0)
 `
 	PipelineTickTestHelper(t, pipe, want)
 }

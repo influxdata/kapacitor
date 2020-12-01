@@ -1,9 +1,11 @@
 package mqtt
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"sync"
+	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -64,6 +66,7 @@ const (
 type Service struct {
 	diag Diagnostic
 
+	bufPool sync.Pool
 	mu      sync.RWMutex
 	clients map[string]Client
 	configs map[string]Config
@@ -93,7 +96,12 @@ func NewService(cs Configs, d Diagnostic) (*Service, error) {
 	}
 
 	return &Service{
-		diag:              d,
+		diag: d,
+		bufPool: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 		configs:           configs,
 		clients:           clients,
 		defaultBrokerName: defaultBrokerName,
@@ -208,21 +216,29 @@ func (s *Service) update(cs Configs) error {
 	return nil
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
 	d := s.diag.WithContext(ctx...)
 	d.CreatingAlertHandler(c)
+
+	topicTmpl, err := text.New("topic").Parse(c.Topic)
+	if err != nil {
+		return nil, err
+	}
+	c.TopicTemplate = topicTmpl
+
 	return &handler{
 		s:    s,
 		c:    c,
 		diag: d,
-	}
+	}, nil
 }
 
 type HandlerConfig struct {
-	BrokerName string   `mapstructure:"broker-name"`
-	Topic      string   `mapstructure:"topic"`
-	QoS        QoSLevel `mapstructure:"qos"`
-	Retained   bool     `mapstructure:"retained"`
+	BrokerName    string         `mapstructure:"broker-name"`
+	Topic         string         `mapstructure:"topic"`
+	QoS           QoSLevel       `mapstructure:"qos"`
+	Retained      bool           `mapstructure:"retained"`
+	TopicTemplate *text.Template `mapstructure:"topic-template"`
 }
 
 type handler struct {
@@ -233,9 +249,28 @@ type handler struct {
 
 func (h *handler) Handle(event alert.Event) {
 	h.diag.HandlingEvent()
-	if err := h.s.Alert(h.c.BrokerName, h.c.Topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
+	topic, err := h.renderTopic(h.c.TopicTemplate, event)
+	if err != nil {
+		h.diag.Error("failed to create MQTT topic from template", err)
+	} else if err = h.s.Alert(h.c.BrokerName, topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
 		h.diag.Error("failed to post message to MQTT broker", err)
 	}
+}
+
+func (h *handler) renderTopic(topicTmpl *text.Template, event alert.Event) (string, error) {
+	td := event.TemplateData()
+
+	topicBuf := h.s.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		topicBuf.Reset()
+		h.s.bufPool.Put(topicBuf)
+	}()
+
+	err := topicTmpl.Execute(topicBuf, td)
+	if err != nil {
+		return "", err
+	}
+	return topicBuf.String(), nil
 }
 
 type testOptions struct {

@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -25,6 +26,11 @@ func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, d NodeDiagnostic) (*
 	if en == nil {
 		return nil, fmt.Errorf("no node found for %s", n.SourceNode.Name())
 	}
+
+	if n.Interval <= 0 {
+		return nil, errors.New("stats node must have positive interval")
+	}
+
 	sn := &StatsNode{
 		node:    node{Node: n, et: et, diag: d},
 		s:       n,
@@ -41,7 +47,11 @@ func (n *StatsNode) runStats([]byte) error {
 		// Wait till we are roughly aligned with the interval.
 		now := time.Now()
 		next := now.Truncate(n.s.Interval).Add(n.s.Interval)
-		after := time.NewTicker(next.Sub(now))
+		dur := next.Sub(now)
+		if dur <= 0 { // this can happen during a time-changeover like a leap second, or if something is messing about with the system
+			return errors.New("alignment interval should be positive but was not")
+		}
+		after := time.NewTicker(dur)
 		select {
 		case <-after.C:
 			after.Stop()
@@ -52,6 +62,9 @@ func (n *StatsNode) runStats([]byte) error {
 		if err := n.emit(now); err != nil {
 			return err
 		}
+	}
+	if n.s.Interval <= 0 {
+		return errors.New("stats interval should be positive but was not")
 	}
 	ticker := time.NewTicker(n.s.Interval)
 	defer ticker.Stop()

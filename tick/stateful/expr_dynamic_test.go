@@ -30,6 +30,7 @@ type testCase struct {
 // runDyanmicTestCase is when we want to change the "dyanmism" of
 // a node - type change or value change
 func runDynamicTestCase(t *testing.T, tc testCase) {
+	t.Helper()
 	se := mustCompileExpression(tc.Node)
 
 	for i, expectation := range tc.Expectations {
@@ -50,8 +51,11 @@ func runDynamicTestCase(t *testing.T, tc testCase) {
 			result, err = se.Eval(scope)
 		}
 
-		if err != nil {
-			if expectation.ExpectedError == nil {
+		if err != nil || expectation.ExpectedError != nil {
+			if err == nil {
+				t.Errorf("%s, %s, Iteration: %v: Expected %v error, but got nil", tc.Title, evaluationType, (i + 1), expectation.ExpectedError)
+
+			} else if expectation.ExpectedError == nil {
 				t.Errorf("%s: %s: Iteration %v: Got unexpected error while expecting for result:\n %v\n", tc.Title, evaluationType, (i + 1), err)
 				continue
 			} else if err.Error() != expectation.ExpectedError.Error() {
@@ -67,94 +71,12 @@ func runDynamicTestCase(t *testing.T, tc testCase) {
 }
 
 func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
+	t.Run("BinaryNode - EvalBool supports numeric type changes", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
 
-	runDynamicTestCase(t, testCase{
-		Title: "BinaryNode - EvalBool supports numeric type changes",
-
-		Node: &ast.BinaryNode{
-			Operator: ast.TokenGreater,
-			Left: &ast.ReferenceNode{
-				Reference: "value",
-			},
-			Right: &ast.NumberNode{
-				IsFloat: true,
-				Float64: float64(10),
-			},
-		},
-
-		Expectations: []valueExpectation{
-			{IsEvalBool: true, Value: float64(20), ExpectedError: nil, ExpectedResult: true},
-			{IsEvalBool: true, Value: int64(5), ExpectedError: nil, ExpectedResult: false},
-		},
-	})
-
-	runDynamicTestCase(t, testCase{
-		Title: "BinaryNode - EvalNum supports numeric type changes",
-
-		Node: &ast.BinaryNode{
-			Operator: ast.TokenPlus,
-			Left: &ast.ReferenceNode{
-				Reference: "value",
-			},
-			Right: &ast.NumberNode{
-				IsFloat: true,
-				Float64: float64(10),
-			},
-		},
-
-		Expectations: []valueExpectation{
-			{
-				IsEvalNum:      true,
-				Value:          float64(20),
-				ExpectedError:  nil,
-				ExpectedResult: float64(30),
-			},
-			{
-				IsEvalNum:      true,
-				Value:          int64(5),
-				ExpectedError:  errors.New("mismatched type to binary operator. got int + float. see bool(), int(), float(), string(), duration()"),
-				ExpectedResult: nil,
-			},
-		},
-	})
-
-	runDynamicTestCase(t, testCase{
-		Title: "BinaryNode - EvalNum supports numeric value changes",
-
-		Node: &ast.BinaryNode{
-			Operator: ast.TokenGreater,
-			Left: &ast.ReferenceNode{
-				Reference: "value",
-			},
-			Right: &ast.NumberNode{
-				IsFloat: true,
-				Float64: float64(10),
-			},
-		},
-
-		Expectations: []valueExpectation{
-			{
-				IsEvalBool:     true,
-				Value:          float64(20),
-				ExpectedError:  nil,
-				ExpectedResult: true,
-			},
-			{
-				IsEvalBool:     true,
-				Value:          int64(5),
-				ExpectedError:  nil,
-				ExpectedResult: false,
-			},
-		},
-	})
-
-	runDynamicTestCase(t, testCase{
-		Title: "BinaryNode - Nested BinaryNodes can determine correct type",
-
-		Node: &ast.BinaryNode{
-			Operator: ast.TokenAnd,
-			Left: &ast.BinaryNode{
-				Operator: ast.TokenLess,
+			Node: &ast.BinaryNode{
+				Operator: ast.TokenGreater,
 				Left: &ast.ReferenceNode{
 					Reference: "value",
 				},
@@ -163,92 +85,205 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 					Float64: float64(10),
 				},
 			},
-			Right: &ast.BinaryNode{
+
+			Expectations: []valueExpectation{
+				{IsEvalBool: true, Value: float64(20), ExpectedError: nil, ExpectedResult: true},
+				{IsEvalBool: true, Value: int64(5), ExpectedError: nil, ExpectedResult: false},
+			},
+		})
+
+	})
+	t.Run("BinaryNode - Eval errors on integer division by zero", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
+
+			Node: &ast.BinaryNode{
+				Operator: ast.TokenDiv,
+				Left: &ast.NumberNode{
+					IsInt: true,
+					Int64: 10,
+				},
+				Right: &ast.NumberNode{
+					IsInt: true,
+					Int64: 0,
+				},
+			},
+
+			Expectations: []valueExpectation{
+				{ExpectedError: errors.New("runtime error: integer divide by zero"), IsEvalNum: true},
+			},
+		})
+	})
+
+	t.Run("BinaryNode - EvalNum supports numeric type changes", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
+
+			Node: &ast.BinaryNode{
+				Operator: ast.TokenPlus,
+				Left: &ast.ReferenceNode{
+					Reference: "value",
+				},
+				Right: &ast.NumberNode{
+					IsFloat: true,
+					Float64: float64(10),
+				},
+			},
+
+			Expectations: []valueExpectation{
+				{
+					IsEvalNum:      true,
+					Value:          float64(20),
+					ExpectedError:  nil,
+					ExpectedResult: float64(30),
+				},
+				{
+					IsEvalNum:      true,
+					Value:          int64(5),
+					ExpectedError:  errors.New("mismatched type to binary operator. got int + float. see bool(), int(), float(), string(), duration()"),
+					ExpectedResult: nil,
+				},
+			},
+		})
+	})
+
+	t.Run("BinaryNode - EvalNum supports numeric type changes", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
+
+			Node: &ast.BinaryNode{
 				Operator: ast.TokenGreater,
 				Left: &ast.ReferenceNode{
 					Reference: "value",
 				},
 				Right: &ast.NumberNode{
 					IsFloat: true,
-					Float64: float64(7),
+					Float64: float64(10),
 				},
 			},
-		},
 
-		Expectations: []valueExpectation{
-			{
-				IsEvalBool:     true,
-				Value:          float64(8),
-				ExpectedError:  nil,
-				ExpectedResult: true,
+			Expectations: []valueExpectation{
+				{
+					IsEvalBool:     true,
+					Value:          float64(20),
+					ExpectedError:  nil,
+					ExpectedResult: true,
+				},
+				{
+					IsEvalBool:     true,
+					Value:          int64(5),
+					ExpectedError:  nil,
+					ExpectedResult: false,
+				},
 			},
-			{
-				IsEvalBool:     true,
-				Value:          int64(5),
-				ExpectedError:  nil,
-				ExpectedResult: false,
-			},
-			{
-				IsEvalBool:     true,
-				Value:          int64(11),
-				ExpectedError:  nil,
-				ExpectedResult: false,
-			},
-		},
+		})
 	})
 
+	t.Run("BinaryNode - Nested BinaryNodes can determine correct type", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
+			Node: &ast.BinaryNode{
+				Operator: ast.TokenAnd,
+				Left: &ast.BinaryNode{
+					Operator: ast.TokenLess,
+					Left: &ast.ReferenceNode{
+						Reference: "value",
+					},
+					Right: &ast.NumberNode{
+						IsFloat: true,
+						Float64: float64(10),
+					},
+				},
+				Right: &ast.BinaryNode{
+					Operator: ast.TokenGreater,
+					Left: &ast.ReferenceNode{
+						Reference: "value",
+					},
+					Right: &ast.NumberNode{
+						IsFloat: true,
+						Float64: float64(7),
+					},
+				},
+			},
+
+			Expectations: []valueExpectation{
+				{
+					IsEvalBool:     true,
+					Value:          float64(8),
+					ExpectedError:  nil,
+					ExpectedResult: true,
+				},
+				{
+					IsEvalBool:     true,
+					Value:          int64(5),
+					ExpectedError:  nil,
+					ExpectedResult: false,
+				},
+				{
+					IsEvalBool:     true,
+					Value:          int64(11),
+					ExpectedError:  nil,
+					ExpectedResult: false,
+				},
+			},
+		})
+
+	})
 }
-
 func TestExpression_UnaryNode_DyanmicTestCases(t *testing.T) {
-	runDynamicTestCase(t, testCase{
-		Title: "UnaryNode - EvalNum supports numeric type changes",
+	t.Run("UnaryNode - EvalNum supports numeric type changes", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
 
-		Node: &ast.UnaryNode{
-			Operator: ast.TokenMinus,
-			Node: &ast.ReferenceNode{
-				Reference: "value",
+			Node: &ast.UnaryNode{
+				Operator: ast.TokenMinus,
+				Node: &ast.ReferenceNode{
+					Reference: "value",
+				},
 			},
-		},
 
-		Expectations: []valueExpectation{
-			{
-				IsEvalNum:      true,
-				Value:          float64(20),
-				ExpectedError:  nil,
-				ExpectedResult: float64(-20),
+			Expectations: []valueExpectation{
+				{
+					IsEvalNum:      true,
+					Value:          float64(20),
+					ExpectedError:  nil,
+					ExpectedResult: float64(-20),
+				},
+				{
+					IsEvalNum:      true,
+					Value:          int64(20),
+					ExpectedError:  nil,
+					ExpectedResult: int64(-20),
+				},
 			},
-			{
-				IsEvalNum:      true,
-				Value:          int64(20),
-				ExpectedError:  nil,
-				ExpectedResult: int64(-20),
-			},
-		},
+		})
 	})
 
-	runDynamicTestCase(t, testCase{
-		Title: "UnaryNode - EvalBool supports boolean value changes",
+	t.Run("UnaryNode - EvalBool supports boolean value changes", func(t *testing.T) {
+		runDynamicTestCase(t, testCase{
+			Title: t.Name(),
 
-		Node: &ast.UnaryNode{
-			Operator: ast.TokenNot,
-			Node: &ast.ReferenceNode{
-				Reference: "value",
+			Node: &ast.UnaryNode{
+				Operator: ast.TokenNot,
+				Node: &ast.ReferenceNode{
+					Reference: "value",
+				},
 			},
-		},
 
-		Expectations: []valueExpectation{
-			{
-				IsEvalBool:     true,
-				Value:          bool(true),
-				ExpectedError:  nil,
-				ExpectedResult: bool(false),
+			Expectations: []valueExpectation{
+				{
+					IsEvalBool:     true,
+					Value:          true,
+					ExpectedError:  nil,
+					ExpectedResult: false,
+				},
+				{
+					IsEvalBool:     true,
+					Value:          false,
+					ExpectedError:  nil,
+					ExpectedResult: true,
+				},
 			},
-			{
-				IsEvalBool:     true,
-				Value:          bool(false),
-				ExpectedError:  nil,
-				ExpectedResult: bool(true),
-			},
-		},
+		})
 	})
 }

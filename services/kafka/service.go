@@ -39,6 +39,10 @@ type Cluster struct {
 
 // writer wraps a kafka.Writer and tracks stats
 type writer struct {
+	// These fields are use with atomic we want to ensure they are aligned properly so we place them at the top of the struct
+	messageCount int64
+	errorCount   int64
+
 	kafka *kafka.Writer
 
 	cluster,
@@ -46,10 +50,8 @@ type writer struct {
 
 	wg sync.WaitGroup
 
-	statsKey     string
-	ticker       *time.Ticker
-	messageCount int64
-	errorCount   int64
+	statsKey string
+	ticker   *time.Ticker
 }
 
 func (w *writer) Open() {
@@ -125,8 +127,8 @@ func NewCluster(c Config) *Cluster {
 	}
 }
 
-func (c *Cluster) WriteMessage(topic string, key, msg []byte) error {
-	w, err := c.writer(topic)
+func (c *Cluster) WriteMessage(diagnostic Diagnostic, topic string, key, msg []byte) error {
+	w, err := c.writer(topic, diagnostic)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func (c *Cluster) WriteMessage(topic string, key, msg []byte) error {
 	})
 }
 
-func (c *Cluster) writer(topic string) (*writer, error) {
+func (c *Cluster) writer(topic string, diagnostic Diagnostic) (*writer, error) {
 	c.mu.RLock()
 	w, ok := c.writers[topic]
 	c.mu.RUnlock()
@@ -145,9 +147,12 @@ func (c *Cluster) writer(topic string) (*writer, error) {
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.WriterConfig()
+			wc, err := c.cfg.WriterConfig(diagnostic)
 			if err != nil {
 				return nil, err
+			}
+			if topic == "" {
+				return nil, errors.New("topic must not be empty")
 			}
 			wc.Topic = topic
 			kw := kafka.NewWriter(wc)
@@ -313,7 +318,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unknown cluster %q", o.Cluster)
 	}
-	return c.WriteMessage(o.Topic, []byte(o.Key), []byte(o.Message))
+	return c.WriteMessage(s.diag, o.Topic, []byte(o.Key), []byte(o.Message))
 }
 
 type HandlerConfig struct {
@@ -345,12 +350,15 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 			return nil, errors.Wrap(err, "failed to parse template")
 		}
 	}
+
+	diag := s.diag.WithContext(ctx...)
+
 	return &handler{
 		s:        s,
 		cluster:  cluster,
 		topic:    c.Topic,
 		template: t,
-		diag:     s.diag.WithContext(ctx...),
+		diag:     diag,
 	}, nil
 }
 
@@ -359,7 +367,7 @@ func (h *handler) Handle(event alert.Event) {
 	if err != nil {
 		h.diag.Error("failed to prepare kafka message body", err)
 	}
-	if err := h.cluster.WriteMessage(h.topic, []byte(event.State.ID), body); err != nil {
+	if err := h.cluster.WriteMessage(h.diag, h.topic, []byte(event.State.ID), body); err != nil {
 		h.diag.Error("failed to write message to kafka", err)
 	}
 }

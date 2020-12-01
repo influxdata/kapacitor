@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path"
+	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
@@ -32,7 +33,7 @@ func (b BasicAuth) validate() error {
 // configuration file.
 type Config struct {
 	Endpoint          string            `toml:"endpoint" override:"endpoint"`
-	URL               string            `toml:"url" override:"url"`
+	URLTemplate       string            `toml:"url" override:"url"`
 	Headers           map[string]string `toml:"headers" override:"headers"`
 	BasicAuth         BasicAuth         `toml:"basic-auth" override:"basic-auth,redact"`
 	AlertTemplate     string            `toml:"alert-template" override:"alert-template"`
@@ -43,8 +44,8 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Endpoint: "example",
-		URL:      "http://example.com",
+		Endpoint:    "example",
+		URLTemplate: "http://example.com",
 	}
 }
 
@@ -55,12 +56,22 @@ func (c Config) Validate() error {
 		return errors.New("must specify endpoint name")
 	}
 
-	if c.URL == "" {
+	if c.URLTemplate == "" {
 		return errors.New("must specify url")
 	}
-
-	if _, err := url.Parse(c.URL); err != nil {
-		return errors.Wrapf(err, "invalid URL %q", c.URL)
+	urlTemplate, err := GetTemplate(c.URLTemplate, "")
+	if err != nil {
+		return errors.Wrapf(err, "invalid URL template syntax %q", c.URLTemplate)
+	}
+	buf := &strings.Builder{}
+	if err = urlTemplate.Execute(buf, nil); err != nil {
+		return errors.Wrapf(err, "invalid URL template syntax %q", c.URLTemplate)
+	}
+	executedURL := buf.String()
+	if c.URLTemplate == executedURL {
+		if _, err := url.Parse(executedURL); err != nil {
+			return errors.Wrapf(err, "invalid URL %q", executedURL)
+		}
 	}
 
 	if c.AlertTemplate != "" && c.AlertTemplateFile != "" {
@@ -83,13 +94,16 @@ func (c Config) Validate() error {
 }
 
 func (c Config) getAlertTemplate() (*template.Template, error) {
-	return getTemplate(c.AlertTemplate, c.AlertTemplateFile)
+	return GetTemplate(c.AlertTemplate, c.AlertTemplateFile)
 }
 func (c Config) getRowTemplate() (*template.Template, error) {
-	return getTemplate(c.RowTemplate, c.RowTemplateFile)
+	return GetTemplate(c.RowTemplate, c.RowTemplateFile)
+}
+func (c Config) getURLTemplate() (*template.Template, error) {
+	return GetTemplate(c.URLTemplate, "")
 }
 
-func getTemplate(tmpl, tpath string) (*template.Template, error) {
+func GetTemplate(tmpl, tpath string) (*template.Template, error) {
 	if tmpl != "" {
 		t, err := template.New("body").Funcs(template.FuncMap{
 			"json": func(v interface{}) string {
@@ -140,7 +154,12 @@ func (cs Configs) index() (map[string]*Endpoint, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get row-template for endpoint %q", c.Endpoint)
 		}
-		m[c.Endpoint] = NewEndpoint(c.URL, c.Headers, c.BasicAuth, at, rt)
+		urlt, err := c.getURLTemplate()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get url for endpoint %q", c.Endpoint)
+		}
+
+		m[c.Endpoint] = NewEndpoint(urlt, c.Headers, c.BasicAuth, at, rt)
 	}
 
 	return m, nil

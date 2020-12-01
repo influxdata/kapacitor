@@ -1,1 +1,11 @@
-{"name":"packets","points":[{"fields":{"value":"bad"},"time":"2015-10-18T00:00:00Z"},{"fields":{"value":"good"},"time":"2015-10-18T00:00:02Z"},{"fields":{"value":"good"},"time":"2015-10-18T00:00:04Z"},{"fields":{"value2":"good"},"time":"2015-10-18T00:00:05Z"},{"fields":{"value":"bad"},"time":"2015-10-18T00:00:06Z"},{"fields":{"value":"good"},"time":"2015-10-18T00:00:08Z"}]}
+{
+    "name":"packets",
+    "points":[
+        {"fields":{"value":"bad"},"time":"2015-10-18T00:00:00Z"},
+        {"fields":{"value":"good"},"time":"2015-10-18T00:00:02Z"},
+        {"fields":{"value":"good"},"time":"2015-10-18T00:00:04Z"},
+        {"fields":{"value2":"good"},"time":"2015-10-18T00:00:05Z"},
+        {"fields":{"value":"bad"},"time":"2015-10-18T00:00:06Z"},
+        {"fields":{"value":"good"},"time":"2015-10-18T00:00:08Z"}
+    ]
+}

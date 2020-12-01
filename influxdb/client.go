@@ -14,6 +14,7 @@ import (
 	"time"
 
 	imodels "github.com/influxdata/influxdb/models"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
 
@@ -123,9 +124,7 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 		return nil, errors.Wrap(err, "invalid URLs")
 	}
 	if conf.Transport == nil {
-		conf.Transport = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		}
+		conf.Transport = khttp.NewDefaultTransport()
 	}
 	c := &HTTPClient{
 		config: conf,

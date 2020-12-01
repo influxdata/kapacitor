@@ -17,6 +17,8 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/bigpanda"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/kafka"
@@ -27,9 +29,11 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -208,15 +212,30 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	}
 
 	for _, pd := range n.PagerDuty2Handlers {
+		links := make([]pagerduty2.LinkTemplate, len(pd.Links))
+		for i, l := range pd.Links {
+			links[i] = pagerduty2.LinkTemplate{
+				Href: l.Href,
+				Text: l.Text,
+			}
+		}
 		c := pagerduty2.HandlerConfig{
 			RoutingKey: pd.RoutingKey,
+			Links:      links,
 		}
-		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		h, err := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create PagerDuty2 handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
 		c := pagerduty2.HandlerConfig{}
-		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+
+		h, err := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create PagerDuty2 handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -224,6 +243,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		c := sensu.HandlerConfig{
 			Source:   s.Source,
 			Handlers: s.HandlersList,
+			Metadata: s.MetadataMap,
 		}
 		h, err := et.tm.SensuService.Handler(c, ctx...)
 		if err != nil {
@@ -385,11 +405,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		if p.Sound != "" {
 			c.Sound = p.Sound
 		}
+		if p.UserKey != "" {
+			c.UserKey = p.UserKey
+		}
 		h := et.tm.PushoverService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 
 	for _, p := range n.HTTPPostHandlers {
+		if p.Endpoint == "" && p.URL == "" {
+			return nil, errors.New("Either URL or endpoint must be non-empty")
+		}
 		c := httppost.HandlerConfig{
 			URL:             p.URL,
 			Endpoint:        p.Endpoint,
@@ -397,7 +423,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			CaptureResponse: p.CaptureResponseFlag,
 			Timeout:         p.Timeout,
 		}
-		h := et.tm.HTTPPostService.Handler(c, ctx...)
+		h, err := et.tm.HTTPPostService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create HTTPPostService.Handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -418,6 +447,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		c := opsgenie2.HandlerConfig{
 			TeamsList:      og.TeamsList,
 			RecipientsList: og.RecipientsList,
+			RecoveryAction: og.RecoveryActionString,
 		}
 		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -440,9 +470,110 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			QoS:        mqtt.QoSLevel(m.Qos),
 			Retained:   m.Retained,
 		}
-		h := et.tm.MQTTService.Handler(c, ctx...)
+		h, err := et.tm.MQTTService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create MQTT handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, s := range n.DiscordHandlers {
+		c := discord.HandlerConfig{
+			Workspace:  s.Workspace,
+			Username:   s.Username,
+			AvatarURL:  s.AvatarURL,
+			EmbedTitle: s.EmbedTitle,
+		}
+		h, err := et.tm.DiscordService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
+	for _, s := range n.BigPandaHandlers {
+		c := bigpanda.HandlerConfig{
+			AppKey: s.AppKey,
+		}
+		h, err := et.tm.BigPandaService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create BigPanda handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
+	for _, t := range n.TeamsHandlers {
+		c := teams.HandlerConfig{
+			ChannelURL: t.ChannelURL,
+		}
+		h := et.tm.TeamsService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.TeamsHandlers) == 0 && (et.tm.TeamsService != nil && et.tm.TeamsService.Global()) {
+		c := teams.HandlerConfig{}
+		h := et.tm.TeamsService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	// If Teams has been configured with state changes only set it.
+	if et.tm.TeamsService != nil &&
+		et.tm.TeamsService.Global() &&
+		et.tm.TeamsService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
+		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+	// If discord has been configured with state changes only set it.
+	if et.tm.DiscordService != nil &&
+		et.tm.DiscordService.Global() &&
+		et.tm.DiscordService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	for _, s := range n.ServiceNowHandlers {
+		c := servicenow.HandlerConfig{
+			URL:            s.URL,
+			Source:         s.Source,
+			Node:           s.Node,
+			Type:           s.Type,
+			Resource:       s.Resource,
+			MetricName:     s.MetricName,
+			MessageKey:     s.MessageKey,
+			AdditionalInfo: s.AdditionalInfoMap,
+		}
+		h := et.tm.ServiceNowService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.ServiceNowHandlers) == 0 && (et.tm.ServiceNowService != nil && et.tm.ServiceNowService.Global()) {
+		h := et.tm.ServiceNowService.Handler(servicenow.HandlerConfig{}, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	// If servicenow has been configured with state changes only set it.
+	if et.tm.ServiceNowService != nil &&
+		et.tm.ServiceNowService.Global() &&
+		et.tm.ServiceNowService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	if len(n.BigPandaHandlers) == 0 && (et.tm.BigPandaService != nil && et.tm.BigPandaService.Global()) {
+		h, err := et.tm.BigPandaService.Handler(bigpanda.HandlerConfig{}, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create BigPanda handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+	// If BigPanda has been configured with state changes only set it.
+	if et.tm.BigPandaService != nil &&
+		et.tm.BigPandaService.Global() &&
+		et.tm.BigPandaService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, alert.Critical+1)
 	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)

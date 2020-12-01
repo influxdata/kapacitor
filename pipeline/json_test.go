@@ -237,7 +237,8 @@ func TestPipeline_MarshalJSON(t *testing.T) {
                     "endpoint": "",
                     "headers": null,
                     "captureResponse": false,
-                    "timeout": 0
+                    "timeout": 0,
+                    "skipSSLVerification": false
                 }
             ],
             "tcp": null,
@@ -250,6 +251,8 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "pushover": null,
             "sensu": null,
             "slack": null,
+            "discord": null,
+            "bigPanda": null,
             "telegram": null,
             "hipChat": null,
             "alerta": null,
@@ -258,7 +261,9 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "talk": null,
             "mqtt": null,
             "snmpTrap": null,
-            "kafka": null
+            "kafka": null,
+            "teams": null,
+            "serviceNow": null
         },
         {
             "typeOf": "httpOut",
@@ -991,7 +996,7 @@ func Test_unmarshalStats(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "unmarshal stats",
+			name: "should error when interval is zero",
 			args: args{
 				parents: []Node{
 					&node{},
@@ -999,9 +1004,27 @@ func Test_unmarshalStats(t *testing.T) {
 				data: []byte(`{
                     "typeOf": "stats",
                     "id": "2",
-                    "interval": "5s",
+                    "interval": "0",
                     "align": true 
                 }`),
+				typ: TypeOf{
+					Type: "stats",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unmarshal stats",
+			args: args{
+				parents: []Node{
+					&node{},
+				},
+				data: []byte(`{
+		           "typeOf": "stats",
+		           "id": "2",
+		           "interval": "5s",
+		           "align": true
+		       }`),
 				typ: TypeOf{
 					Type: "stats",
 				},
@@ -1014,9 +1037,9 @@ func Test_unmarshalStats(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.wantErr {
-				p := &Pipeline{}
-				p1 := tt.args.parents[0]
+			p := &Pipeline{}
+			p1 := tt.args.parents[0]
+			if p1 != nil {
 				p.addSource(p1)
 			}
 			got, err := unmarshalStats(tt.args.data, tt.args.parents, tt.args.typ)

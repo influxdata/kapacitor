@@ -66,6 +66,10 @@ func (ec *consumer) Consume() error {
 			if err := ec.r.Barrier(m); err != nil {
 				return err
 			}
+		case DeleteGroupMessage:
+			if err := ec.r.DeleteGroup(m); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unexpected message of type %T", msg)
 		}
