@@ -26,6 +26,8 @@ type Config struct {
 	RecoveryAction string `toml:"recovery_action" override:"recovery_action"`
 	// Whether every alert should automatically go to OpsGenie.
 	Global bool `toml:"global" override:"global"`
+	// Whether to use event details as OpsGenie alert description.
+	Details bool `toml:"details" override:"details"`
 }
 
 func NewConfig() Config {

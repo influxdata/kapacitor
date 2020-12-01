@@ -9521,6 +9521,7 @@ stream
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := opsgenie2.NewConfig()
 		c.Enabled = true
+		c.Details = false
 		c.URL = ts.URL
 		c.APIKey = "api_key"
 		og := opsgenie2.NewService(c, diagService.NewOpsGenie2Handler())
@@ -9608,6 +9609,7 @@ stream
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := opsgenie2.NewConfig()
 		c.Enabled = true
+		c.Details = false
 		c.URL = ts.URL
 		c.RecoveryAction = "notes"
 		c.APIKey = "api_key"

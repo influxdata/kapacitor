@@ -7362,6 +7362,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"api-key":         false,
 						"enabled":         false,
 						"global":          false,
+						"details":         false,
 						"recipients":      nil,
 						"teams":           nil,
 						"url":             "http://opsgenie2.example.com",
@@ -7378,6 +7379,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"api-key":         false,
 					"enabled":         false,
 					"global":          false,
+					"details":         false,
 					"recipients":      nil,
 					"teams":           nil,
 					"url":             "http://opsgenie2.example.com",
@@ -7404,6 +7406,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"api-key":         true,
 								"enabled":         false,
 								"global":          true,
+								"details":         false,
 								"recipients":      nil,
 								"teams":           []interface{}{"teamA", "teamB"},
 								"url":             "http://opsgenie2.example.com",
@@ -7420,6 +7423,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"api-key":         true,
 							"enabled":         false,
 							"global":          true,
+							"details":         false,
 							"recipients":      nil,
 							"teams":           []interface{}{"teamA", "teamB"},
 							"url":             "http://opsgenie2.example.com",
@@ -10222,6 +10226,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.OpsGenie2.Enabled = true
+				c.OpsGenie2.Details = false
 				c.OpsGenie2.URL = ts.URL
 				c.OpsGenie2.RecoveryAction = "notes"
 				c.OpsGenie2.APIKey = "api_key"
