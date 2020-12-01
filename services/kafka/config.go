@@ -2,18 +2,20 @@ package kafka
 
 import (
 	"crypto/tls"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go"
 )
 
 const (
 	DefaultTimeout      = 10 * time.Second
 	DefaultBatchSize    = 100
 	DefaultBatchTimeout = 1 * time.Second
+	DefaultID           = "default"
 )
 
 type Config struct {
@@ -45,7 +47,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{ID: DefaultID}
 }
 
 func (c Config) Validate() error {
@@ -74,7 +76,7 @@ func (c *Config) ApplyConditionalDefaults() {
 	}
 }
 
-func (c Config) WriterConfig() (kafka.WriterConfig, error) {
+func (c Config) WriterConfig(diagnostic Diagnostic) (kafka.WriterConfig, error) {
 	var tlsCfg *tls.Config
 	if c.UseSSL {
 		t, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
@@ -87,13 +89,22 @@ func (c Config) WriterConfig() (kafka.WriterConfig, error) {
 		Timeout: time.Duration(c.Timeout),
 		TLS:     tlsCfg,
 	}
+
 	return kafka.WriterConfig{
 		Brokers:      c.Brokers,
 		Balancer:     &kafka.LeastBytes{},
 		Dialer:       dialer,
 		ReadTimeout:  time.Duration(c.Timeout),
 		WriteTimeout: time.Duration(c.Timeout),
+		BatchSize:    c.BatchSize,
 		BatchTimeout: time.Duration(c.BatchTimeout),
+		// Async=true allows internal batching of the messages to take place.
+		// It also means that no errors will be captured from the WriteMessages method.
+		// As such we track the WriteStats for errors and report them with Kapacitor's normal diagnostics.
+		Async: true,
+		ErrorLogger: kafka.LoggerFunc(func(s string, x ...interface{}) {
+			diagnostic.Error("kafka client error", fmt.Errorf(s, x...))
+		}),
 	}, nil
 }
 

@@ -36,19 +36,41 @@ import (
 // Where the data are unchanged, but only the points
 // where the value changes from the previous value are
 // emitted.
-
+//
+// It is also possible to provide a list of many fields and if any field changes the point will be emitted.
+//
+// Example:
+//     stream
+//         |from()
+//             .measurement('packets')
+//         |changeDetect('in','out')
+//         ...
+//
+// with source data:
+// packets in=0,out=0 0000000000
+// packets in=1,out=0 0000000001
+// packets in=1,out=1 0000000002
+// packets in=1,out=1 0000000003
+// packets in=2,out=1 0000000004
+// packets in=2,out=1 0000000005
+//
+// Would have output:
+// packets in=0,out=0 0000000000
+// packets in=1,out=0 0000000001
+// packets in=1,out=1 0000000002
+// packets in=2,out=1 0000000004
 type ChangeDetectNode struct {
 	chainnode `json:"-"`
 
 	// The field to use when calculating the changeDetect
 	// tick:ignore
-	Field string `json:"field"`
+	Fields []string `json:"fields"`
 }
 
-func newChangeDetectNode(wants EdgeType, field string) *ChangeDetectNode {
+func newChangeDetectNode(wants EdgeType, fields []string) *ChangeDetectNode {
 	return &ChangeDetectNode{
 		chainnode: newBasicChainNode("changeDetect", wants, wants),
-		Field:     field,
+		Fields:    fields,
 	}
 }
 

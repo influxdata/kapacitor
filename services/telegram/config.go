@@ -34,7 +34,7 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		URL: DefaultTelegramURL,
+		URL:                   DefaultTelegramURL,
 		DisableWebPagePreview: DefaultTelegramLinksPreviewDisable,
 		DisableNotification:   DefaultTelegramNotificationDisable,
 	}

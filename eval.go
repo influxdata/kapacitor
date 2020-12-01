@@ -91,8 +91,7 @@ func (n *EvalNode) newGroup() *evalGroup {
 	}
 }
 
-func (n *EvalNode) eval(expressions []stateful.Expression, p edge.FieldsTagsTimeSetter) error {
-
+func (n *EvalNode) eval(expressions []stateful.Expression, p edge.FieldsTagsTimeSetter) (err error) {
 	vars := n.scopePool.Get()
 	defer n.scopePool.Put(vars)
 
@@ -172,7 +171,7 @@ func (n *EvalNode) eval(expressions []stateful.Expression, p edge.FieldsTagsTime
 	}
 	p.SetFields(newFields)
 	p.SetTags(newTags)
-	return nil
+	return
 }
 
 type evalGroup struct {

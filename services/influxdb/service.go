@@ -21,6 +21,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
@@ -503,10 +504,7 @@ func httpConfig(c Config) (influxdb.Config, error) {
 	if err != nil {
 		return influxdb.Config{}, errors.Wrap(err, "invalid TLS options")
 	}
-	tr := &http.Transport{
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: tlsConfig,
-	}
+	tr := khttp.NewDefaultTransportWithTLS(tlsConfig)
 	var credentials influxdb.Credentials
 	if c.Username != "" {
 		credentials = influxdb.Credentials{

@@ -69,7 +69,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.DotRemoveZeroValue("post", h.URL).
 			Dot("endpoint", h.Endpoint).
 			DotIf("captureResponse", h.CaptureResponseFlag).
-			Dot("timeout", h.Timeout)
+			Dot("timeout", h.Timeout).
+			DotIf("skipSSLVerification", h.SkipSSLVerificationFlag)
 
 		var headers []string
 		for k := range h.Headers {
@@ -120,7 +121,14 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 
 	for _, h := range a.PagerDuty2Handlers {
 		n.Dot("pagerDuty2").
-			Dot("serviceKey", h.ServiceKey)
+			Dot("routingKey", h.RoutingKey)
+		for _, l := range h.Links {
+			if len(l.Text) > 0 {
+				n.Dot("link", l.Href, l.Text)
+			} else {
+				n.Dot("link", l.Href)
+			}
+		}
 	}
 
 	for _, h := range a.PushoverHandlers {
@@ -137,6 +145,36 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.Dot("sensu").
 			Dot("source", h.Source).
 			Dot("handlers", args(h.HandlersList)...)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.MetadataMap))
+		for k := range h.MetadataMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("metadata", k, h.MetadataMap[k])
+		}
+	}
+
+	for _, h := range a.ServiceNowHandlers {
+		n.Dot("servicenow").
+			Dot("source", h.Source).
+			Dot("node", h.Node).
+			Dot("type", h.Type).
+			Dot("resource", h.Resource).
+			Dot("metricName", h.MetricName).
+			Dot("messageKey", h.MessageKey)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.AdditionalInfoMap))
+		for k := range h.AdditionalInfoMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("additionalInfo", k, h.AdditionalInfoMap[k])
+		}
 	}
 
 	for _, h := range a.SlackHandlers {
@@ -178,6 +216,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
 			Dot("services", args(h.Service)...).
+			Dot("correlated", args(h.Correlate)...).
 			Dot("timeout", h.Timeout)
 	}
 

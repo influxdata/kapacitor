@@ -701,9 +701,22 @@ func doDefine(args []string) error {
 			return errors.Wrapf(err, "failed to open file %s", *dvars)
 		}
 		defer f.Close()
-		dec := json.NewDecoder(f)
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read task vars file %q", *dvars)
+		}
+
+		dec := json.NewDecoder(strings.NewReader(string(data)))
 		if err := dec.Decode(&vars); err != nil {
-			return errors.Wrapf(err, "invalid JSON in file %s", *dvars)
+			var taskVars client.TaskVars
+
+			decTaskVars := json.NewDecoder(strings.NewReader(string(data)))
+			dec.Decode(&taskVars)
+			if err := decTaskVars.Decode(&taskVars); err != nil {
+				return errors.Wrapf(err, "invalid JSON in file %s", *dvars)
+			} else {
+				vars = taskVars.Vars
+			}
 		}
 	}
 

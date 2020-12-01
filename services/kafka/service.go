@@ -6,13 +6,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"text/template"
+	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
 	kafka "github.com/segmentio/kafka-go"
+)
+
+const (
+	statWriteMessageCount = "write_messages"
+	statWriteErrorCount   = "write_errors"
 )
 
 type Diagnostic interface {
@@ -25,28 +34,111 @@ type Cluster struct {
 	mu  sync.RWMutex
 	cfg Config
 
-	writers map[string]*kafka.Writer
+	writers map[string]*writer
+}
+
+// writer wraps a kafka.Writer and tracks stats
+type writer struct {
+	// These fields are use with atomic we want to ensure they are aligned properly so we place them at the top of the struct
+	messageCount int64
+	errorCount   int64
+
+	kafka *kafka.Writer
+
+	cluster,
+	topic string
+
+	wg sync.WaitGroup
+
+	statsKey string
+	ticker   *time.Ticker
+}
+
+func (w *writer) Open() {
+	statsKey, statsMap := vars.NewStatistic("kafka", map[string]string{
+		"cluster": w.cluster,
+		"topic":   w.topic,
+	})
+	w.statsKey = statsKey
+	// setup stats for the writer
+	writeErrors := &writeErrorCount{
+		w: w,
+	}
+	statsMap.Set(statWriteErrorCount, writeErrors)
+	writeMessages := &writeMessageCount{
+		w: w,
+	}
+	statsMap.Set(statWriteMessageCount, writeMessages)
+
+	w.ticker = time.NewTicker(time.Second)
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		w.pollStats()
+	}()
+}
+
+func (w *writer) Close() {
+	w.ticker.Stop()
+	vars.DeleteStatistic(w.statsKey)
+	w.kafka.Close()
+	w.wg.Wait()
+}
+
+// pollStats periodically reads the writer Stats and accumulates the results.
+// A read operation on the kafka.Writer.Stats() method causes the internal counters to be reset.
+// As a result we control all reads through this method.
+func (w *writer) pollStats() {
+	for range w.ticker.C {
+		stats := w.kafka.Stats()
+		atomic.AddInt64(&w.messageCount, stats.Messages)
+		atomic.AddInt64(&w.errorCount, stats.Errors)
+	}
+}
+
+// writeMessageCount implements the kexpvar.IntVar to expose error counts.
+type writeMessageCount struct {
+	w *writer
+}
+
+func (w *writeMessageCount) IntValue() int64 {
+	return atomic.LoadInt64(&w.w.messageCount)
+}
+func (w *writeMessageCount) String() string {
+	return strconv.FormatInt(w.IntValue(), 10)
+}
+
+// writeErrorCount implements the kexpvar.IntVar to expose error counts.
+type writeErrorCount struct {
+	w *writer
+}
+
+func (w *writeErrorCount) IntValue() int64 {
+	return atomic.LoadInt64(&w.w.errorCount)
+}
+func (w *writeErrorCount) String() string {
+	return strconv.FormatInt(w.IntValue(), 10)
 }
 
 func NewCluster(c Config) *Cluster {
 	return &Cluster{
 		cfg:     c,
-		writers: make(map[string]*kafka.Writer),
+		writers: make(map[string]*writer),
 	}
 }
 
-func (c *Cluster) WriteMessage(topic string, key, msg []byte) error {
-	w, err := c.writer(topic)
+func (c *Cluster) WriteMessage(diagnostic Diagnostic, topic string, key, msg []byte) error {
+	w, err := c.writer(topic, diagnostic)
 	if err != nil {
 		return err
 	}
-	return w.WriteMessages(context.Background(), kafka.Message{
+	return w.kafka.WriteMessages(context.Background(), kafka.Message{
 		Key:   key,
 		Value: msg,
 	})
 }
 
-func (c *Cluster) writer(topic string) (*kafka.Writer, error) {
+func (c *Cluster) writer(topic string, diagnostic Diagnostic) (*writer, error) {
 	c.mu.RLock()
 	w, ok := c.writers[topic]
 	c.mu.RUnlock()
@@ -55,12 +147,22 @@ func (c *Cluster) writer(topic string) (*kafka.Writer, error) {
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.WriterConfig()
+			wc, err := c.cfg.WriterConfig(diagnostic)
 			if err != nil {
 				return nil, err
 			}
+			if topic == "" {
+				return nil, errors.New("topic must not be empty")
+			}
 			wc.Topic = topic
-			w = kafka.NewWriter(wc)
+			kw := kafka.NewWriter(wc)
+			// Create new writer
+			w = &writer{
+				kafka:   kw,
+				cluster: c.cfg.ID,
+				topic:   topic,
+			}
+			w.Open()
 			c.writers[topic] = w
 		}
 	}
@@ -216,7 +318,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unknown cluster %q", o.Cluster)
 	}
-	return c.WriteMessage(o.Topic, []byte(o.Key), []byte(o.Message))
+	return c.WriteMessage(s.diag, o.Topic, []byte(o.Key), []byte(o.Message))
 }
 
 type HandlerConfig struct {
@@ -248,12 +350,15 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 			return nil, errors.Wrap(err, "failed to parse template")
 		}
 	}
+
+	diag := s.diag.WithContext(ctx...)
+
 	return &handler{
 		s:        s,
 		cluster:  cluster,
 		topic:    c.Topic,
 		template: t,
-		diag:     s.diag.WithContext(ctx...),
+		diag:     diag,
 	}, nil
 }
 
@@ -262,7 +367,7 @@ func (h *handler) Handle(event alert.Event) {
 	if err != nil {
 		h.diag.Error("failed to prepare kafka message body", err)
 	}
-	if err := h.cluster.WriteMessage(h.topic, []byte(event.State.ID), body); err != nil {
+	if err := h.cluster.WriteMessage(h.diag, h.topic, []byte(event.State.ID), body); err != nil {
 		h.diag.Error("failed to write message to kafka", err)
 	}
 }

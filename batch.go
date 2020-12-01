@@ -190,7 +190,7 @@ func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, d NodeDiagnostic) (*
 		return nil, errors.New("must not set both 'every' and 'cron' properties")
 	}
 	switch {
-	case n.Every != 0:
+	case n.Every > 0:
 		bn.ticker = newTimeTicker(n.Every, n.AlignFlag)
 	case n.Cron != "":
 		var err error
@@ -198,6 +198,8 @@ func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, d NodeDiagnostic) (*
 		if err != nil {
 			return nil, err
 		}
+	case n.Every < 0:
+		return nil, errors.New("'every' duration must must non-negative")
 	default:
 		return nil, errors.New("must define one of 'every' or 'cron'")
 	}

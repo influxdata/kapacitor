@@ -1,4 +1,8 @@
-required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen-go"]
+required = [
+    "github.com/benbjohnson/tmpl",
+    "github.com/golang/protobuf/protoc-gen-go",
+    "github.com/mailru/easyjson/easyjson",
+]
 
 [prune]
   unused-packages = true
@@ -8,6 +12,10 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
 [[constraint]]
   branch = "master"
   name = "github.com/davecgh/go-spew"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mailru/easyjson"
 
 [[constraint]]
   branch = "master"
@@ -42,6 +50,10 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   name = "github.com/eclipse/paho.mqtt.golang"
   version = "~1.0.0"
 
+[[constraint]]
+  name = "github.com/gorhill/cronexpr"
+  branch = "master"
+
 # Pin BurntSushi/toml to the same version used in influxdb
 # This also avoids using a version with the WTFPL license
 [[constraint]]
@@ -57,3 +69,11 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   name = "github.com/Azure/go-autorest"
   revision = "a2fdd780c9a50455cecd249b00bdc3eb73a78e31"
 
+[[override]]
+  name= "gopkg.in/fsnotify.v1"
+  revision = "629574ca2a5df945712d3079857300b5e4da0236"
+  source = "git@github.com:fsnotify/fsnotify"
+
+[[override]]
+  name= "github.com/mailru/easyjson"
+  revision = "3fdea8d05856a0c8df22ed4bc71b3219245e4485"

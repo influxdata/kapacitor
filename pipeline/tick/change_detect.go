@@ -21,6 +21,10 @@ func NewChangeDetect(parents []ast.Node) *ChangeDetectNode {
 
 // Build creates a ChangeDetect ast.Node
 func (n *ChangeDetectNode) Build(d *pipeline.ChangeDetectNode) (ast.Node, error) {
-	n.Pipe("changeDetect", d.Field)
+	fields := make([]interface{}, len(d.Fields))
+	for i, f := range d.Fields {
+		fields[i] = f
+	}
+	n.Pipe("changeDetect", fields...)
 	return n.prev, n.err
 }

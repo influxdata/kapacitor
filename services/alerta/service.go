@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/pkg/errors"
@@ -45,10 +46,7 @@ func NewService(c Config, d Diagnostic) *Service {
 	}
 	s.configValue.Store(c)
 	s.clientValue.Store(&http.Client{
-		Transport: &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
-		},
+		Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
 	})
 	return s
 }
@@ -63,6 +61,7 @@ type testOptions struct {
 	Message     string   `json:"message"`
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
+	Correlate   []string `json:"correlate"`
 	Timeout     string   `json:"timeout"`
 }
 
@@ -78,6 +77,7 @@ func (s *Service) TestOptions() interface{} {
 		Message:     "test alerta message",
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
+		Correlate:   []string{"testServiceX", "testServiceY"},
 		Timeout:     "24h0m0s",
 	}
 }
@@ -101,6 +101,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Message,
 		o.Origin,
 		o.Service,
+		o.Correlate,
 		timeout,
 		map[string]string{},
 		models.Result{},
@@ -128,22 +129,19 @@ func (s *Service) Update(newConfig []interface{}) error {
 	} else {
 		s.configValue.Store(c)
 		s.clientValue.Store(&http.Client{
-			Transport: &http.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
-			},
+			Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
 		})
 	}
 
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, tags map[string]string, data models.Result) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, timeout time.Duration, tags map[string]string, data models.Result) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, timeout, tags, data)
+	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, correlate, timeout, tags, data)
 	if err != nil {
 		return err
 	}
@@ -171,7 +169,7 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	return nil
 }
 
-func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, tags map[string]string, data models.Result) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, timeout time.Duration, tags map[string]string, data models.Result) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -216,6 +214,9 @@ func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, 
 	postData["rawData"] = data
 	if len(service) > 0 {
 		postData["service"] = service
+	}
+	if len(correlate) > 0 {
+		postData["correlate"] = correlate
 	}
 	postData["timeout"] = int64(timeout / time.Second)
 
@@ -283,6 +284,9 @@ type HandlerConfig struct {
 	// List of effected Services
 	Service []string `mapstructure:"service"`
 
+	// List of correlated events
+	Correlate []string `mapstructure:"correlate"`
+
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `mapstructure:"timeout"`
@@ -299,6 +303,7 @@ type handler struct {
 	valueTmpl       *text.Template
 	groupTmpl       *text.Template
 	serviceTmpl     []*text.Template
+	correlateTmpl   []*text.Template
 }
 
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
@@ -342,6 +347,15 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 		stmpl = append(stmpl, tmpl)
 	}
 
+	var ctmpl []*text.Template
+	for _, correlate := range c.Correlate {
+		tmpl, err := text.New("correlate").Parse(correlate)
+		if err != nil {
+			return nil, err
+		}
+		ctmpl = append(ctmpl, tmpl)
+	}
+
 	return &handler{
 		s:               s,
 		c:               c,
@@ -352,6 +366,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 		groupTmpl:       gtmpl,
 		valueTmpl:       vtmpl,
 		serviceTmpl:     stmpl,
+		correlateTmpl:   ctmpl,
 	}, nil
 }
 
@@ -435,6 +450,22 @@ func (h *handler) Handle(event alert.Event) {
 			buf.Reset()
 		}
 	}
+	buf.Reset()
+
+	var correlate []string
+	if len(h.correlateTmpl) == 0 {
+		correlate = []string{td.Name}
+	} else {
+		for _, tmpl := range h.correlateTmpl {
+			err = tmpl.Execute(&buf, td)
+			if err != nil {
+				h.diag.TemplateError(err, keyvalue.KV("correlate", tmpl.Name()))
+				return
+			}
+			correlate = append(correlate, buf.String())
+			buf.Reset()
+		}
+	}
 
 	var severity string
 
@@ -463,6 +494,7 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		h.c.Origin,
 		service,
+		correlate,
 		h.c.Timeout,
 		event.Data.Tags,
 		event.Data.Result,

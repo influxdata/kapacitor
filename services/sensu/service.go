@@ -60,11 +60,12 @@ func (s *Service) Update(newConfig []interface{}) error {
 }
 
 type testOptions struct {
-	Name     string      `json:"name"`
-	Source   string      `json:"source"`
-	Output   string      `json:"output"`
-	Handlers []string    `json:"handlers"`
-	Level    alert.Level `json:"level"`
+	Name     string                 `json:"name"`
+	Source   string                 `json:"source"`
+	Output   string                 `json:"output"`
+	Handlers []string               `json:"handlers"`
+	Metadata map[string]interface{} `json:"metadata"`
+	Level    alert.Level            `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -73,6 +74,7 @@ func (s *Service) TestOptions() interface{} {
 		Source:   "Kapacitor",
 		Output:   "testOutput",
 		Handlers: []string{},
+		Metadata: map[string]interface{}{},
 		Level:    alert.Critical,
 	}
 }
@@ -87,16 +89,17 @@ func (s *Service) Test(options interface{}) error {
 		o.Source,
 		o.Output,
 		o.Handlers,
+		o.Metadata,
 		o.Level,
 	)
 }
 
-func (s *Service) Alert(name, source, output string, handlers []string, level alert.Level) error {
+func (s *Service) Alert(name, source, output string, handlers []string, metadata map[string]interface{}, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
 
-	addr, postData, err := s.prepareData(name, source, output, handlers, level)
+	addr, postData, err := s.prepareData(name, source, output, handlers, metadata, level)
 	if err != nil {
 		return err
 	}
@@ -122,7 +125,7 @@ func (s *Service) Alert(name, source, output string, handlers []string, level al
 	return nil
 }
 
-func (s *Service) prepareData(name, source, output string, handlers []string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
+func (s *Service) prepareData(name, source, output string, handlers []string, metadata map[string]interface{}, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
 
 	c := s.config()
 
@@ -162,6 +165,12 @@ func (s *Service) prepareData(name, source, output string, handlers []string, le
 		return nil, nil, err
 	}
 
+	for k, v := range metadata {
+		if _, ok := postData[k]; !ok {
+			postData[k] = v
+		}
+	}
+
 	return addr, postData, nil
 }
 
@@ -173,6 +182,9 @@ type HandlerConfig struct {
 	// Sensu handler list
 	// If empty uses the handler list from the configuration
 	Handlers []string `mapstructure:"handlers"`
+
+	// Metadata is a map of key value data to include on the sensu API request.
+	Metadata map[string]interface{} `mapstructure:"metadata"`
 }
 
 type handler struct {
@@ -211,6 +223,7 @@ func (h *handler) Handle(event alert.Event) {
 		sourceStr,
 		event.State.Message,
 		h.c.Handlers,
+		h.c.Metadata,
 		event.State.Level,
 	); err != nil {
 		h.diag.Error("failed to send event to Sensu", err)

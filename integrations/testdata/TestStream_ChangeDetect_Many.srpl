@@ -1,0 +1,21 @@
+dbname
+rpname
+packets a="bad",b=0 0000000000
+dbname
+rpname
+packets a="good",b=0 0000000001
+dbname
+rpname
+packets a="good",b=0 0000000002
+dbname
+rpname
+packets a="good",b=0,c="something else" 0000000003
+dbname
+rpname
+packets a="bad",b=1 0000000004
+dbname
+rpname
+packets a="bad",b=0 0000000005
+dbname
+rpname
+packets a="pump",b=2 0000000006

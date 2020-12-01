@@ -11,6 +11,7 @@ func TestBarrierNode(t *testing.T) {
 	type args struct {
 		idle   time.Duration
 		period time.Duration
+		del    bool
 	}
 	tests := []struct {
 		name string
@@ -39,6 +40,17 @@ func TestBarrierNode(t *testing.T) {
         .period(1s)
 `,
 		},
+		{
+			name: "barrier with delete",
+			args: args{
+				del: true,
+			},
+			want: `stream
+    |from()
+    |barrier()
+        .delete(TRUE)
+`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,6 +60,7 @@ func TestBarrierNode(t *testing.T) {
 			b := stream.From().Barrier()
 			b.Idle = tt.args.idle
 			b.Period = tt.args.period
+			b.Delete = tt.args.del
 
 			got, err := PipelineTick(pipe)
 			if err != nil {

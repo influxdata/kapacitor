@@ -58,7 +58,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
             "endpoint": "/endpoint",
             "headers": null,
             "captureResponse": false,
-            "timeout": 0
+            "timeout": 0,
+            "skipSSLVerification": false
         }
     ],
     "tcp": null,
@@ -71,6 +72,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "pushover": null,
     "sensu": null,
     "slack": null,
+    "discord": null,
+    "bigPanda": null,
     "telegram": null,
     "hipChat": null,
     "alerta": null,
@@ -79,7 +82,9 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "talk": null,
     "mqtt": null,
     "snmpTrap": null,
-    "kafka": null
+    "kafka": null,
+    "teams": null,
+    "serviceNow": null
 }`,
 		},
 	}
