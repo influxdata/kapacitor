@@ -30,6 +30,7 @@ import (
 //    * batches_queried -- number of batches returned from queries
 //    * points_queried -- total number of points in batches
 //
+
 type BatchNode struct {
 	node
 }
@@ -89,6 +90,14 @@ func (n *BatchNode) UnmarshalJSON(data []byte) error {
 // passed to the `groupBy` method.
 func (b *BatchNode) Query(q string) *QueryNode {
 	n := newQueryNode()
+	n.QueryStr = q
+	b.linkChild(n)
+	return n
+}
+
+// The flux script to execute.
+func (b *BatchNode) QueryFlux(q string) *QueryFluxNode {
+	n := newQueryFluxNode()
 	n.QueryStr = q
 	b.linkChild(n)
 	return n
@@ -335,7 +344,7 @@ func (n *QueryNode) GroupByMeasurement() *QueryNode {
 	return n
 }
 
-// Align start and stop times for quiries with even boundaries of the QueryNode.Every property.
+// Align start and stop times for queries with even boundaries of the QueryNode.Every property.
 // Does not apply if using the QueryNode.Cron property.
 // tick:property
 func (b *QueryNode) Align() *QueryNode {
@@ -348,4 +357,149 @@ func (b *QueryNode) Align() *QueryNode {
 func (b *QueryNode) AlignGroup() *QueryNode {
 	b.AlignGroupFlag = true
 	return b
+}
+
+// A QueryFluxNode defines a source and a schedule for
+// processing batch data. The data is queried from
+// an InfluxDB database and then passed into the data pipeline.
+//
+// Example:
+// batch
+//     |fluxQuery('''
+//         from(bucket: "example-bucket")
+//         |> range(start: -1m)
+//         |> filter(fn: (r) =>
+//           r._measurement == "example-measurement" and
+//           r._field == "example-field"
+//         )
+//     ''')
+//         .period(1m)
+//         .every(20s)
+//     ...
+//
+// In the above example InfluxDB is queried every 20 seconds; the window of time returned
+type QueryFluxNode struct {
+	chainnode `json:"-"`
+
+	// The query text
+	//tick:ignore
+	QueryStr string `json:"queryStr"`
+
+	// The period or length of time that will be queried from InfluxDB
+	Period time.Duration `json:"period"`
+
+	// How often to query InfluxDB.
+	//
+	// The Every property is mutually exclusive with the Cron property.
+	Every time.Duration `json:"every"`
+
+	// Align start and end times with the Every value
+	// Does not apply if Cron is used.
+	// tick:ignore
+	AlignFlag bool `tick:"Align" json:"align"`
+
+	// Define a schedule using a cron syntax.
+	//
+	// The specific cron implementation is documented here:
+	// https://github.com/gorhill/cronexpr#implementation
+	//
+	// The Cron property is mutually exclusive with the Every property.
+	Cron string `json:"cron"`
+
+	// How far back in time to query from the current time
+	//
+	// For example an Offest of 2 hours and an Every of 5m,
+	// Kapacitor will query InfluxDB every 5 minutes for the window of data 2 hours ago.
+	//
+	// This applies to Cron schedules as well. If the cron specifies to run every Sunday at
+	// 1 AM and the Offset is 1 hour. Then at 1 AM on Sunday the data from 12 AM will be queried.
+	Offset time.Duration `json:"offset"`
+
+	// The name of a configured InfluxDB cluster.
+	// If empty the default cluster will be used.
+	Cluster string `json:"cluster"`
+
+	// The influxdb 2x organization for flux
+	// if empty the default org will be used
+	Org string `json:"org"`
+
+	// The influxdb 2x organization-id for flux
+	// if empty the default orgid will be used
+	OrgID string `json:"orgid"`
+}
+
+func newQueryFluxNode() *QueryFluxNode {
+	return &QueryFluxNode{
+		chainnode: newBasicChainNode("queryFlux", BatchEdge, BatchEdge),
+	}
+}
+
+// MarshalJSON converts QueryNode to JSON
+// tick:ignore
+func (n *QueryFluxNode) MarshalJSON() ([]byte, error) {
+	type Alias QueryFluxNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+		Offset string `json:"offset"`
+	}{
+		TypeOf: TypeOf{
+			Type: "queryFlux",
+			ID:   n.ID(),
+		},
+		Alias:  (*Alias)(n),
+		Period: influxql.FormatDuration(n.Period),
+		Every:  influxql.FormatDuration(n.Every),
+		Offset: influxql.FormatDuration(n.Offset),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an QueryNode
+// tick:ignore
+func (n *QueryFluxNode) UnmarshalJSON(data []byte) error {
+	type Alias QueryFluxNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Every  string `json:"every"`
+		Offset string `json:"offset"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "queryFlux" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as QueryNode", raw.ID, raw.Type)
+	}
+
+	n.Every, err = influxql.ParseDuration(raw.Every)
+	if err != nil {
+		return err
+	}
+
+	n.Offset, err = influxql.ParseDuration(raw.Offset)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
+	return nil
+}
+
+//tick:ignore
+func (n *QueryFluxNode) ChainMethods() map[string]reflect.Value {
+	return map[string]reflect.Value{}
+}
+
+// Align start and stop times for queries with even boundaries of the QueryNode.Every property.
+// Does not apply if using the QueryNode.Cron property.
+// tick:property
+func (n *QueryFluxNode) Align() *QueryFluxNode {
+	n.AlignFlag = true
+	return n
 }

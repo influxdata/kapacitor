@@ -205,6 +205,7 @@ func (n *node) Wait() error {
 	defer n.finishedMu.Unlock()
 	if !n.finished {
 		n.finished = true
+		// deadlocking here
 		n.err = <-n.errCh
 	}
 	return n.err

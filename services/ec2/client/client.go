@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	//"log"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -35,7 +34,6 @@ func New(c Config) (Client, error) {
 		Credentials: credentials.NewStaticCredentials(c.AccessKey, c.SecretKey, ""),
 	})
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	svc := autoscaling.New(sess)

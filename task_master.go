@@ -598,7 +598,7 @@ func (tm *TaskMaster) stopTask(id string) (err error) {
 		case BatchTask:
 			delete(tm.batches, id)
 		}
-
+		//FIXME: deadlock is here
 		err = et.stop()
 		if err != nil {
 			tm.diag.StoppedTaskWithError(id, err)

@@ -22,6 +22,48 @@ import (
 	"github.com/influxdata/wlog"
 )
 
+func TestBatch_Flux(t *testing.T) {
+	testCases := []struct {
+		script   string
+		name     string
+		expected models.Result
+	}{
+		{
+			name: "test1",
+			script: `batch|queryFlux('from(bucket:"example-bucket")
+|> range(start:-1h)
+|> filter(fn:(r) =>
+r._measurement == "cpu" and
+r.cpu == "cpu-total"
+)
+|> aggregateWindow(every: 1m, fn: mean)')
+	.every(1s)
+|httpOut('TestBatch_FluxQuery')
+`,
+			expected: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "yeas",
+						Tags:    map[string]string{"vote": "should we orange juice"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{mustParseTime("1971-01-01T00:00:00Z"), "yea"},
+							{mustParseTime("1971-01-01T00:00:02Z"), "nay"},
+							{mustParseTime("1971-01-01T00:00:04Z"), "yea"},
+							{mustParseTime("1971-01-01T00:00:05Z"), "yea"},
+							{mustParseTime("1971-01-01T00:00:06Z"), "nay"},
+							{mustParseTime("1971-01-01T00:00:08Z"), "yea"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		testBatcherWithOutput(t, "TestBatch_FluxQuery", tc.script, 21*time.Second, tc.expected, false)
+	}
+}
+
 func TestBatch_InvalidQuery(t *testing.T) {
 
 	// Create a new execution env
@@ -61,13 +103,6 @@ func TestBatch_InvalidQuery(t *testing.T) {
 	}
 }
 
-//{"name":"packets","points":[
-// {"fields":{"value":"bad"},"time":"2015-10-18T00:00:00Z"},
-// {"fields":{"value":"good"},"time":"2015-10-18T00:00:02Z"},
-// {"fields":{"value":"good"},"time":"2015-10-18T00:00:04Z"},
-// {"fields":{"value2":"good"},"time":"2015-10-18T00:00:05Z"},
-// {"fields":{"value":"bad"},"time":"2015-10-18T00:00:06Z"},
-// {"fields":{"value":"good"},"time":"2015-10-18T00:00:08Z"}]}
 func TestBatch_ChangeDetect(t *testing.T) {
 
 	var script = `

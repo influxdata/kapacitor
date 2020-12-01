@@ -126,6 +126,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewLog(parents).Build(node)
 	case *pipeline.QueryNode:
 		return NewQuery(parents).Build(node)
+	case *pipeline.QueryFluxNode:
+		return NewQueryFlux(parents).Build(node)
 	case *pipeline.SampleNode:
 		return NewSample(parents).Build(node)
 	case *pipeline.ShiftNode:

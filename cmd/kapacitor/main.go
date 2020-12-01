@@ -348,11 +348,12 @@ var (
 	rbId             = recordBatchFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 
 	recordQueryFlags = flag.NewFlagSet("record-query", flag.ExitOnError)
-	rqQuery          = recordQueryFlags.String("query", "", "The query to record.")
-	rqType           = recordQueryFlags.String("type", "", "The type of the recording to save (stream|batch).")
-	rqCluster        = recordQueryFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
-	rqNowait         = recordQueryFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
-	rqId             = recordQueryFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
+	// TODO: queryFlux recording
+	rqQuery   = recordQueryFlags.String("query", "", "The query to record.")
+	rqType    = recordQueryFlags.String("type", "", "The type of the recording to save (stream|batch).")
+	rqCluster = recordQueryFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
+	rqNowait  = recordQueryFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
+	rqId      = recordQueryFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 )
 
 func recordUsage() {
@@ -539,7 +540,6 @@ func doRecord(args []string) error {
 		return fmt.Errorf("Unknown record type %q, expected 'stream', 'batch' or 'query'", args[0])
 	}
 	if noWait {
-		fmt.Println(recording.ID)
 		return nil
 	}
 	for recording.Status == client.Running {
@@ -1041,7 +1041,6 @@ func doReplay(args []string) error {
 		return err
 	}
 	if *rnowait {
-		fmt.Println(replay.ID)
 		return nil
 	}
 	for replay.Status == client.Running {
@@ -1225,7 +1224,6 @@ func doReplayLive(args []string) error {
 		return fmt.Errorf("Unknown replay-live type %q, expected 'batch' or 'query'", args[0])
 	}
 	if noWait {
-		fmt.Println(replay.ID)
 		return nil
 	}
 	for replay.Status == client.Running {
