@@ -60,6 +60,7 @@ type PostData struct {
 	Text        string   `json:"text"`
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
+	Correlate   []string `json:"correlate"`
 	Value       string   `json:"value"`
 	Timeout     int64    `json:"timeout"`
 }

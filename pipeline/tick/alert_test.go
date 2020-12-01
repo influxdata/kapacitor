@@ -571,6 +571,7 @@ func TestAlertAlerta(t *testing.T) {
 	handler.Value = "Save the Galaxy"
 	handler.Origin = "Omega"
 	handler.Services("legion", "vent", "garrus", "distraction team", "grunt", "crew", "samara", "barrier")
+	handler.Correlated("Harbinger")
 	handler.Timeout = 10 * time.Second
 
 	want := `stream
@@ -589,6 +590,7 @@ func TestAlertAlerta(t *testing.T) {
         .value('Save the Galaxy')
         .origin('Omega')
         .services('legion', 'vent', 'garrus', 'distraction team', 'grunt', 'crew', 'samara', 'barrier')
+        .correlated('Harbinger')
         .timeout(10s)
 `
 	PipelineTickTestHelper(t, pipe, want)

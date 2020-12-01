@@ -216,6 +216,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
 			Dot("services", args(h.Service)...).
+			Dot("correlated", args(h.Correlate)...).
 			Dot("timeout", h.Timeout)
 	}
 
