@@ -29,7 +29,7 @@ func easyjson7be57abeDecodeGithubComInfluxdataKapacitorServicesAlert(in *jlexer.
 	}
 	in.Delim('{')
 	for !in.IsDelim('}') {
-		key := in.UnsafeString()
+		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		if in.IsNull() {
 			in.Skip()
@@ -44,11 +44,7 @@ func easyjson7be57abeDecodeGithubComInfluxdataKapacitorServicesAlert(in *jlexer.
 				in.Skip()
 			} else {
 				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.EventStates = make(map[string]EventState)
-				} else {
-					out.EventStates = nil
-				}
+				out.EventStates = make(map[string]EventState)
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
@@ -75,22 +71,12 @@ func easyjson7be57abeEncodeGithubComInfluxdataKapacitorServicesAlert(out *jwrite
 	_ = first
 	{
 		const prefix string = ",\"topic\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix[1:])
 		out.String(string(in.Topic))
 	}
 	{
 		const prefix string = ",\"event-states\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		if in.EventStates == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
 			out.RawString(`null`)
 		} else {
@@ -146,7 +132,7 @@ func easyjson7be57abeDecodeGithubComInfluxdataKapacitorServicesAlert1(in *jlexer
 	}
 	in.Delim('{')
 	for !in.IsDelim('}') {
-		key := in.UnsafeString()
+		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		if in.IsNull() {
 			in.Skip()
@@ -184,52 +170,27 @@ func easyjson7be57abeEncodeGithubComInfluxdataKapacitorServicesAlert1(out *jwrit
 	_ = first
 	{
 		const prefix string = ",\"message\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix[1:])
 		out.String(string(in.Message))
 	}
 	{
 		const prefix string = ",\"details\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Details))
 	}
 	{
 		const prefix string = ",\"time\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Raw((in.Time).MarshalJSON())
 	}
 	{
 		const prefix string = ",\"duration\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int64(int64(in.Duration))
 	}
 	{
 		const prefix string = ",\"level\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.RawText((in.Level).MarshalText())
 	}
 	out.RawByte('}')

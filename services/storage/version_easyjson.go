@@ -28,7 +28,7 @@ func easyjson8e52a332DecodeGithubComInfluxdataKapacitorServicesStorage(in *jlexe
 	}
 	in.Delim('{')
 	for !in.IsDelim('}') {
-		key := in.UnsafeString()
+		key := in.UnsafeFieldName(false)
 		in.WantColon()
 		if in.IsNull() {
 			in.Skip()
@@ -66,22 +66,12 @@ func easyjson8e52a332EncodeGithubComInfluxdataKapacitorServicesStorage(out *jwri
 	_ = first
 	{
 		const prefix string = ",\"version\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix[1:])
 		out.Int(int(in.Version))
 	}
 	{
 		const prefix string = ",\"value\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		if in.Value == nil {
 			out.RawString("null")
 		} else {

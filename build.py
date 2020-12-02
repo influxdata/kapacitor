@@ -158,24 +158,18 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
-    run("go install ./vendor/github.com/benbjohnson/tmpl")
-    run("go install ./vendor/github.com/mailru/easyjson/easyjson")
-    generate_cmd = ["go", "generate", "./..."]
-    p = subprocess.Popen(generate_cmd)
-    code = p.wait()
-    if code == 0:
-        logging.info("Generate succeeded.")
-        return True
-    else:
-        logging.error("Generate failed.")
+    run("go get github.com/golang/protobuf/protoc-gen-go/... github.com/benbjohnson/tmpl/... github.com/mailru/easyjson/easyjson/...")
+    try:
+         subprocess.check_output(["go", "generate", "./..."])
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
         return False
+    return True
 
 def go_get():
     """
     Retrieve build dependencies or restore pinned dependencies.
     """
-    # Nothing to do, all dependencies are vendored.
     return True
 
 def check_nochanges():
@@ -206,12 +200,14 @@ def run_tests(race, parallel, timeout, no_vet):
         logging.error("{}".format(out))
         return False
     if not no_vet:
-        vet_cmd = go_vet_command
-        out = run(vet_cmd)
-        if len(out) > 0:
-            logging.error("Go vet failed. Please run '{}' and fix any errors.".format(vet_cmd))
-            logging.error("{}".format(out))
+        try:
+            vet_cmd = ["go", "vet", "./..."]
+            subprocess.check_output(vet_cmd)
+        except subprocess.CalledProcessError as exc:
+            logging.error("Go vet failed. Please run '{}' and fix any errors.".format(' '.join(vet_cmd)))
+            logging.error("{}".format(exc.output))
             return False
+        return True
     else:
         logging.info("Skipping 'go vet' call...")
     test_command = "go test"
