@@ -1,6 +1,6 @@
 package storage
 
-//go:generate easyjson version.go
+//go:generate easyjson -all ./version.go
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 
 // VersionWrapper wraps a structure with a version so that changes
 // to the structure can be properly decoded.
-//easyjson:json
 type VersionWrapper struct {
 	Version int              `json:"version"`
 	Value   *json.RawMessage `json:"value"`

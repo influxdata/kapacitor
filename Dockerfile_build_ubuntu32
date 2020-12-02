@@ -41,7 +41,7 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.13.6
+ENV GO_VERSION 1.15.5
 ENV GO_ARCH 386
 RUN wget -q https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
