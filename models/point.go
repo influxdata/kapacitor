@@ -89,12 +89,15 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 	var buf strings.Builder
 	l := 0
 	if dims.ByName {
+		// add capacity for the name + "\n"
 		l += len(name) + 1
 	}
 	for i, d := range dims.TagNames {
 		if i != 0 {
+			// add capacity for the comma after the tagnames
 			l++
 		}
+		// add capacity for the name length, and the tag length, and the "="
 		l += len(d) + len(tags[d]) + 1
 	}
 	buf.Grow(l)
