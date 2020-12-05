@@ -2,13 +2,16 @@ package influxdb
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,6 +81,9 @@ type Config struct {
 	// Transport is the HTTP transport to use for requests
 	// If nil, a default transport will be used.
 	Transport *http.Transport
+
+	// Which compression should we use for writing to influxdb, defaults to "gzip".
+	Compression string
 }
 
 // AuthenticationMethod defines the type of authentication used.
@@ -106,11 +112,12 @@ type Credentials struct {
 
 // HTTPClient is safe for concurrent use.
 type HTTPClient struct {
-	mu     sync.RWMutex
-	config Config
-	urls   []url.URL
-	client *http.Client
-	index  int32
+	mu          sync.RWMutex
+	config      Config
+	urls        []url.URL
+	client      *http.Client
+	index       int32
+	compression string
 }
 
 // NewHTTPClient returns a new Client from the provided config.
@@ -133,6 +140,14 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 			Timeout:   conf.Timeout,
 			Transport: conf.Transport,
 		},
+	}
+	switch compression := strings.ToLower(strings.TrimSpace(conf.Compression)); compression {
+	case "none":
+		return c, nil
+	case "gzip", "": // treat gzip as default
+		c.compression = "gzip"
+	default:
+		return nil, fmt.Errorf("%s is not a supported compression type", compression)
 	}
 	return c, nil
 }
@@ -310,8 +325,29 @@ func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
 }
 
 func (c *HTTPClient) Write(bp BatchPoints) error {
-	var b bytes.Buffer
+	b := bytes.Buffer{}
 	precision := bp.Precision()
+
+	u := c.url()
+	u.Path = "write"
+	v := url.Values{}
+	v.Set("db", bp.Database())
+	v.Set("rp", bp.RetentionPolicy())
+	v.Set("precision", bp.Precision())
+	v.Set("consistency", bp.WriteConsistency())
+	u.RawQuery = v.Encode()
+
+	reqBody := io.Reader(&b)
+
+	if c.compression == "gzip" {
+		var err error
+		reqBody, err = CompressWithGzip(reqBody, gzip.DefaultCompression)
+		if err != nil {
+			return err
+		}
+
+	}
+
 	for _, p := range bp.Points() {
 		if _, err := b.Write(p.Bytes(precision)); err != nil {
 			return err
@@ -322,19 +358,14 @@ func (c *HTTPClient) Write(bp BatchPoints) error {
 		}
 	}
 
-	u := c.url()
-	u.Path = "write"
-	v := url.Values{}
-	v.Set("db", bp.Database())
-	v.Set("rp", bp.RetentionPolicy())
-	v.Set("precision", bp.Precision())
-	v.Set("consistency", bp.WriteConsistency())
-	u.RawQuery = v.Encode()
-	req, err := http.NewRequest("POST", u.String(), &b)
+	req, err := http.NewRequest("POST", u.String(), reqBody)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
+	if c.compression == "gzip" {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 
 	_, err = c.do(req, nil, http.StatusNoContent, http.StatusOK)
 	return err
