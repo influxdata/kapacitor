@@ -1017,10 +1017,20 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)
 	}
+	if h == nil && err != nil {
+		return handler{}, err
+	}
 	if spec.Match != "" {
 		// Wrap handler in match handler
 		handlerDiag := s.diag.WithHandlerContext(ctx...)
-		h, err = newMatchHandler(spec.Match, h, handlerDiag)
+		if h == nil {
+			panic("handler is nil, this should not happen")
+		}
+		var err2 error
+		h, err2 = newMatchHandler(spec.Match, h, handlerDiag)
+		if err2 != nil {
+			return handler{Spec: spec, Handler: h}, err2
+		}
 	}
 	return handler{Spec: spec, Handler: h}, err
 }
