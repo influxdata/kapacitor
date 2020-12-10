@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Bugfixes
+- [#2448](https://github.com/influxdata/kapacitor/pull/2448): Changes the alert-handler match function duration() to be alertDuration() to avoid name collision with the type conversion function of the same name.
+
+
 ### Features
 - [#1839](https://github.com/influxdata/kapacitor/pull/1839): Add Subscription path configuration option to allow Kapacitor to run behind a reverse proxy, thanks @aspring
 - [#2055](https://github.com/influxdata/kapacitor/pull/2055): Add support for correlate in the Alerta AlertNode, thanks @nermolaev!

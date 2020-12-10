@@ -168,7 +168,7 @@ func (kv *handlerSpecKV) getHelper(o storage.BinaryObject, err error) (HandlerSp
 }
 
 func (kv *handlerSpecKV) Create(h HandlerSpec) error {
-	return kv.store.Create(&h)
+	return kv.store.Put(&h)
 }
 func (kv *handlerSpecKV) CreateTx(tx storage.Tx, h HandlerSpec) error {
 	return kv.store.CreateTx(tx, &h)
