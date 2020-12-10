@@ -450,10 +450,6 @@ func (h *matchHandler) Handle(event alert.Event) {
 		}
 	}()
 
-	if h.h == nil {
-		panic("h.h is nil")
-	}
-
 	if ok, err := h.match(event); err != nil {
 		h.diag.Error("failed to evaluate match expression", err)
 	} else if ok {
