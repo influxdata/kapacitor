@@ -226,6 +226,12 @@ func (s *Service) preparePost(appKey, id string, message string, details string,
 		}
 	}
 
+	if len(data.Fields) > 0 {
+		for k, v := range data.Fields {
+			bpData[k] = fmt.Sprintf("%v", v)
+		}
+	}
+
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
 	if err := enc.Encode(bpData); err != nil {
