@@ -8,6 +8,7 @@
 
 ### Features
 - [#1839](https://github.com/influxdata/kapacitor/pull/1839): Add Subscription path configuration option to allow Kapacitor to run behind a reverse proxy, thanks @aspring
+- [#1894](https://github.com/influxdata/kapacitor/pull/1894): Add HTTP sources for sideload configuration, thanks @jregovic!
 - [#2055](https://github.com/influxdata/kapacitor/pull/2055): Add support for correlate in the Alerta AlertNode, thanks @nermolaev!
 - [#2409](https://github.com/influxdata/kapacitor/pull/2409): Optionally use kapacitor alert details as opsgenie description text,  thanks @JamesClonk!
 - [#2441](https://github.com/influxdata/kapacitor/pull/2441): Preallocate GroupIDs for increased performance by reducing allocations.
@@ -103,8 +104,6 @@
 ## v1.5.0 [2018-05-17]
 
 ### Features
-- [#1894](https://github.com/influxdata/kapacitor/pull/1894): Add HTTP sources for sideload configuration. 
-
 - [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to suppress events from other matching alerts.
 - [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
