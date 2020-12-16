@@ -4712,6 +4712,170 @@ errorCounts
 	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 
+func TestStream_DeleteJoin(t *testing.T) {
+
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.streamName('error_view')
+		.tolerance(2s)
+	|eval(lambda: "errors.sum" / "views.sum")
+		.as('error_percent')
+		.keep()
+	|httpOut('TestStream_Join')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						3.0,
+						300.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						11.0,
+						1100.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						12.0,
+						1200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						6.0,
+						600.0,
+					},
+				},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						5.0,
+						500.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						2.0,
+						200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						10.0,
+						1000.0,
+					},
+				},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+						200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						5.0,
+						500.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						4.0,
+						400.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						6.0,
+						600.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						4.0,
+						400.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinTolerance", script, 13*time.Second, er, true, nil)
+}
+
 func TestStream_Join_Delimiter(t *testing.T) {
 
 	var script = `

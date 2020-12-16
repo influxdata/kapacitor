@@ -20,6 +20,7 @@ type JoinNode struct {
 	j         *pipeline.JoinNode
 	fill      influxql.FillOption
 	fillValue interface{}
+	deleteAll bool
 
 	groupsMu sync.RWMutex
 	groups   map[models.GroupID]*joinGroup
@@ -91,8 +92,29 @@ func (n *JoinNode) Point(src int, p edge.PointMessage) error {
 
 func (n *JoinNode) Barrier(src int, b edge.BarrierMessage) error {
 	g := n.getOrCreateGroup(b.GroupID())
-	g.Barrier(src, b.Time())
+	if err := g.Barrier(src, b.Time()); err != nil {
+		return err
+	}
 	return edge.Forward(n.outs, b)
+}
+
+// Delete deletes the group from the JoinNode, and resets the Low Marks for from the group from that source.
+// if deleteAll is set on the
+func (n *JoinNode) Delete(src int, d edge.DeleteGroupMessage) error {
+	groupID := d.GroupID()
+	n.groupsMu.Lock()
+	delete(n.groups, groupID)
+	delete(n.matchGroupsBuffer, groupID)
+	delete(n.specificGroupsBuffer, groupID)
+	if n.deleteAll {
+		for x := range n.lowMarks {
+			delete(n.lowMarks, x)
+		}
+	} else {
+		delete(n.lowMarks, srcGroup{src: src, groupId: groupID})
+	}
+	n.groupsMu.Unlock()
+	return edge.Forward(n.outs, d)
 }
 
 func (n *JoinNode) Finish() error {
@@ -109,6 +131,7 @@ type messageMeta interface {
 	edge.Message
 	edge.PointMeta
 }
+
 type srcPoint struct {
 	Src int
 	Msg messageMeta
@@ -123,15 +146,17 @@ func (n *JoinNode) doMessage(src int, m messageMeta) error {
 	} else {
 		// Just send point on to group, we are not joining on specific dimensions.
 		group := n.getOrCreateGroup(m.GroupID())
-		group.Collect(src, m)
+		if err := group.Collect(src, m); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// The purpose of this method is to match more specific points
-// with the less specific points as they arrive.
+// The purpose of this method is to match more-specific points
+// with the less-specific points as they arrive.
 //
-// Where 'more specific' means, that a point has more dimensions than the join.on dimensions.
+// Where 'more-specific' means, that a point has more dimensions than the join.on dimensions.
 func (n *JoinNode) matchPoints(p srcPoint) {
 	// Specific points may be sent to the joinset without a matching point, but not the other way around.
 	// This is because the specific points have the needed specific tag data.
@@ -232,7 +257,6 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 				n.getOrCreateSpecificGroup(groupId).Enqueue(p)
 			}
 		}
-
 	} else {
 		// Cache match point.
 		n.getOrCreateMatchGroup(groupId).Enqueue(p)
