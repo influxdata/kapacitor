@@ -11,6 +11,7 @@ Group=kapacitor
 LimitNOFILE=65536
 EnvironmentFile=-/etc/default/kapacitor
 ExecStart=/usr/bin/kapacitord -config /etc/kapacitor/kapacitor.conf $KAPACITOR_OPTS
+ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
 

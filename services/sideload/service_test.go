@@ -23,9 +23,12 @@ func TestService_Source_Lookup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &httppost.Endpoint{
-		Url: fmt.Sprintf("file://%s/testdata/src0", wd),
+	conf := httppost.Config{URLTemplate: fmt.Sprintf("file://%s/testdata/src0", wd)}
+	e := &httppost.Endpoint{}
+	if err := e.Update(conf); err != nil {
+		t.Fatal(err)
 	}
+
 	src, err := s.Source(e)
 	if err != nil {
 		t.Fatal(err)

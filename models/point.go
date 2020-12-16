@@ -1,8 +1,8 @@
 package models
 
 import (
-	"bytes"
 	"sort"
+	"strings"
 )
 
 type GroupID string
@@ -86,7 +86,21 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		}
 		return NilGroup
 	}
-	var buf bytes.Buffer
+	var buf strings.Builder
+	l := 0
+	if dims.ByName {
+		// add capacity for the name + "\n"
+		l += len(name) + 1
+	}
+	for i, d := range dims.TagNames {
+		if i != 0 {
+			// add capacity for the comma after the tagnames
+			l++
+		}
+		// add capacity for the name length, and the tag length, and the "="
+		l += len(d) + len(tags[d]) + 1
+	}
+	buf.Grow(l)
 	if dims.ByName {
 		buf.WriteString(name)
 		// Add delimiter that is not allowed in name.
@@ -101,5 +115,5 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		buf.WriteString(tags[d])
 
 	}
-	return GroupID(buf.Bytes())
+	return GroupID(buf.String())
 }

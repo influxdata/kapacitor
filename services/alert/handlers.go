@@ -373,7 +373,7 @@ const (
 	levelFunc    = "level"
 	nameFunc     = "name"
 	taskNameFunc = "taskName"
-	durationFunc = "duration"
+	durationFunc = "alertDuration"
 )
 
 var matchIdentifiers = map[string]interface{}{
@@ -408,7 +408,6 @@ func newMatchHandler(match string, h alert.Handler, d HandlerDiagnostic) (*match
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid match expression")
 	}
-
 	mh := &matchHandler{
 		h:     h,
 		expr:  expr,
@@ -440,6 +439,17 @@ func newMatchHandler(match string, h alert.Handler, d HandlerDiagnostic) (*match
 }
 
 func (h *matchHandler) Handle(event alert.Event) {
+	defer func() {
+		if r := recover(); r != nil {
+			switch r := r.(type) {
+			case string:
+				h.diag.Error("recovered from panic", errors.New(r))
+			case error:
+				h.diag.Error("recovered from panic", r)
+			}
+		}
+	}()
+
 	if ok, err := h.match(event); err != nil {
 		h.diag.Error("failed to evaluate match expression", err)
 	} else if ok {
@@ -534,7 +544,6 @@ func (h *matchHandler) match(event alert.Event) (bool, error) {
 			return false, fmt.Errorf("no tag exists for %s", v)
 		}
 	}
-
 	// Evaluate expression with scope
 	return h.expr.EvalBool(h.scope)
 }

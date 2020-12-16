@@ -26,15 +26,7 @@ function enable_chkconfig {
     chkconfig --add kapacitor
 }
 
-if ! id kapacitor >/dev/null 2>&1; then
-    useradd --system -U -M kapacitor -s /bin/false -d $DATA_DIR
-fi
 chmod a+rX $BIN_DIR/kapacitor*
-
-mkdir -p $LOG_DIR
-chown -R -L kapacitor:kapacitor $LOG_DIR
-mkdir -p $DATA_DIR
-chown -R -L kapacitor:kapacitor $DATA_DIR
 
 test -f /etc/default/kapacitor || touch /etc/default/kapacitor
 
@@ -51,6 +43,17 @@ if [[ -f /etc/redhat-release ]]; then
     fi
 elif [[ -f /etc/debian_version ]]; then
     # Debian/Ubuntu logic
+
+    # Ownership for RH-based platforms is set in build.py via the `rmp-attr` option.
+    # We perform ownership change only for Debian-based systems.
+    # Moving these lines out of this if statement would make `rmp -V` fail after installation.
+    test -d $LOG_DIR || mkdir -p $LOG_DIR
+    test -d $DATA_DIR || mkdir -p $DATA_DIR
+    chown -R -L kapacitor:kapacitor $LOG_DIR
+    chown -R -L kapacitor:kapacitor $DATA_DIR
+    chmod 755 $LOG_DIR
+    chmod 755 $DATA_DIR
+
     if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
         install_systemd
         enable_systemd
@@ -66,7 +69,10 @@ elif [[ -f /etc/debian_version ]]; then
     fi
 elif [[ -f /etc/os-release ]]; then
     source /etc/os-release
-    if [[ $ID = "amzn" ]]; then
+    if [[ "$NAME" = "Amazon Linux" ]]; then
+        # Amazon Linux 2+ logic
+        install_systemd
+    elif [[ "$NAME" = "Amazon Linux AMI" ]]; then
         # Amazon Linux logic
         install_init
         # Do not enable service

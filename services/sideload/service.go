@@ -1,6 +1,7 @@
 package sideload
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,34 +91,37 @@ func (s *Service) Reload() error {
 
 func (s *Service) Source(endpoint *httppost.Endpoint) (Source, error) {
 	var src Source
-
-	u, err := url.Parse(endpoint.Url)
+	buf := &bytes.Buffer{}
+	if err := endpoint.URL().Execute(buf, map[interface{}]string{}); err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(buf.String())
 	if err != nil {
 		return nil, err
 	}
 	if u.Scheme != "file" && u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported source scheme %q, must be 'file' or 'http'", u.Scheme)
+		return nil, fmt.Errorf("unsupported source scheme %q, must be 'file', 'http', or 'https'", u.Scheme)
 	}
 
 	if u.Scheme == "file" {
-		src, err = s.SourceFile(u.Path)
+		src, err = s.sourceFile(u.Path)
 	} else if u.Scheme == "http" || u.Scheme == "https" {
-		src, err = s.SourceHttp(endpoint, u.Scheme)
+		src, err = s.sourceHttp(endpoint, u.Scheme)
 	}
 
 	return src, err
 }
 
-func (s *Service) SourceHttp(endpoint *httppost.Endpoint, scheme string) (Source, error) {
+func (s *Service) sourceHttp(endpoint *httppost.Endpoint, scheme string) (Source, error) {
 	var err error
-	dir := endpoint.Url
+	buf := &bytes.Buffer{}
+	if err := endpoint.URL().Execute(buf, map[interface{}]string{}); err != nil {
+		return nil, fmt.Errorf("Error creating request for sideload data from %s :: %s", buf.String(), err.Error())
+	}
+
+	dir := buf.String()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	/*
-		if err != nil {
-			return nil,fmt.Errorf("Error creating request for sideload data from %s :: %s",srcURL,err.Error())
-		}
-	*/
 	src, ok := s.sources[dir]
 	if !ok {
 		src = &source{
@@ -128,18 +132,15 @@ func (s *Service) SourceHttp(endpoint *httppost.Endpoint, scheme string) (Source
 		}
 		err = src.updateCache()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", dir, err.Error())
 		}
 		s.sources[dir] = src
 	}
 	src.referenceCount++
 
-	if err != nil {
-		return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", dir, err.Error())
-	}
 	return src, nil
 }
-func (s *Service) SourceFile(path string) (Source, error) {
+func (s *Service) sourceFile(path string) (Source, error) {
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("sideload source path must be absolute %q", path)
 	}
@@ -219,10 +220,13 @@ func (s *source) updateCacheFile() error {
 		s.cache[rel] = values
 		return nil
 	})
-	return errors.Wrapf(err, "failed to update sideload cache for source %q", s.dir)
+	return errors.Wrapf(err, "failed to update sideload cache for source file %q", s.dir)
 }
 func (s *source) updateCacheHttp() error {
 	req, err := http.NewRequest("GET", s.dir, nil)
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate request to update sideload cache for source %q", s.dir)
+	}
 	if s.e.Auth.Username != "" && s.e.Auth.Password != "" {
 		req.SetBasicAuth(s.e.Auth.Username, s.e.Auth.Password)
 	}
@@ -238,7 +242,7 @@ func (s *source) updateCacheHttp() error {
 
 	values, err := loadValues(resp.Body)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update sideload cache for source %q", s.dir)
+		return errors.Wrapf(err, "failed to load body to update sideload cache for source %q", s.dir)
 	}
 	for k, v := range values {
 		s.cache[k] = v

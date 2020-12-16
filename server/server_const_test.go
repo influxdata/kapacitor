@@ -5,7 +5,8 @@ package server_test
 
 const (
 	ExecutableSuffix    = ""
-	PythonExecutable    = "python2"
+	Python2Executable   = "python2"
+	PythonExecutable    = "python"
 	LogFileExpectedMode = 0604
 	AlertLogPath        = `/var/log/alert.log`
 )

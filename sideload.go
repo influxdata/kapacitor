@@ -2,6 +2,12 @@ package kapacitor
 
 import (
 	"fmt"
+	"log"
+	"net/url"
+	"strconv"
+	"text/template"
+	text "text/template"
+
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -10,11 +16,6 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/pkg/errors"
-	"log"
-	"net/url"
-	"strconv"
-	"text/template"
-	text "text/template"
 )
 
 type SideloadNode struct {
@@ -48,8 +49,10 @@ func newSideloadNode(et *ExecutingTask, n *pipeline.SideloadNode, d NodeDiagnost
 			log.Fatal("Specified endpoint does not exist: " + n.Source)
 		}
 	} else {
-		e = &httppost.Endpoint{
-			Url: n.Source,
+		conf := httppost.Config{URLTemplate: n.Source}
+		e = &httppost.Endpoint{}
+		if err := e.Update(conf); err != nil {
+			return nil, err
 		}
 	}
 	sn.Endpoint = e

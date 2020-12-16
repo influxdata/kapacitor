@@ -15,10 +15,12 @@ import (
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -43,6 +45,7 @@ import (
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/serverset"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -52,11 +55,13 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 
 	"github.com/influxdata/influxdb/services/collectd"
@@ -75,6 +80,7 @@ type Config struct {
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        diagnostic.Config `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
+	TLS            tlsconfig.Config  `toml:"tls"`
 
 	// Input services
 	Graphite []graphite.Config `toml:"graphite"`
@@ -84,6 +90,8 @@ type Config struct {
 
 	// Alert handlers
 	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
+	BigPanda   bigpanda.Config   `toml:"bigpanda" override:"bigpanda"`
+	Discord    discord.Configs   `toml:"discord" override:"discord,element-key=workspace"`
 	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
 	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
 	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
@@ -96,8 +104,10 @@ type Config struct {
 	SMTP       smtp.Config       `toml:"smtp" override:"smtp"`
 	SNMPTrap   snmptrap.Config   `toml:"snmptrap" override:"snmptrap"`
 	Sensu      sensu.Config      `toml:"sensu" override:"sensu"`
+	ServiceNow servicenow.Config `toml:"servicenow" override:"servicenow"`
 	Slack      slack.Configs     `toml:"slack" override:"slack,element-key=workspace"`
 	Talk       talk.Config       `toml:"talk" override:"talk"`
+	Teams      teams.Config      `toml:"teams" override:"teams"`
 	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
 	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
 
@@ -147,11 +157,14 @@ func NewConfig() *Config {
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = diagnostic.NewConfig()
 	c.ConfigOverride = config.NewConfig()
+	c.TLS = tlsconfig.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
 
 	c.Alerta = alerta.NewConfig()
+	c.BigPanda = bigpanda.NewConfig()
+	c.Discord = discord.Configs{discord.NewDefaultConfig()}
 	c.HipChat = hipchat.NewConfig()
 	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
@@ -163,8 +176,10 @@ func NewConfig() *Config {
 	c.HTTPPost = httppost.Configs{httppost.NewConfig()}
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
+	c.ServiceNow = servicenow.NewConfig()
 	c.Slack = slack.Configs{slack.NewDefaultConfig()}
 	c.Talk = talk.NewConfig()
+	c.Teams = teams.NewConfig()
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
@@ -222,6 +237,9 @@ func (c *Config) Validate() error {
 	if err := c.Task.Validate(); err != nil {
 		return errors.Wrap(err, "task")
 	}
+	if err := c.TLS.Validate(); err != nil {
+		return errors.Wrap(err, "tls")
+	}
 	if err := c.Load.Validate(); err != nil {
 		return err
 	}
@@ -266,6 +284,12 @@ func (c *Config) Validate() error {
 	if err := c.Alerta.Validate(); err != nil {
 		return errors.Wrap(err, "alerta")
 	}
+	if err := c.BigPanda.Validate(); err != nil {
+		return errors.Wrap(err, "bigpanda")
+	}
+	if err := c.Discord.Validate(); err != nil {
+		return err
+	}
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
 	}
@@ -302,11 +326,17 @@ func (c *Config) Validate() error {
 	if err := c.Sensu.Validate(); err != nil {
 		return errors.Wrap(err, "sensu")
 	}
+	if err := c.ServiceNow.Validate(); err != nil {
+		return errors.Wrap(err, "servicenow")
+	}
 	if err := c.Slack.Validate(); err != nil {
 		return errors.Wrap(err, "slack")
 	}
 	if err := c.Talk.Validate(); err != nil {
 		return errors.Wrap(err, "talk")
+	}
+	if err := c.Teams.Validate(); err != nil {
+		return errors.Wrap(err, "teams")
 	}
 	if err := c.Telegram.Validate(); err != nil {
 		return errors.Wrap(err, "telegram")

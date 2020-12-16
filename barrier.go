@@ -59,7 +59,7 @@ func (n *BarrierNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge
 
 func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (edge.ForwardReceiver, func(), error) {
 	switch {
-	case n.b.Idle != 0:
+	case n.b.Idle > 0:
 		idleBarrier := newIdleBarrier(
 			first.Name(),
 			group,
@@ -69,7 +69,7 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 			n.b.Delete,
 		)
 		return idleBarrier, idleBarrier.Stop, nil
-	case n.b.Period != 0:
+	case n.b.Period > 0:
 		periodicBarrier := newPeriodicBarrier(
 			first.Name(),
 			group,
@@ -80,7 +80,7 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 		)
 		return periodicBarrier, periodicBarrier.Stop, nil
 	default:
-		return nil, nil, errors.New("unreachable code, barrier node should have non-zero idle or non-zero period")
+		return nil, nil, errors.New("unreachable code, barrier node should have positive idle or positive period")
 	}
 }
 
@@ -109,8 +109,8 @@ func newIdleBarrier(name string, group edge.GroupInfo, in edge.Edge, idle time.D
 		lastBarrierT: atomic.Value{},
 		wg:           sync.WaitGroup{},
 		outs:         outs,
-		stopC:        make(chan struct{}),
-		resetTimerC:  make(chan struct{}),
+		stopC:        make(chan struct{}, 1),
+		resetTimerC:  make(chan struct{}, 1),
 		del:          del,
 	}
 
@@ -128,11 +128,17 @@ func (n *idleBarrier) Init() {
 }
 
 func (n *idleBarrier) Stop() {
+	n.stop()
+	n.wg.Wait()
+}
+
+func (n *idleBarrier) stop() {
+	// Send a stop signal at least once to the stop channel.
+	// The stop channel has a buffer of size one and only the
+	// first stop signal matters.
 	select {
-	case <-n.stopC:
+	case n.stopC <- struct{}{}:
 	default:
-		close(n.stopC)
-		n.wg.Wait()
 	}
 }
 
@@ -161,7 +167,8 @@ func (n *idleBarrier) Barrier(m edge.BarrierMessage) (edge.Message, error) {
 }
 func (n *idleBarrier) DeleteGroup(m edge.DeleteGroupMessage) (edge.Message, error) {
 	if m.GroupID() == n.group.ID {
-		n.Stop()
+		// Signal that the idle barrier should stop.
+		n.stop()
 	}
 	return m, nil
 }
@@ -177,7 +184,13 @@ func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *idleBarrier) resetTimer() {
-	n.resetTimerC <- struct{}{}
+	// The first reset will be buffered and subsequent resets when the
+	// channel is full can be safely discarded because the reset signal
+	// has already been sent.
+	select {
+	case n.resetTimerC <- struct{}{}:
+	default:
+	}
 }
 
 func (n *idleBarrier) emitBarrier() error {

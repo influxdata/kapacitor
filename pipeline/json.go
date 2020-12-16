@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -447,6 +448,9 @@ func unmarshalStats(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	}
 	child := nodeParent.Stats(0)
 	err := json.Unmarshal(data, child)
+	if child.Interval == 0 {
+		return nil, errors.New("zero is an invalid stats interval")
+	}
 	return child, err
 }
 

@@ -157,6 +157,26 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		}
 	}
 
+	for _, h := range a.ServiceNowHandlers {
+		n.Dot("servicenow").
+			Dot("source", h.Source).
+			Dot("node", h.Node).
+			Dot("type", h.Type).
+			Dot("resource", h.Resource).
+			Dot("metricName", h.MetricName).
+			Dot("messageKey", h.MessageKey)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.AdditionalInfoMap))
+		for k := range h.AdditionalInfoMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("additionalInfo", k, h.AdditionalInfoMap[k])
+		}
+	}
+
 	for _, h := range a.SlackHandlers {
 		n.Dot("slack").
 			Dot("workspace", h.Workspace).
@@ -196,6 +216,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
 			Dot("services", args(h.Service)...).
+			Dot("correlated", args(h.Correlate)...).
 			Dot("timeout", h.Timeout)
 	}
 

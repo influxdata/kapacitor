@@ -82,13 +82,14 @@ func (s *Service) Open() error {
 // Close stops the scraper service
 func (s *Service) Close() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.open {
+	if s.open {
+		s.open = false
+		s.mu.Unlock()
+	} else {
+		s.mu.Unlock()
 		return nil
 	}
 
-	s.open = false
 	close(s.closing)
 
 	s.wg.Wait()
