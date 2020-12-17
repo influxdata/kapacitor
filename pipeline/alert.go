@@ -1637,6 +1637,7 @@ type DiscordHandler struct {
 //      enabled = true
 //      app-key = "my-app-key"
 //      token = "your-api-key"
+//      url = "BigPanda alert webhook url"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
@@ -1654,11 +1655,13 @@ type DiscordHandler struct {
 //      |alert()
 //          .bigPanda()
 //          .appKey('my-application')
+//          .primaryProperty('property1')
+//          .secondaryProperty('property2')
 //
-// send alerts with custom appKey
+// send alerts with custom appKey, primary and secondary property
 //
 // If the 'bigpanda' section in the configuration has the option: global = true
-// then all alerts are sent to BigpPanda without the need to explicitly state it
+// then all alerts are sent to BigPanda without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
@@ -1690,6 +1693,12 @@ type BigPandaHandler struct {
 	// Application id
 	// If empty uses the default config
 	AppKey string `json:"app-key"`
+
+	// Custom primary BigPanda property
+	PrimaryProperty string `json:"primary-property"`
+
+	// Custom secondary BigPanda property
+	SecondaryProperty string `json:"secondary-property"`
 }
 
 // Send the alert to Telegram.
