@@ -16,7 +16,31 @@ import (
 //
 // Add a field `cpu_threshold` and a tag `foo` to each point based on the value loaded from the hierarchical source.
 // The list of templates in the `.order()` property are evaluated using the points tags.
+// .source may be one of: a file URI, a URL, or an endpoint name as configured in the Kapacitor configuration file
+// as an httppost object.
+//
+// If  source is defined as a plain string and not a URI (file://,http://), the source wil interpreted as an endpoint
+// defined in an [[httpost]] section in the Kapacitor configuration.
+//
+// A source defined as an HTTP URL or [[httppost]] endpoint will be loaded as an HTTP GET and loaded only once when a
+// task is enabled, and then on subsequent calls to the /sideload/reload endpoint.
+// An HTTP source endpoint should return a JSON document where each property is a key name specified in the order statement
+// and a its value is an object with a set of key/value pairs.
+// HTTP Source example:
+//{
+//	"host1" : {
+// 	"cpu_threshold":98,
+// 	"some_tag": "value",
+// 	"disable": "False"
+// 	},
+// 	"some_tag_value": {
+// 		"cpu_threshold": 97
+// 		"another_tag": "value"
+// 	}
+// }
+//
 // The files paths are checked then checked in order for the specified keys and the first value that is found is used.
+// HTTP endpoints are checked in the same manner.
 type SideloadNode struct {
 	chainnode
 

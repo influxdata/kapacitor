@@ -33,7 +33,7 @@ type Endpoint struct {
 	mu            sync.RWMutex
 	urlTemplate   *template.Template
 	headers       map[string]string
-	auth          BasicAuth
+	Auth          BasicAuth
 	alertTemplate *template.Template
 	rowTemplate   *template.Template
 	closed        bool
@@ -43,7 +43,7 @@ func NewEndpoint(urlt *template.Template, headers map[string]string, auth BasicA
 	return &Endpoint{
 		urlTemplate:   urlt,
 		headers:       headers,
-		auth:          auth,
+		Auth:          auth,
 		alertTemplate: at,
 		rowTemplate:   rt,
 	}
@@ -64,7 +64,7 @@ func (e *Endpoint) Update(c Config) error {
 	}
 	e.urlTemplate = ut
 	e.headers = c.Headers
-	e.auth = c.BasicAuth
+	e.Auth = c.BasicAuth
 	at, err := c.getAlertTemplate()
 	if err != nil {
 		return err
@@ -112,8 +112,8 @@ func (e *Endpoint) NewHTTPRequest(body io.Reader, tmplCtx interface{}) (req *htt
 		return nil, fmt.Errorf("failed to create POST request: %v", err)
 	}
 
-	if e.auth.valid() {
-		req.SetBasicAuth(e.auth.Username, e.auth.Password)
+	if e.Auth.valid() {
+		req.SetBasicAuth(e.Auth.Username, e.Auth.Password)
 	}
 
 	for k, v := range e.headers {

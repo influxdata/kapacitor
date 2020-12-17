@@ -2,6 +2,8 @@ package kapacitor
 
 import (
 	"fmt"
+	"log"
+	"net/url"
 	"strconv"
 	"text/template"
 	text "text/template"
@@ -11,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/pkg/errors"
 )
@@ -20,14 +23,15 @@ type SideloadNode struct {
 	s          *pipeline.SideloadNode
 	source     sideload.Source
 	orderTmpls []orderTmpl
-
-	order []string
-
+	Endpoint   *httppost.Endpoint
+	order      []string
 	bufferPool *bufpool.Pool
 }
 
 // Create a new SideloadNode which loads fields and tags from external sources.
 func newSideloadNode(et *ExecutingTask, n *pipeline.SideloadNode, d NodeDiagnostic) (*SideloadNode, error) {
+	var e *httppost.Endpoint
+	var ok bool
 	sn := &SideloadNode{
 		node:       node{Node: n, et: et, diag: d},
 		s:          n,
@@ -35,11 +39,29 @@ func newSideloadNode(et *ExecutingTask, n *pipeline.SideloadNode, d NodeDiagnost
 		order:      make([]string, len(n.OrderList)),
 		orderTmpls: make([]orderTmpl, len(n.OrderList)),
 	}
-	src, err := et.tm.SideloadService.Source(n.Source)
+	u, err := url.Parse(n.Source)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if u.Scheme == "" {
+		e, ok = et.tm.HTTPPostService.Endpoint(n.Source)
+		if !ok {
+			log.Fatal("Specified endpoint does not exist: " + n.Source)
+		}
+	} else {
+		conf := httppost.Config{URLTemplate: n.Source}
+		e = &httppost.Endpoint{}
+		if err := e.Update(conf); err != nil {
+			return nil, err
+		}
+	}
+	sn.Endpoint = e
+	src, err := et.tm.SideloadService.Source(e)
 	if err != nil {
 		return nil, err
 	}
 	sn.source = src
+
 	for i, o := range n.OrderList {
 		op, err := newOrderTmpl(o, sn.bufferPool)
 		if err != nil {
