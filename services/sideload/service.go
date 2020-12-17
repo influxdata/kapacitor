@@ -36,7 +36,7 @@ type Service struct {
 	routes []httpd.Route
 
 	mu      sync.Mutex
-	sources map[string]*source
+	sources map[string]Source
 
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -47,7 +47,7 @@ type Service struct {
 func NewService(d Diagnostic) *Service {
 	return &Service{
 		diag:    d,
-		sources: make(map[string]*source),
+		sources: make(map[string]Source),
 	}
 }
 
@@ -82,7 +82,7 @@ func (s *Service) Reload() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for dir, src := range s.sources {
-		if err := src.updateCache(); err != nil {
+		if err := src.UpdateCache(); err != nil {
 			return errors.Wrapf(err, "failed to update source %q", dir)
 		}
 	}
@@ -124,19 +124,21 @@ func (s *Service) sourceHttp(endpoint *httppost.Endpoint, scheme string) (Source
 	defer s.mu.Unlock()
 	src, ok := s.sources[dir]
 	if !ok {
-		src = &source{
-			s:      s,
-			dir:    dir,
-			scheme: scheme,
-			e:      endpoint,
+		src = &httpSource{
+			fileSource: fileSource{
+				s:      s,
+				dir:    dir,
+				scheme: scheme,
+			},
+			e: endpoint,
 		}
-		err = src.updateCache()
+		err = src.UpdateCache()
 		if err != nil {
 			return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", dir, err.Error())
 		}
 		s.sources[dir] = src
 	}
-	src.referenceCount++
+	src.addToReferenceCount(1)
 
 	return src, nil
 }
@@ -149,24 +151,24 @@ func (s *Service) sourceFile(path string) (Source, error) {
 	defer s.mu.Unlock()
 	src, ok := s.sources[dir]
 	if !ok {
-		src = &source{
+		src = &fileSource{
 			s:      s,
 			dir:    dir,
 			scheme: "file",
 		}
-		err := src.updateCache()
+		err := src.UpdateCache()
 		if err != nil {
 			return nil, err
 		}
 
 		s.sources[dir] = src
 	}
-	src.referenceCount++
+	src.addToReferenceCount(1)
 
 	return src, nil
 
 }
-func (s *Service) removeSource(src *source) {
+func (s *Service) removeSource(src *fileSource) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	src.referenceCount--
@@ -178,24 +180,30 @@ func (s *Service) removeSource(src *source) {
 type Source interface {
 	Lookup(order []string, key string) interface{}
 	Close()
+	UpdateCache() error
+	addToReferenceCount(int) int
 }
 
-type source struct {
-	s      *Service
-	scheme string
-	dir    string
-	mu     sync.RWMutex
-	e      *httppost.Endpoint
-
+type fileSource struct {
+	s              *Service
+	dir            string
+	mu             sync.RWMutex
+	scheme         string
 	cache          map[string]map[string]interface{}
 	referenceCount int
 }
 
-func (s *source) Close() {
+func (s *fileSource) addToReferenceCount(i int) int {
+	s.referenceCount += i
+	return s.referenceCount
+}
+
+func (s *fileSource) Close() {
 	s.s.removeSource(s)
 }
 
-func (s *source) updateCacheFile() error {
+func (s *fileSource) UpdateCache() error {
+	s.cache = make(map[string]map[string]interface{})
 	err := filepath.Walk(s.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -222,7 +230,35 @@ func (s *source) updateCacheFile() error {
 	})
 	return errors.Wrapf(err, "failed to update sideload cache for source file %q", s.dir)
 }
-func (s *source) updateCacheHttp() error {
+
+func (s *fileSource) Lookup(order []string, key string) (value interface{}) {
+	key = filepath.Clean(key)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, o := range order {
+		values, ok := s.cache[o]
+		if !ok {
+			continue
+		}
+		v, ok := values[key]
+		if !ok {
+			continue
+		}
+		value = v
+		break
+	}
+	return
+}
+
+type httpSource struct {
+	fileSource
+	e *httppost.Endpoint
+}
+
+func (s *httpSource) UpdateCache() error {
+	s.cache = make(map[string]map[string]interface{})
 	req, err := http.NewRequest("GET", s.dir, nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate request to update sideload cache for source %q", s.dir)
@@ -248,40 +284,6 @@ func (s *source) updateCacheHttp() error {
 		s.cache[k] = v
 	}
 	return nil
-}
-
-func (s *source) updateCache() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cache = make(map[string]map[string]interface{})
-
-	if s.scheme == "file" {
-		return s.updateCacheFile()
-	} else if s.scheme == "http" || s.scheme == "https" {
-		return s.updateCacheHttp()
-	}
-	return nil
-}
-
-func (s *source) Lookup(order []string, key string) (value interface{}) {
-	key = filepath.Clean(key)
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, o := range order {
-		values, ok := s.cache[o]
-		if !ok {
-			continue
-		}
-		v, ok := values[key]
-		if !ok {
-			continue
-		}
-		value = v
-		break
-	}
-	return
 }
 
 func readValues(p string) (map[string]interface{}, error) {
