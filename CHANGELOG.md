@@ -13,6 +13,7 @@
 - [#2409](https://github.com/influxdata/kapacitor/pull/2409): Optionally use kapacitor alert details as opsgenie description text,  thanks @JamesClonk!
 - [#2441](https://github.com/influxdata/kapacitor/pull/2441): Preallocate GroupIDs for increased performance by reducing allocations.
 - [#2456](https://github.com/influxdata/kapacitor/pull/2456): Gzip data by default that is sent to influxdb.
+- [#2454](https://github.com/influxdata/kapacitor/pull/2454): Add PrimaryProperty and SecondaryProperty methods to BigPanda AlertNode.
 
 ## v1.5.7 [2020-10-27]
 
