@@ -113,11 +113,14 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.AppKey, "", o.Message, "", o.Level, o.Timestamp, o.Data)
+	hc := &HandlerConfig{
+		AppKey: o.AppKey,
+	}
+	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc)
 }
 
-func (s *Service) Alert(appKey, id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	req, err := s.preparePost(appKey, id, message, details, level, timestamp, data)
+func (s *Service) Alert(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig) error {
+	req, err := s.preparePost(id, message, details, level, timestamp, data, hc)
 
 	if err != nil {
 		return err
@@ -173,7 +176,7 @@ curl -X POST -H "Content-Type: application/json" \
   "primary_property": "application",
   "secondary_property": "host"
 */
-func (s *Service) preparePost(appKey, id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
+func (s *Service) preparePost(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -215,15 +218,26 @@ func (s *Service) preparePost(appKey, id string, message string, details string,
 	bpData["timestamp"] = timestamp.Unix()
 	bpData["status"] = status
 
-	if appKey == "" {
-		appKey = c.AppKey
+	// primary and secondary property
+	if hc.PrimaryProperty != "" {
+		bpData["primary_property"] = hc.PrimaryProperty
 	}
-	bpData["app_key"] = appKey
+	if hc.SecondaryProperty != "" {
+		bpData["secondary_property"] = hc.SecondaryProperty
+	}
 
-	if len(data.Tags) > 0 {
-		for k, v := range data.Tags {
-			bpData[k] = v
-		}
+	if hc.AppKey != "" {
+		bpData["app_key"] = hc.AppKey
+	} else {
+		bpData["app_key"] = c.AppKey
+	}
+
+	for k, v := range data.Tags {
+		bpData[k] = v
+	}
+
+	for k, v := range data.Fields {
+		bpData[k] = fmt.Sprintf("%v", v)
 	}
 
 	var post bytes.Buffer
@@ -232,7 +246,12 @@ func (s *Service) preparePost(appKey, id string, message string, details string,
 		return nil, err
 	}
 
-	alertUrl, err := url.Parse(c.URL)
+	bpUrl := hc.URL
+	if bpUrl == "" {
+		bpUrl = c.URL
+	}
+
+	alertUrl, err := url.Parse(bpUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +267,17 @@ func (s *Service) preparePost(appKey, id string, message string, details string,
 
 // HandlerConfig defines the high-level struct required to connect to BigPanda
 type HandlerConfig struct {
+	// BigPanda AppKey
 	AppKey string `mapstructure:"app-key"`
+
+	// webhook URL used to post alert.
+	// If empty uses the service URL from the configuration.
+	URL string `mapstructure:"url"`
+
+	// custom primary BigPanda property
+	PrimaryProperty string `mapstructure:"primary-property"`
+	// custom secondary BigPanda property
+	SecondaryProperty string `mapstructure:"secondary-property"`
 }
 
 type handler struct {
@@ -267,13 +296,13 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
-		h.c.AppKey,
 		event.State.ID,
 		event.State.Message,
 		event.State.Details,
 		event.State.Level,
 		event.State.Time,
 		event.Data,
+		&h.c,
 	); err != nil {
 		h.diag.Error("failed to send event to BigPanda", err)
 	}
