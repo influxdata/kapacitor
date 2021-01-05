@@ -232,16 +232,12 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		bpData["app_key"] = c.AppKey
 	}
 
-	if len(data.Tags) > 0 {
-		for k, v := range data.Tags {
-			bpData[k] = v
-		}
+	for k, v := range data.Tags {
+		bpData[k] = v
 	}
 
-	if len(data.Fields) > 0 {
-		for k, v := range data.Fields {
-			bpData[k] = fmt.Sprintf("%v", v)
-		}
+	for k, v := range data.Fields {
+		bpData[k] = fmt.Sprintf("%v", v)
 	}
 
 	var post bytes.Buffer
@@ -250,12 +246,11 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		return nil, err
 	}
 
-	var bpUrl string
-	if hc.URL != "" {
-		bpUrl = hc.URL
-	} else {
+	bpUrl := hc.URL
+	if bpUrl == "" {
 		bpUrl = c.URL
 	}
+
 	alertUrl, err := url.Parse(bpUrl)
 	if err != nil {
 		return nil, err

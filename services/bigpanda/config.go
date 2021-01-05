@@ -26,16 +26,17 @@ type Config struct {
 	// Only applies if global is also set.
 	StateChangesOnly bool `toml:"state-changes-only" override:"state-changes-only"`
 
-	// Whether to skip the tls verification of the alerta host
+	// Whether to skip the tls verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 
-	// BigPanda Alert webhook URL,
-	// https://api.bigpanda.io/data/v2/alerts
+	//BigPanda Alert api URL, if not specified https://api.bigpanda.io/data/v2/alerts is used
 	URL string `toml:"url" override:"url"`
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		URL: defaultBigPandaAlertApi,
+	}
 }
 
 func (c Config) Validate() error {
