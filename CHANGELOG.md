@@ -14,7 +14,7 @@
 - [#2441](https://github.com/influxdata/kapacitor/pull/2441): Preallocate GroupIDs for increased performance by reducing allocations.
 - [#2456](https://github.com/influxdata/kapacitor/pull/2456): Gzip data by default that is sent to influxdb.
 - [#2454](https://github.com/influxdata/kapacitor/pull/2454): Add PrimaryProperty and SecondaryProperty methods to BigPanda AlertNode.
-- [#2461](https://github.com/influxdata/kapacitor/pull/2461): BREAKING: we are forced to remove support for 386 builds as go doesn't support them anymore.
+- [#2462](https://github.com/influxdata/kapacitor/pull/2462): BREAKING: we are forced to remove support for 386/darwin builds as go doesn't support them anymore.  We also added arm64/darwin builds.
 
 ## v1.5.7 [2020-10-27]
 
