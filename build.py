@@ -92,9 +92,9 @@ targets = {
 }
 
 supported_builds = {
-    'darwin': [ "amd64" ],
-    'linux': [ "amd64", "armhf", "arm64", "armel", "static_amd64" ],
-    'windows': [ "amd64" ]
+    'darwin': [ "amd64", "arm64" ],
+    'linux': [ "amd64", "i386", "armhf", "arm64", "armel", "static_i386", "static_amd64" ],
+    'windows': [ "amd64", "i386" ]
 }
 
 supported_packages = {
@@ -382,6 +382,8 @@ def get_system_arch():
     arch = os.uname()[4]
     if arch == "x86_64":
         arch = "amd64"
+    elif arch == "386":
+        arch = "i386"
     elif arch == "aarch64":
         arch = "arm64"
     elif 'arm' in arch:
@@ -529,7 +531,9 @@ def build(version=None,
 
         # Handle variations in architecture output
         fullarch = arch
-        if arch == "aarch64" or arch == "arm64":
+        if arch == "i386" or arch == "i686":
+            arch = "386"
+        elif arch == "aarch64" or arch == "arm64":
             arch = "arm64"
         elif "arm" in arch:
             arch = "arm"
@@ -909,7 +913,7 @@ if __name__ == '__main__':
                         type=str,
                         help='Name to use for package name (when package is specified)')
     parser.add_argument('--arch',
-                        metavar='<amd64|armhf|arm64|armel|all>',
+                        metavar='<amd64|i386|armhf|arm64|armel|all>',
                         type=str,
                         default=get_system_arch(),
                         help='Target architecture for build output')
