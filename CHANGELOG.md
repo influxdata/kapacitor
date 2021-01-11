@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.8 [2021-01-11]
 
 ### Bugfixes
 - [#2448](https://github.com/influxdata/kapacitor/pull/2448): Changes the alert-handler match function duration() to be alertDuration() to avoid name collision with the type conversion function of the same name.
