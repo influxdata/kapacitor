@@ -253,15 +253,18 @@ func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc s
 	return nil
 }
 
-func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.Reader, error) {
+func (s *Service) sendResolve(c Config, routingKey, alertID string, data alert.EventData) (string, io.Reader, error) {
 	// create a new AlertPayload for us to fire off
 	type Resolve struct {
 		RoutingKey  string `json:"routing_key"`
 		DedupKey    string `json:"dedup_key"`
 		EventAction string `json:"event_action"`
+		Payload     *PDCEF `json:"payload"`
 	}
 
-	ap := Resolve{}
+	ap := Resolve{
+		Payload: &PDCEF{},
+	}
 
 	if routingKey == "" {
 		ap.RoutingKey = c.RoutingKey
@@ -271,6 +274,9 @@ func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.
 
 	ap.DedupKey = alertID
 	ap.EventAction = "resolve"
+
+	ap.Payload.CustomDetails = make(map[string]interface{})
+	ap.Payload.CustomDetails["result"] = data.Result
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
@@ -301,7 +307,9 @@ func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, 
 		severity = "info"
 	default:
 		// default is a 'resolve' function
-		return s.sendResolve(c, routingKey, alertID)
+		// return s.sendResolve(c, routingKey, alertID, data)
+		severity = "info"
+		eventType = "resolve"
 	}
 
 	// create a new AlertPayload for us to fire off
