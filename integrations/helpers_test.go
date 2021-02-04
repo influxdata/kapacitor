@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/influxdb"
@@ -112,8 +113,8 @@ func compareResultsIgnoreSeriesOrder(exp, got models.Result) (bool, string) {
 		if !reflect.DeepEqual(exp.Series[i].Columns, got.Series[j].Columns) {
 			return false, fmt.Sprintf("unexpected series columns: i: %d \nexp %v \ngot %v", i, exp.Series[i].Columns, got.Series[j].Columns)
 		}
-		if !reflect.DeepEqual(exp.Series[i].Values, got.Series[j].Values) {
-			return false, fmt.Sprintf("unexpected series values: i: %d \nexp %v \ngot %v", i, exp.Series[i].Values, got.Series[j].Values)
+		if !cmp.Equal(exp.Series[i].Values, got.Series[j].Values) {
+			return false, fmt.Sprintf("unexpected series values: i: %d \n %s", i, cmp.Diff(exp.Series[i].Values, got.Series[j].Values))
 		}
 	}
 	return true, ""
