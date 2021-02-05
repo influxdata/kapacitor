@@ -127,11 +127,12 @@ func (s *Service) Alert(channelURL, alertTopic, alertID, message string, level a
 // Card is a Microsoft MessageCard structure.
 // See https://docs.microsoft.com/en-us/outlook/actionable-messages/message-card-reference#card-fields.
 type Card struct {
-	CardType string `json:"@type"`
-	Context  string `json:"@context"`
-	Title    string `json:"title"`
-	Text     string `json:"text"`
-	Summary  string `json:"summary"`
+	CardType   string `json:"@type"`
+	Context    string `json:"@context"`
+	Title      string `json:"title"`
+	Text       string `json:"text"`
+	Summary    string `json:"summary"`
+	ThemeColor string `json:"themeColor"`
 }
 
 func (s *Service) preparePost(channelURL, alertTopic, alertID, message string, level alert.Level) (string, io.Reader, error) {
@@ -163,12 +164,23 @@ func (s *Service) preparePost(channelURL, alertTopic, alertID, message string, l
 		summary = title + " - " + message
 	}
 
+	var color string
+	switch level {
+	case alert.Warning:
+		color = "FFA533"
+	case alert.Critical:
+		color = "CC4A31"
+	default:
+		color = "34CC25"
+	}
+
 	card := &Card{
-		CardType: "MessageCard",
-		Context:  "http://schema.org/extensions",
-		Title:    title,
-		Text:     message,
-		Summary:  summary[:int(math.Min(float64(summaryCutoff), float64(len(summary))))] + "...",
+		CardType:   "MessageCard",
+		Context:    "http://schema.org/extensions",
+		Title:      title,
+		Text:       message,
+		Summary:    summary[:int(math.Min(float64(summaryCutoff), float64(len(summary))))] + "...",
+		ThemeColor: color,
 	}
 
 	postBytes, err := json.Marshal(card)

@@ -10341,21 +10341,23 @@ stream
 		teamstest.Request{
 			URL: "/",
 			Card: teams.Card{
-				CardType: "MessageCard",
-				Context:  "http://schema.org/extensions",
-				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
-				Text:     "kapacitor/cpu/serverA is CRITICAL",
-				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+				CardType:   "MessageCard",
+				Context:    "http://schema.org/extensions",
+				Title:      "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:       "kapacitor/cpu/serverA is CRITICAL",
+				Summary:    "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+				ThemeColor: "CC4A31",
 			},
 		},
 		teamstest.Request{
 			URL: "/",
 			Card: teams.Card{
-				CardType: "MessageCard",
-				Context:  "http://schema.org/extensions",
-				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
-				Text:     "kapacitor/cpu/serverA is CRITICAL",
-				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+				CardType:   "MessageCard",
+				Context:    "http://schema.org/extensions",
+				Title:      "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:       "kapacitor/cpu/serverA is CRITICAL",
+				Summary:    "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+				ThemeColor: "CC4A31",
 			},
 		},
 	}

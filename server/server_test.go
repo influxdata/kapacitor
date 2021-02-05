@@ -10798,11 +10798,12 @@ func TestServer_AlertHandlers(t *testing.T) {
 				exp := []teamstest.Request{{
 					URL: "/",
 					Card: teams.Card{
-						CardType: "MessageCard",
-						Context:  "http://schema.org/extensions",
-						Title:    "CRITICAL: [id]",
-						Text:     "message",
-						Summary:  "CRITICAL: [id] - message...",
+						CardType:   "MessageCard",
+						Context:    "http://schema.org/extensions",
+						Title:      "CRITICAL: [id]",
+						Text:       "message",
+						Summary:    "CRITICAL: [id] - message...",
+						ThemeColor: "CC4A31",
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {
