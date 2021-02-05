@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go v5.0.0-beta.0.20161028183111-bd73d950fa44+incompatible // indirect
 	github.com/Azure/go-autorest v7.3.1+incompatible // indirect
-	github.com/BurntSushi/toml v0.3.1-0.20170626110600-a368813c5e64
+	github.com/BurntSushi/toml v0.3.1
 	github.com/PuerkitoBio/purell v1.1.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170324140228-bbf7a2afc14f // indirect
 	github.com/armon/go-metrics v0.3.4 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/go-openapi/swag v0.0.0-20170424051500-24ebf76d720b // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.4.0
+	github.com/google/go-cmp v0.5.4
 	github.com/google/uuid v1.0.0
 	github.com/googleapis/gax-go v0.0.0-20170321005343-9af46dd5a171 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
@@ -94,6 +94,7 @@ require (
 	github.com/syndtr/goleveldb v0.0.0-20170409015612-8c81ea47d4c4 // indirect
 	github.com/ugorji/go v0.0.0-20170312112114-708a42d24682 // indirect
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
+	golang.org/x/tools/gopls v0.6.5 // indirect
 	google.golang.org/api v0.0.0-20170421051952-fbbaff182731 // indirect
 	google.golang.org/appengine v1.0.0 // indirect
 	google.golang.org/grpc v1.2.1 // indirect
