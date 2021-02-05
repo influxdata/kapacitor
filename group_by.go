@@ -77,7 +77,9 @@ func (n *GroupByNode) BeginBatch(begin edge.BeginBatchMessage) error {
 	n.timer.Start()
 	defer n.timer.Stop()
 
-	n.emit(begin.Time())
+	if err := n.emit(begin.Time()); err != nil {
+		return err
+	}
 
 	n.begin = begin
 	n.dimensions = begin.Dimensions()
