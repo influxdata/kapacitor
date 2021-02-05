@@ -1,10 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- [#2475](https://github.com/influxdata/kapacitor/pull/2475): Add default color theme to teams alerts
+
 ## v1.5.8 [2021-01-11]
 
 ### Bugfixes
 - [#2448](https://github.com/influxdata/kapacitor/pull/2448): Changes the alert-handler match function duration() to be alertDuration() to avoid name collision with the type conversion function of the same name.
-
 
 ### Features
 - [#1839](https://github.com/influxdata/kapacitor/pull/1839): Add Subscription path configuration option to allow Kapacitor to run behind a reverse proxy, thanks @aspring
@@ -15,7 +19,6 @@
 - [#2456](https://github.com/influxdata/kapacitor/pull/2456): Gzip data by default that is sent to influxdb.
 - [#2454](https://github.com/influxdata/kapacitor/pull/2454): Add PrimaryProperty and SecondaryProperty methods to BigPanda AlertNode.
 - [#2462](https://github.com/influxdata/kapacitor/pull/2462): BREAKING: we are forced to remove support for 386/darwin builds as go doesn't support them anymore.
-- [#2475](https://github.com/influxdata/kapacitor/pull/2475): Add default color theme to teams alerts
 
 ## v1.5.7 [2020-10-27]
 
