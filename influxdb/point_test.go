@@ -78,5 +78,10 @@ func TestPoint_Bytes(t *testing.T) {
 			t.Errorf("%s: Bytes() mismatch:\n actual:	%v\n exp:		%v",
 				test.name, got, exp)
 		}
+		if got, exp := string(p.BytesWithLineFeed(test.precision)), test.exp+"\n"; got != exp {
+			t.Errorf("%s: Bytes() mismatch:\n actual:	%v\n exp:		%v",
+				test.name, got, exp)
+		}
+
 	}
 }

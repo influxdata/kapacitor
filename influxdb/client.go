@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -325,7 +324,7 @@ func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
 }
 
 func (c *HTTPClient) Write(bp BatchPoints) error {
-	b := bytes.Buffer{}
+	b := &bytes.Buffer{}
 	precision := bp.Precision()
 
 	u := c.url()
@@ -337,28 +336,26 @@ func (c *HTTPClient) Write(bp BatchPoints) error {
 	v.Set("consistency", bp.WriteConsistency())
 	u.RawQuery = v.Encode()
 
-	reqBody := io.Reader(&b)
-
 	if c.compression == "gzip" {
-		var err error
-		reqBody, err = CompressWithGzip(reqBody, gzip.DefaultCompression)
-		if err != nil {
+		bodyWriteCloser := gzip.NewWriter(b)
+		for _, p := range bp.Points() {
+			if _, err := bodyWriteCloser.Write(p.BytesWithLineFeed(precision)); err != nil {
+				return err
+			}
+		}
+		if err := bodyWriteCloser.Close(); err != nil {
 			return err
 		}
 
+	} else {
+		for _, p := range bp.Points() {
+			if _, err := b.Write(p.BytesWithLineFeed(precision)); err != nil {
+				return err
+			}
+		}
 	}
 
-	for _, p := range bp.Points() {
-		if _, err := b.Write(p.Bytes(precision)); err != nil {
-			return err
-		}
-
-		if err := b.WriteByte('\n'); err != nil {
-			return err
-		}
-	}
-
-	req, err := http.NewRequest("POST", u.String(), reqBody)
+	req, err := http.NewRequest("POST", u.String(), b)
 	if err != nil {
 		return err
 	}
@@ -569,6 +566,33 @@ func (p Point) Bytes(precision string) []byte {
 	}
 
 	return bytes
+}
+
+func (p Point) BytesWithLineFeed(precision string) []byte {
+	key := imodels.MakeKey([]byte(p.Name), imodels.NewTags(p.Tags))
+	fields := imodels.Fields(p.Fields).MarshalBinary()
+	kl := len(key)
+	fl := len(fields)
+	var bytes []byte
+
+	if p.Time.IsZero() {
+		bytes = make([]byte, fl+kl+2)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+	} else {
+		timeStr := strconv.FormatInt(p.Time.UnixNano()/imodels.GetPrecisionMultiplier(precision), 10)
+		tl := len(timeStr)
+		bytes = make([]byte, fl+kl+tl+3)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+		bytes[kl+fl+1] = ' '
+		copy(bytes[kl+fl+2:], []byte(timeStr))
+	}
+	bytes[len(bytes)-1] = '\n'
+	return bytes
+
 }
 
 // Simple type to create github.com/influxdata/kapacitor/influxdb clients.
