@@ -1,6 +1,7 @@
 package influxdb
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"io/ioutil"
@@ -190,6 +191,59 @@ func TestClient_Write(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
+	err = c.Write(bp)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClient_WriteLarge(t *testing.T) {
+	expected := &bytes.Buffer{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		uncompressedBody, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		bod, err := ioutil.ReadAll(uncompressedBody)
+		if err != nil {
+			t.Error(err)
+		}
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Errorf("expected gzip Content-Encoding but got %s", r.Header.Get("Content-Encoding"))
+		}
+		if string(bod) != expected.String() {
+			t.Errorf("unexpected send, expected '%s', got '%s'", expected, string(bod))
+		}
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	config := Config{URLs: []string{ts.URL}}
+	c, _ := NewHTTPClient(config)
+
+	bp, err := NewBatchPoints(BatchPointsConfig{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+
+	startT := time.Date(1999, 11, 9, 0, 0, 0, 3, time.UTC)
+	for i := 0; i < 1000000; i++ {
+		pt := Point{
+			Name:   "testpt",
+			Tags:   map[string]string{"tag1": "tag1"},
+			Fields: map[string]interface{}{"value": 1},
+			Time:   startT.Add(time.Second * time.Duration(i)),
+		}
+		bp.AddPoint(pt)
+		expected.Write(pt.BytesWithLineFeed(bp.Precision()))
+	}
+
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+
 	err = c.Write(bp)
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
