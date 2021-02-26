@@ -6,6 +6,10 @@
 
 ### Bugfixes
 - [#2498](https://github.com/influxdata/kapacitor/pull/2498): avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
+## unreleased
+
+### BugFixes
+- [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix memory leaks in JoinNode and UnionNode.
 
 ## v1.5.8 [2021-01-11]
 

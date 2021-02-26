@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -12,12 +13,14 @@ type UnionNode struct {
 	u *pipeline.UnionNode
 
 	// Buffer of points/batches from each source.
-	sources [][]timeMessage
+	sources []*timeMessageCircularQueue
 	// the low water marks for each source.
 	lowMarks []time.Time
-
-	rename string
+	lock     sync.Mutex
+	rename   string
 }
+
+//go:generate tmpl -data "[\"timeMessage\"]" -o=union_circularqueues.gen.go circularqueue.gen.go.tmpl
 
 type timeMessage interface {
 	edge.Message
@@ -39,7 +42,10 @@ func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, d NodeDiagnostic) (*
 func (n *UnionNode) runUnion([]byte) error {
 	// Keep buffer of values from parents so they can be ordered.
 
-	n.sources = make([][]timeMessage, len(n.ins))
+	n.sources = make([]*timeMessageCircularQueue, len(n.ins))
+	for i := range n.ins {
+		n.sources[i] = newTimeMessageCircularQueue()
+	}
 	n.lowMarks = make([]time.Time, len(n.ins))
 
 	consumer := edge.NewMultiConsumerWithStats(n.ins, n)
@@ -57,7 +63,7 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 	}
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], batch)
+	n.sources[src].Enqueue(batch)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -66,13 +72,14 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 func (n *UnionNode) Point(src int, p edge.PointMessage) error {
 	n.timer.Start()
 	defer n.timer.Stop()
+
 	if n.rename != "" {
 		p = p.ShallowCopy()
 		p.SetName(n.rename)
 	}
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], p)
+	n.sources[src].Enqueue(p)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -83,7 +90,7 @@ func (n *UnionNode) Barrier(src int, b edge.BarrierMessage) error {
 	defer n.timer.Stop()
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], b)
+	n.sources[src].Enqueue(b)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -96,6 +103,8 @@ func (n *UnionNode) Finish() error {
 
 func (n *UnionNode) emitReady(drain bool) error {
 	emitted := true
+	var v timeMessage
+	var i int
 	// Emit all points until nothing changes
 	for emitted {
 		emitted = false
@@ -104,8 +113,8 @@ func (n *UnionNode) emitReady(drain bool) error {
 		validSources := 0
 		for i, values := range n.sources {
 			sourceMark := n.lowMarks[i]
-			if len(values) > 0 {
-				t := values[0].Time()
+			if values.Len() > 0 {
+				t := values.Peek(0).Time()
 				if mark.IsZero() || t.Before(mark) {
 					mark = t
 				}
@@ -126,14 +135,14 @@ func (n *UnionNode) emitReady(drain bool) error {
 			// Unless we are draining the buffer than we can continue.
 			return nil
 		}
-
 		// Emit all values that are at or below the mark.
-		for i, values := range n.sources {
-			var j int
-			l := len(values)
+		for i = range n.sources {
+			l := n.sources[i].Len()
+			j := 0
 			for j = 0; j < l; j++ {
-				if !values[j].Time().After(mark) {
-					err := n.emit(values[j])
+				v = n.sources[i].Peek(j)
+				if !v.Time().After(mark) {
+					err := n.emit(v)
 					if err != nil {
 						return err
 					}
@@ -143,12 +152,13 @@ func (n *UnionNode) emitReady(drain bool) error {
 					break
 				}
 			}
-			// Drop values that were emitted
-			n.sources[i] = values[j:]
+			n.sources[i].Dequeue(j)
 		}
 	}
 	return nil
 }
+
+var q = 0
 
 func (n *UnionNode) emit(m edge.Message) error {
 	n.timer.Pause()
