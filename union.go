@@ -12,12 +12,14 @@ type UnionNode struct {
 	u *pipeline.UnionNode
 
 	// Buffer of points/batches from each source.
-	sources [][]timeMessage
+	sources []*timeMessageCircularQueue
 	// the low water marks for each source.
 	lowMarks []time.Time
 
 	rename string
 }
+
+//go:generate tmpl -data "[\"timeMessage\"]" -o=union_circularqueues.gen.go circularqueue.gen.go.tmpl
 
 type timeMessage interface {
 	edge.Message
@@ -39,7 +41,10 @@ func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, d NodeDiagnostic) (*
 func (n *UnionNode) runUnion([]byte) error {
 	// Keep buffer of values from parents so they can be ordered.
 
-	n.sources = make([][]timeMessage, len(n.ins))
+	n.sources = make([]*timeMessageCircularQueue, len(n.ins))
+	for i := range n.ins {
+		n.sources[i] = newTimeMessageCircularQueue(nil)
+	}
 	n.lowMarks = make([]time.Time, len(n.ins))
 
 	consumer := edge.NewMultiConsumerWithStats(n.ins, n)
@@ -57,7 +62,12 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 	}
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], batch)
+	q := n.sources[src]
+	if q == nil {
+		q = newTimeMessageCircularQueue()
+		n.sources[src] = q
+	}
+	q.Enqueue(batch)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -72,7 +82,12 @@ func (n *UnionNode) Point(src int, p edge.PointMessage) error {
 	}
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], p)
+	q := n.sources[src]
+	if q == nil {
+		q = newTimeMessageCircularQueue()
+		n.sources[src] = q
+	}
+	q.Enqueue(p)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -83,7 +98,12 @@ func (n *UnionNode) Barrier(src int, b edge.BarrierMessage) error {
 	defer n.timer.Stop()
 
 	// Add newest point to buffer
-	n.sources[src] = append(n.sources[src], b)
+	q := n.sources[src]
+	if q == nil {
+		q = newTimeMessageCircularQueue()
+		n.sources[src] = q
+	}
+	q.Enqueue(b)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -104,8 +124,8 @@ func (n *UnionNode) emitReady(drain bool) error {
 		validSources := 0
 		for i, values := range n.sources {
 			sourceMark := n.lowMarks[i]
-			if len(values) > 0 {
-				t := values[0].Time()
+			if v, ok := values.Peek(0); ok {
+				t := v.Time()
 				if mark.IsZero() || t.Before(mark) {
 					mark = t
 				}
@@ -128,12 +148,11 @@ func (n *UnionNode) emitReady(drain bool) error {
 		}
 
 		// Emit all values that are at or below the mark.
-		for i, values := range n.sources {
-			var j int
-			l := len(values)
-			for j = 0; j < l; j++ {
-				if !values[j].Time().After(mark) {
-					err := n.emit(values[j])
+		for _, values := range n.sources {
+			for values.Next() {
+				v := values.Val()
+				if !v.Time().After(mark) {
+					err := n.emit(v)
 					if err != nil {
 						return err
 					}
@@ -143,8 +162,6 @@ func (n *UnionNode) emitReady(drain bool) error {
 					break
 				}
 			}
-			// Drop values that were emitted
-			n.sources[i] = values[j:]
 		}
 	}
 	return nil

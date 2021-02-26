@@ -13,6 +13,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// tmpl -- go get github.com/benbjohnson/tmpl
+//go:generate tmpl -data "[\"srcPoint\", \"joinsetPtr\"]" -o=join_circularqueues.gen.go circularqueue.gen.go.tmpl
+
 type JoinNode struct {
 	node
 	j         *pipeline.JoinNode
@@ -26,9 +29,9 @@ type JoinNode struct {
 	lowMarks map[srcGroup]time.Time
 
 	// Buffer for caching points that need to be matched with specific points.
-	matchGroupsBuffer map[models.GroupID][]srcPoint
+	matchGroupsBuffer map[models.GroupID]*srcPointCircularQueue
 	// Buffer for caching specific points until their match arrivces.
-	specificGroupsBuffer map[models.GroupID][]srcPoint
+	specificGroupsBuffer map[models.GroupID]*srcPointCircularQueue
 
 	reported    map[int]bool
 	allReported bool
@@ -40,8 +43,8 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, d NodeDiagnostic) (*Jo
 		j:                    n,
 		node:                 node{Node: n, et: et, diag: d},
 		groups:               make(map[models.GroupID]*joinGroup),
-		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
-		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
+		matchGroupsBuffer:    make(map[models.GroupID]*srcPointCircularQueue),
+		specificGroupsBuffer: make(map[models.GroupID]*srcPointCircularQueue),
 		lowMarks:             make(map[srcGroup]time.Time),
 		reported:             make(map[int]bool),
 	}
@@ -107,6 +110,7 @@ type messageMeta interface {
 	edge.Message
 	edge.PointMeta
 }
+
 type srcPoint struct {
 	Src int
 	Msg messageMeta
@@ -167,20 +171,17 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 	// Check for cached specific points that can now be sent alone.
 	if n.allReported {
 		// Send all cached specific point that won't match anymore.
-		var i int
 		buf := n.specificGroupsBuffer[groupId]
-		l := len(buf)
-		for i = 0; i < l; i++ {
-			st := buf[i].Msg.Time().Round(n.j.Tolerance)
+		for buf.Next() {
+			pt := buf.Val()
+			st := pt.Msg.Time().Round(n.j.Tolerance)
 			if st.Before(lowMark) {
 				// Send point by itself since it won't get a match.
-				n.sendSpecificPoint(buf[i])
+				n.sendSpecificPoint(pt)
 			} else {
 				break
 			}
 		}
-		// Remove all sent points.
-		n.specificGroupsBuffer[groupId] = buf[i:]
 	}
 
 	if len(p.Msg.Dimensions().TagNames) > len(n.j.Dimensions) {
@@ -193,10 +194,8 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		// Also purge any old match points.
 		matches := n.matchGroupsBuffer[groupId]
 		matched := false
-		var i int
-		l := len(matches)
-		for i = 0; i < l; i++ {
-			match := matches[i]
+		for matches.Next() {
+			match := matches.Val()
 			pt := match.Msg.Time().Round(n.j.Tolerance)
 			if pt.Equal(t) {
 				// Option 1, send both points
@@ -206,11 +205,6 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 			if !pt.Before(lowMark) {
 				break
 			}
-		}
-		if n.allReported {
-			// Can't trust lowMark until all parents have reported.
-			// Remove any unneeded match points.
-			n.matchGroupsBuffer[groupId] = matches[i:]
 		}
 
 		// If the point didn't match that leaves us with options 2 and 3.
@@ -222,27 +216,35 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 			} else {
 				// Option 2
 				// Cache this point for when its match arrives.
-				n.specificGroupsBuffer[groupId] = append(n.specificGroupsBuffer[groupId], p)
+
+				sgb := n.specificGroupsBuffer[groupId]
+				if sgb == nil {
+					sgb = newSrcPointCircularQueue()
+					n.specificGroupsBuffer[groupId] = sgb
+				}
+				sgb.Enqueue(p)
 			}
 		}
 	} else {
 		// Cache match point.
-		n.matchGroupsBuffer[groupId] = append(n.matchGroupsBuffer[groupId], p)
+		mgb := n.matchGroupsBuffer[groupId]
+		if mgb == nil {
+			mgb = newSrcPointCircularQueue()
+			n.matchGroupsBuffer[groupId] = mgb
+		}
+		mgb.Enqueue(p)
 
 		// Send all specific points that match, to the group.
-		var i int
 		buf := n.specificGroupsBuffer[groupId]
-		l := len(buf)
-		for i = 0; i < l; i++ {
-			st := buf[i].Msg.Time().Round(n.j.Tolerance)
+		for buf.Next() {
+			pt := buf.Val()
+			st := pt.Msg.Time().Round(n.j.Tolerance)
 			if st.Equal(t) {
-				n.sendMatchPoint(buf[i], p)
+				n.sendMatchPoint(pt, p)
 			} else {
 				break
 			}
 		}
-		// Remove all sent points
-		n.specificGroupsBuffer[groupId] = buf[i:]
 	}
 }
 
@@ -290,7 +292,7 @@ func (n *JoinNode) getOrCreateGroup(groupID models.GroupID) *joinGroup {
 func (n *JoinNode) newGroup(count int) *joinGroup {
 	return &joinGroup{
 		n:    n,
-		sets: make(map[time.Time][]*joinset),
+		sets: make(map[time.Time]*joinsetPtrCircularQueue),
 		head: make([]time.Time, count),
 	}
 }
@@ -299,7 +301,7 @@ func (n *JoinNode) newGroup(count int) *joinGroup {
 type joinGroup struct {
 	n *JoinNode
 
-	sets       map[time.Time][]*joinset
+	sets       map[time.Time]*joinsetPtrCircularQueue
 	head       []time.Time
 	oldestTime time.Time
 }
@@ -318,21 +320,23 @@ func (g *joinGroup) Collect(src int, p timeMessage) error {
 
 	var set *joinset
 	sets := g.sets[t]
-	if len(sets) == 0 {
-		set = g.newJoinset(t)
-		sets = append(sets, set)
-		g.sets[t] = sets
+	if sets.Len() == 0 {
+		g.sets[t] = newJoinsetPtrCircularQueue(joinsetPtr(g.newJoinset(t)))
 	}
-	for i := 0; i < len(sets); i++ {
-		if !sets[i].Has(src) {
-			set = sets[i]
+	for i, ok := 0, false; i < sets.Len(); i++ {
+		set, ok = sets.Peek(i)
+		if ok && !set.Has(src) {
 			break
 		}
 	}
 	if set == nil {
 		set = g.newJoinset(t)
-		sets = append(sets, set)
-		g.sets[t] = sets
+		q := g.sets[t]
+		if q == nil {
+			q = newJoinsetPtrCircularQueue()
+			g.sets[t] = q
+		}
+		q.Enqueue(set)
 	}
 	set.Set(src, p)
 
@@ -386,10 +390,10 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 		return nil
 	}
 	sets := g.sets[g.oldestTime]
-	i := 0
-	for ; i < len(sets); i++ {
-		if sets[i].Ready() || !onlyReadySets {
-			err := g.emitJoinedSet(sets[i])
+	for sets.Next() {
+		s := (*joinset)(sets.Val())
+		if s.Ready() || !onlyReadySets {
+			err := g.emitJoinedSet(s)
 			if err != nil {
 				return err
 			}
@@ -397,10 +401,8 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 			break
 		}
 	}
-	if i == len(sets) {
+	if sets.Len() == 0 {
 		delete(g.sets, g.oldestTime)
-	} else {
-		g.sets[g.oldestTime] = sets[i:]
 	}
 
 	g.oldestTime = time.Time{}
@@ -481,6 +483,8 @@ type srcGroup struct {
 	src     int
 	groupId models.GroupID
 }
+
+type joinsetPtr *joinset
 
 // represents a set of points or batches from the same joined time
 type joinset struct {

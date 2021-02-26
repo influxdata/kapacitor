@@ -1,0 +1,111 @@
+//lint:file-ignore U1000 this is generated code
+package kapacitor
+
+{{with $types := .}}{{range $k := $types}}
+
+// CircularQueue defines a circular queue, always use the contructor to create one.
+type {{ $k }}CircularQueue struct {
+	data     []{{ $k }}
+	head     int
+	tail     int
+	l        int
+	oldHead  int
+}
+
+
+// {{ if eq (substr 0 1 $k ) (substr 0 1 $k | upper) -}} New {{- else -}} new {{- end -}}
+{{- substr 0 1 $k | upper -}}{{- substr 1 (len $k) $k -}} constructs a Circular Queue
+// with a given buffer buf.  It is ok for buf to be nil.
+func {{ if eq (substr 0 1 $k ) (substr 0 1 $k | upper) -}} New {{- else -}} new {{- end -}}
+{{- substr 0 1 $k | upper -}}{{- substr 1 (len $k) $k -}} CircularQueue(buf ...{{ $k }}) *{{ $k }}CircularQueue {
+	return &{{ $k }}CircularQueue{
+	    data: buf[:cap(buf)],
+	    head: 0,
+	    tail: len(buf),
+	    l :   len(buf),
+	    oldHead: -1,  // -1 means there is no oldHead
+	}
+}
+
+// Enqueue adds an item to the queue if you call this it may overwrite any dequeued items,
+//so view them via `.Val()` before Enqueuing if you want to use the value.
+func (q * {{- $k -}} CircularQueue) Enqueue(v {{ $k }}) {
+	// if full we must grow and insert together. This is an expensive op
+	if cap(q.data) > q.l{ // no need to grow
+	    	if q.tail == len(q.data){
+	    		q.tail = 0
+	    	}
+	        q.data[q.tail] = v
+	} else {
+		if q.tail > q.head { // where the current buffer is filled with continuous data
+			buf := make([]{{ $k }}, cap(q.data)*2)
+			copy(buf[:q.tail], q.data[:q.tail])
+			copy(buf[q.tail+1:], q.data[q.tail:])
+			buf[q.tail] = v
+		}
+	}
+	q.l++
+	q.tail ++
+
+	// wrap tail
+	if q.tail == len(q.data)+1{
+	    q.tail = 0
+	    return
+	}
+	return
+}
+
+// Next moves the head forward, and dequeues it.
+func (q *{{ $k }}CircularQueue) Next() bool {
+
+	// zero the old q.head to prevent leaking of sub fields.
+	var fill {{ $k }}
+	if q.oldHead >= 0{
+	    q.data[q.oldHead] = fill
+	}
+	q.oldHead = q.head
+
+	// check for empty
+	if q.head == q.tail{
+	    q.oldHead = -1
+	    return false
+	}
+	q.l--
+	q.head++
+
+	// wrap head if needed
+	if q.head == len(q.data)+1{
+	    q.head = 0
+	}
+
+
+	return true
+}
+
+// Val accesses the item in the queue.  If Next has not been called, it will panic.
+func (q *{{ $k }}CircularQueue) Val() {{ $k }} {
+	return q.data[q.head-1]
+}
+
+// Peek looks at the queue without dequeueing.
+func (q *{{ $k }}CircularQueue) Peek(i int) ({{ $k }}, bool) {
+
+	if i > q.l-1{
+	    var x {{$k}}
+	    return x, false
+	}
+	    p := q.head+i
+	    if p >= len(q.data) {
+	        p-=len(q.data)
+	    }
+	    return q.data[p], true
+}
+
+
+// Len returns the current number of items in the queue.
+func (q *{{ $k }}CircularQueue) Len() int {
+	return q.l
+}
+
+{{end}}
+{{end}}

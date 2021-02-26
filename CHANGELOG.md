@@ -1,5 +1,10 @@
 # Changelog
 
+## unreleased
+
+### BugFixes
+- [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix memory leaks in JoinNode and UnionNode.
+
 ## v1.5.8 [2021-01-11]
 
 ### Bugfixes
