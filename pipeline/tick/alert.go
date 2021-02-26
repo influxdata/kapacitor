@@ -158,7 +158,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.ServiceNowHandlers {
-		n.Dot("servicenow").
+		n.Dot("serviceNow").
 			Dot("source", h.Source).
 			Dot("node", h.Node).
 			Dot("type", h.Type).
