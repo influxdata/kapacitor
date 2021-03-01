@@ -71,6 +71,8 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
+	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
 )
@@ -8715,6 +8717,119 @@ func TestServer_UpdateConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			section: "zenoss",
+			setDefaults: func(c *server.Config) {
+				c.Zenoss.URL = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"global":             false,
+						"state-changes-only": false,
+						"url":                "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router",
+						"username":           "",
+						"password":           false,
+						"action":             "EventsRouter",
+						"method":             "add_event",
+						"type":               "rpc",
+						"tid":                float64(1),
+						"severity-map": map[string]interface{}{
+							"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
+						},
+					},
+					Redacted: []string{
+						"password",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"global":             false,
+					"state-changes-only": false,
+					"url":                "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router",
+					"username":           "",
+					"password":           false,
+					"action":             "EventsRouter",
+					"method":             "add_event",
+					"type":               "rpc",
+					"tid":                float64(1),
+					"severity-map": map[string]interface{}{
+						"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
+					},
+				},
+				Redacted: []string{
+					"password",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled":  true,
+							"url":      "https://dev12345.zenoss.io:8080/zport/dmd/evconsole_router",
+							"username": "dev",
+							"password": "12345",
+							"action":   "ScriptsRouter",
+							"method":   "kapa_handler",
+							"severity-map": zenoss.SeverityMap{
+								OK: 0, Info: 2, Warning: 3, Critical: 5,
+							},
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss/"},
+							Options: map[string]interface{}{
+								"enabled":            true,
+								"global":             false,
+								"state-changes-only": false,
+								"url":                "https://dev12345.zenoss.io:8080/zport/dmd/evconsole_router",
+								"username":           "dev",
+								"password":           true,
+								"action":             "ScriptsRouter",
+								"method":             "kapa_handler",
+								"type":               "rpc",
+								"tid":                float64(1),
+								"severity-map": map[string]interface{}{
+									"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
+								},
+							},
+							Redacted: []string{
+								"password",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss/"},
+						Options: map[string]interface{}{
+							"enabled":            true,
+							"global":             false,
+							"state-changes-only": false,
+							"url":                "https://dev12345.zenoss.io:8080/zport/dmd/evconsole_router",
+							"username":           "dev",
+							"password":           true,
+							"action":             "ScriptsRouter",
+							"method":             "kapa_handler",
+							"type":               "rpc",
+							"tid":                float64(1),
+							"severity-map": map[string]interface{}{
+								"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
+							},
+						},
+						Redacted: []string{
+							"password",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	compareElements := func(got, exp client.ConfigElement) error {
@@ -9217,6 +9332,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"entityID":    "testEntityID",
 				},
 			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/zenoss"},
+				Name: "zenoss",
+				Options: client.ServiceTestOptions{
+					"action": "EventsRouter",
+					"method": "add_event",
+					"type":   "rpc",
+					"tid":    float64(1),
+				},
+			},
 		},
 	}
 	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
@@ -9535,6 +9660,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "victorops",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "zenoss",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -10882,6 +11015,43 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected victorops request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "zenoss",
+				Options: map[string]interface{}{
+					"action": "EventsRouter",
+					"method": "add_event",
+					"type":   "rpc",
+					"TID":    1,
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := zenosstest.NewServer()
+				ctxt := context.WithValue(context.Background(), "server", ts)
+
+				c.Zenoss.Enabled = true
+				c.Zenoss.URL = ts.URL + "/zport/dmd/evconsole_router"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*zenosstest.Server)
+				ts.Close()
+				exp := []zenosstest.Request{{
+					URL: "/zport/dmd/evconsole_router",
+					Event: zenoss.Event{
+						Action: "EventsRouter",
+						Method: "add_event",
+						Type:   "rpc",
+						TID:    1,
+					},
+				}}
+				got := ts.Requests()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected zenoss request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

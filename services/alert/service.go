@@ -35,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
@@ -147,6 +148,9 @@ type Service struct {
 	}
 	ServiceNowService interface {
 		Handler(servicenow.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	ZenossService interface {
+		Handler(zenoss.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 }
 
@@ -1013,6 +1017,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = s.VictorOpsService.Handler(c, ctx...)
+		h = newExternalHandler(h)
+	case "zenoss":
+		c := zenoss.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.ZenossService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)

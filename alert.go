@@ -36,6 +36,7 @@ import (
 	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
@@ -573,6 +574,36 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if et.tm.BigPandaService != nil &&
 		et.tm.BigPandaService.Global() &&
 		et.tm.BigPandaService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	for _, s := range n.ZenossHandlers {
+		c := zenoss.HandlerConfig{
+			URL:           s.URL,
+			Action:        s.Action,
+			Method:        s.Method,
+			Type:          s.Type,
+			TID:           s.TID,
+			Summary:       s.Summary,
+			Device:        s.Device,
+			Component:     s.Component,
+			EventClassKey: s.EventClassKey,
+			EventClass:    s.EventClass,
+			Message:       s.Message,
+			Collector:     s.Collector,
+			CustomFields:  s.CustomFieldsMap,
+		}
+		h := et.tm.ZenossService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.ZenossHandlers) == 0 && (et.tm.ZenossService != nil && et.tm.ZenossService.Global()) {
+		h := et.tm.ZenossService.Handler(zenoss.HandlerConfig{}, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	// If zenoss has been configured with state changes only set it.
+	if et.tm.ZenossService != nil &&
+		et.tm.ZenossService.Global() &&
+		et.tm.ZenossService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 

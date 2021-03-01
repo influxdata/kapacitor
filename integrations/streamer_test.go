@@ -83,6 +83,8 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
+	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
@@ -11146,6 +11148,160 @@ stream
 	// Flapping detection should drop the last alerts.
 	if rc := atomic.LoadInt32(&requestCount); rc != 9 {
 		t.Errorf("got %v exp %v", rc, 9)
+	}
+}
+
+func TestStream_AlertZenoss(t *testing.T) {
+	ts := zenosstest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host', 'type')
+	|window()
+		.period(10s)
+		.every(10s)
+	|mean('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "mean" > 15.0)
+		.warn(lambda: "mean" > 50.0)
+		.crit(lambda: "mean" > 90.0)
+		.zenoss()
+			.device('#DEVICE001')
+			.component('CPU')
+			.eventClass('/App')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := zenoss.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/zport/dmd/evconsole_router"
+		svc := zenoss.NewService(c, diagService.NewZenossHandler())
+		tm.ZenossService = svc
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		zenosstest.Request{
+			URL: "/zport/dmd/evconsole_router",
+			Event: zenoss.Event{
+				Action: "EventsRouter",
+				Method: "add_event",
+				Data: []map[string]interface{}{
+					{
+						"summary":    "kapacitor/cpu/serverA is CRITICAL",
+						"device":     "#DEVICE001",
+						"component":  "CPU",
+						"severity":   "Critical",
+						"evclasskey": "",
+						"evclass":    "/App",
+					},
+				},
+				Type: "rpc",
+				TID:  1,
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertZenoss_Custom(t *testing.T) {
+	ts := zenosstest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host', 'type')
+	|window()
+		.period(10s)
+		.every(10s)
+	|mean('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "mean" > 15.0)
+		.warn(lambda: "mean" > 50.0)
+		.crit(lambda: "mean" > 90.0)
+		.details('{{.}}')
+		.zenoss()
+			.action('ScriptsRouter')
+			.method('kapa_handler')
+			.eventClass('/App')
+			.message('This is message for alert {{ .ID }}')
+			.collector('{{ index .Tags "host" }}')
+			.customField('data', '{"id":"{{.ID}}","message":"{{.Message}}","time":"{{.Time}}","duration":"{{ .Duration}}","level":"{{.Level}}","recoverable":{{.Recoverable}}}')
+			.customField('ticks', 33)
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := zenoss.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/zport/dmd/evconsole_router"
+		c.SeverityMap = zenoss.SeverityMap{OK: 0, Info: 2, Warning: 3, Critical: 5}
+		svc := zenoss.NewService(c, diagService.NewZenossHandler())
+		tm.ZenossService = svc
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		zenosstest.Request{
+			URL: "/zport/dmd/evconsole_router",
+			Event: zenoss.Event{
+				Action: "ScriptsRouter",
+				Method: "kapa_handler",
+				Data: []map[string]interface{}{
+					{
+						"summary":    "kapacitor/cpu/serverA is CRITICAL",
+						"device":     "",
+						"component":  "",
+						"severity":   float64(5),
+						"evclasskey": "",
+						"evclass":    "/App",
+						"collector":  "serverA",
+						"message":    "This is message for alert kapacitor/cpu/serverA",
+						"data": map[string]interface{}{
+							"id":          "kapacitor/cpu/serverA",
+							"level":       "CRITICAL",
+							"message":     "kapacitor/cpu/serverA is CRITICAL",
+							"time":        "1971-01-01 00:00:10 +0000 UTC",
+							"duration":    "0s",
+							"recoverable": true,
+						},
+						"ticks": float64(33),
+					},
+				},
+				Type: "rpc",
+				TID:  1,
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 

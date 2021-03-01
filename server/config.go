@@ -61,6 +61,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 
@@ -110,6 +111,7 @@ type Config struct {
 	Teams      teams.Config      `toml:"teams" override:"teams"`
 	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
 	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
+	Zenoss     zenoss.Config     `toml:"zenoss" override:"zenoss"`
 
 	// Discovery for scraping
 	Scraper         []scraper.Config          `toml:"scraper" override:"scraper,element-key=name"`
@@ -183,6 +185,7 @@ func NewConfig() *Config {
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
+	c.Zenoss = zenoss.NewConfig()
 
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
@@ -343,6 +346,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.VictorOps.Validate(); err != nil {
 		return errors.Wrap(err, "victorops")
+	}
+	if err := c.Zenoss.Validate(); err != nil {
+		return errors.Wrap(err, "zenoss")
 	}
 
 	if err := c.UDF.Validate(); err != nil {

@@ -490,3 +490,9 @@ func (s *Service) NewServiceNowHandler() *ServiceNowHandler {
 		l: s.Logger.With(String("service", "serviceNow")),
 	}
 }
+
+func (s *Service) NewZenossHandler() *ZenossHandler {
+	return &ZenossHandler{
+		l: s.Logger.With(String("service", "zenoss")),
+	}
+}

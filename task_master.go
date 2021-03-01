@@ -43,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -221,6 +222,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(servicenow.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
+	ZenossService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(zenoss.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
 
 	Commander command.Commander
 
@@ -319,6 +325,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.SideloadService = tm.SideloadService
 	n.TeamsService = tm.TeamsService
 	n.ServiceNowService = tm.ServiceNowService
+	n.ZenossService = tm.ZenossService
 	return n
 }
 
