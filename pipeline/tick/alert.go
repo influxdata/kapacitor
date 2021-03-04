@@ -177,6 +177,13 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		}
 	}
 
+	for _, h := range a.BigPandaHandlers {
+		n.Dot("bigPanda").
+			Dot("appKey", h.AppKey).
+			Dot("primaryProperty", h.PrimaryProperty).
+			Dot("secondaryProperty", h.SecondaryProperty)
+	}
+
 	for _, h := range a.SlackHandlers {
 		n.Dot("slack").
 			Dot("workspace", h.Workspace).
