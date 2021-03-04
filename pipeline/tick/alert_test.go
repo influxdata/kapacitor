@@ -118,6 +118,28 @@ func TestAlertHTTPPost(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertBigPanda(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().BigPanda()
+	handler.AppKey = "A"
+	handler.PrimaryProperty = "B"
+	handler.SecondaryProperty = "C"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .bigPanda()
+        .appKey('A')
+        .primaryProperty('B')
+        .secondaryProperty('C')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertHTTPPostMultipleHeaders(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Post("")
