@@ -93,8 +93,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
 				AlertNodeData: &AlertNodeData{
 					KafkaHandlers: []*KafkaHandler{
 						{
-							Cluster: "my-cluster",
-							KafkaTopic: "my-topic",
+							Cluster:                "my-cluster",
+							KafkaTopic:             "my-topic",
 							IsDisablePartitionById: false,
 							PartitionHashAlgorithm: "murmur2",
 						},
@@ -169,8 +169,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
 				AlertNodeData: &AlertNodeData{
 					KafkaHandlers: []*KafkaHandler{
 						{
-							Cluster: "my-cluster",
-							KafkaTopic: "my-topic",
+							Cluster:                "my-cluster",
+							KafkaTopic:             "my-topic",
 							IsDisablePartitionById: true,
 						},
 					},

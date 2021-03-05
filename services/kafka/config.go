@@ -129,7 +129,7 @@ func (c Config) WriterConfig(diagnostic Diagnostic, target WriteTarget) (kafka.W
 		ErrorLogger: kafka.LoggerFunc(func(s string, x ...interface{}) {
 			diagnostic.Error("kafka client error", fmt.Errorf(s, x...))
 		}),
-		Topic: target.Topic,
+		Topic:    target.Topic,
 		Balancer: balancer,
 	}
 
