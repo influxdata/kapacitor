@@ -2155,9 +2155,33 @@ type KafkaHandler struct {
 	// Kafka Topic
 	KafkaTopic string `json:"kafka-topic"`
 
+	// If false (default), messages will be routed to partitions based on their IDs
+	// If true, messages will be routed to the partition with the least data regardless of IDs
+	// tick:ignore
+	IsDisablePartitionById bool `tick:"DisablePartitionById" json:"disable-partition-by-id"`
+
+	// Algorithm used to hash message IDs when determining a target partition
+	//
+	// Valid values are:
+	//
+	//    * "crc32"   - Compatible with librdkafka and confluent-kafka-go
+	//    * "murmur2" - Compatible with the default Java partitioner
+	//    * "fnv-1a"  - Compatible with Shopify's sarama producer
+	//
+	// Default: crc32
+	PartitionHashAlgorithm string `json:"partition-hash-algorithm,omitempty"`
+
 	// Template used to construct the message body
 	// If empty the alert data in JSON is sent as the message body.
-	Template string `json:"template"`
+	// tick:ignore
+	Template string `json:"template,omitempty"`
+}
+
+// Disables use of message IDs when determining target Kafka partitions.
+// tick:property
+func (k *KafkaHandler) DisablePartitionById() *KafkaHandler {
+	k.IsDisablePartitionById = true
+	return k
 }
 
 // Send the alert to a Microsoft Teams channel.

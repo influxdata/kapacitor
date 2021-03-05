@@ -16,7 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go"
 )
 
 const (
@@ -127,8 +127,8 @@ func NewCluster(c Config) *Cluster {
 	}
 }
 
-func (c *Cluster) WriteMessage(diagnostic Diagnostic, topic string, key, msg []byte) error {
-	w, err := c.writer(topic, diagnostic)
+func (c *Cluster) WriteMessage(diagnostic Diagnostic, target WriteTarget, key, msg []byte) error {
+	w, err := c.writer(target, diagnostic)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,8 @@ func (c *Cluster) WriteMessage(diagnostic Diagnostic, topic string, key, msg []b
 	})
 }
 
-func (c *Cluster) writer(topic string, diagnostic Diagnostic) (*writer, error) {
+func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, error) {
+	topic := target.Topic
 	c.mu.RLock()
 	w, ok := c.writers[topic]
 	c.mu.RUnlock()
@@ -147,14 +148,10 @@ func (c *Cluster) writer(topic string, diagnostic Diagnostic) (*writer, error) {
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.WriterConfig(diagnostic)
+			wc, err := c.cfg.WriterConfig(diagnostic, target)
 			if err != nil {
 				return nil, err
 			}
-			if topic == "" {
-				return nil, errors.New("topic must not be empty")
-			}
-			wc.Topic = topic
 			kw := kafka.NewWriter(wc)
 			// Create new writer
 			w = &writer{
@@ -294,16 +291,20 @@ func (s *Service) Close() error {
 }
 
 type testOptions struct {
-	Cluster string `json:"cluster"`
-	Topic   string `json:"topic"`
-	Key     string `json:"key"`
-	Message string `json:"message"`
+	Cluster string      `json:"cluster"`
+	Target  WriteTarget `json:"target"`
+	Key     string      `json:"key"`
+	Message string      `json:"message"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Cluster: "example",
-		Topic:   "test",
+		Target: WriteTarget{
+			Topic:              "test",
+			PartitionById:      true,
+			PartitionAlgorithm: "",
+		},
 		Key:     "key",
 		Message: "test kafka message",
 	}
@@ -318,21 +319,23 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unknown cluster %q", o.Cluster)
 	}
-	return c.WriteMessage(s.diag, o.Topic, []byte(o.Key), []byte(o.Message))
+	return c.WriteMessage(s.diag, o.Target, []byte(o.Key), []byte(o.Message))
 }
 
 type HandlerConfig struct {
-	Cluster  string `mapstructure:"cluster"`
-	Topic    string `mapstructure:"topic"`
-	Template string `mapstructure:"template"`
+	Cluster              string `mapstructure:"cluster"`
+	Topic                string `mapstructure:"topic"`
+	Template             string `mapstructure:"template"`
+	DisablePartitionById bool   `mapstructure:"disablePartitionById"`
+	PartitionAlgorithm   string `mapstructure:"partitionAlgorithm"`
 }
 
 type handler struct {
 	s *Service
 
-	cluster  *Cluster
-	topic    string
-	template *template.Template
+	cluster     *Cluster
+	writeTarget WriteTarget
+	template    *template.Template
 
 	diag Diagnostic
 }
@@ -354,9 +357,13 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 	diag := s.diag.WithContext(ctx...)
 
 	return &handler{
-		s:        s,
-		cluster:  cluster,
-		topic:    c.Topic,
+		s:       s,
+		cluster: cluster,
+		writeTarget: WriteTarget{
+			Topic:              c.Topic,
+			PartitionById:      !c.DisablePartitionById,
+			PartitionAlgorithm: c.PartitionAlgorithm,
+		},
 		template: t,
 		diag:     diag,
 	}, nil
@@ -367,7 +374,7 @@ func (h *handler) Handle(event alert.Event) {
 	if err != nil {
 		h.diag.Error("failed to prepare kafka message body", err)
 	}
-	if err := h.cluster.WriteMessage(h.diag, h.topic, []byte(event.State.ID), body); err != nil {
+	if err := h.cluster.WriteMessage(h.diag, h.writeTarget, []byte(event.State.ID), body); err != nil {
 		h.diag.Error("failed to write message to kafka", err)
 	}
 }

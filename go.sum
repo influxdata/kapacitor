@@ -196,6 +196,7 @@ github.com/k-sone/snmpgo v3.2.0+incompatible h1:2NogYilKYSia0f+seO9P7aRa6MKG6Rcn
 github.com/k-sone/snmpgo v3.2.0+incompatible/go.mod h1:9MC6LeG1sGPgrwnmu/V/ncg9P2M5zS5IvE+c4KZj25g=
 github.com/kimor79/gollectd v1.0.0 h1:6APoEersLJ2W0iwWj8C7COlienQ8XTWh8np4w0ggI8k=
 github.com/kimor79/gollectd v1.0.0/go.mod h1:lDxzEAixH34FPZ0nBIpjCu2vR3ZdIKZbbnf2rc+b2ao=
+github.com/klauspost/compress v1.9.8/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
@@ -278,6 +279,8 @@ github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 h1:nn5Wsu0esKSJiIVhscUt
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/segmentio/kafka-go v0.3.5 h1:2JVT1inno7LxEASWj+HflHh5sWGfM0gkRiLAxkXhGG4=
 github.com/segmentio/kafka-go v0.3.5/go.mod h1:OT5KXBPbaJJTcvokhWR2KFmm0niEx3mnccTwjmLvSi4=
+github.com/segmentio/kafka-go v0.3.10 h1:h/1aSu7gWp6DXLmp0csxm8wrYD6rRYyaqclu2aQ/PWo=
+github.com/segmentio/kafka-go v0.3.10/go.mod h1:8rEphJEczp+yDE/R5vwmaqZgF1wllrl4ioQcNKB8wVA=
 github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b h1:B6dcIy62mIVH3xZ+Alc5J4fLDWthEa1RPzK7L7/glTw=
 github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b/go.mod h1:Yow6lPLSAXx2ifx470yD/nUe22Dv5vBvxK/UK9UUTVs=
 github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 h1:+OTcQECFnrdh6oabESXRUNFuM3Ol347YZvD+sL/Nfv0=
