@@ -9689,7 +9689,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := bigpandatest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.BigPanda.Enabled = true
 				c.BigPanda.Token = "my-token-123"
