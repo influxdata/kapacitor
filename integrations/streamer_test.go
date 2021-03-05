@@ -8897,7 +8897,7 @@ stream
 	for _, m := range msgs {
 		// Record the partitions used per message key.
 		partitions, ok := got[m.Key]
-		if ! ok {
+		if !ok {
 			got[m.Key] = make(map[int32]struct{})
 			partitions = got[m.Key]
 		}

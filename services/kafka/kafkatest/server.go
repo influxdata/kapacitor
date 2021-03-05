@@ -32,8 +32,8 @@ type Server struct {
 
 func NewServer() (*Server, error) {
 	s := &Server{
-		closing: make(chan struct{}),
-		nodeID:  1,
+		closing:        make(chan struct{}),
+		nodeID:         1,
 		partitionCount: 3,
 	}
 	l, err := net.Listen("tcp", ":0")
@@ -188,7 +188,7 @@ func (s *Server) handle(c net.Conn) error {
 				// Write error code
 				response = writeInt16(response, 0)
 				// Write partition ID
-				response = writeInt32(response, i + 1)
+				response = writeInt32(response, i+1)
 				// Write leader ID
 				response = writeInt32(response, s.nodeID)
 				// Write 0 len replicas
@@ -227,7 +227,7 @@ func (s *Server) handle(c net.Conn) error {
 
 type produceResponse struct {
 	partition int32
-	offset int64
+	offset    int64
 }
 
 // readProduceRequest, assume only a single message per partition exists
