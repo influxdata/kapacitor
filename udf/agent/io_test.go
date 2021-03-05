@@ -5,6 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -30,8 +34,8 @@ func TestMessage_ReadWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(req, nreq) {
-		t.Errorf("unexpected request: \ngot %v\nexp %v", nreq, req)
+	if !cmp.Equal(req, nreq, cmpopts.IgnoreUnexported(agent.Request{}, agent.KeepaliveRequest{})) {
+		t.Errorf("unexpected request: \n%s", cmp.Diff(nreq, req))
 	}
 }
 
