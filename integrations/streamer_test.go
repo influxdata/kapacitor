@@ -8811,7 +8811,7 @@ stream
 	exp := []interface{}{
 		kafkatest.Message{
 			Topic:     "testTopic",
-			Partition: 1,
+			Partition: 2,
 			Offset:    0,
 			Key:       "kapacitor/cpu/serverA",
 			Message:   "kapacitor/cpu/serverA is CRITICAL",

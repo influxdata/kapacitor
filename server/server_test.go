@@ -9866,7 +9866,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}
 				exp := []kafkatest.Message{{
 					Topic:     "test",
-					Partition: 1,
+					Partition: 3,
 					Offset:    0,
 					Key:       "id",
 					Message:   string(adJSON) + "\n",
