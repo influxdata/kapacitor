@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -13413,9 +13414,15 @@ func testStreamerWithOutput(
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Assert we got the expected result
 	result := models.Result{}
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		resp.Body, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		t.Fatal(err)
