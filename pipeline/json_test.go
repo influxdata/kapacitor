@@ -832,6 +832,8 @@ func TestPipeline_unmarshalNode(t *testing.T) {
 				cmpopts.IgnoreUnexported(InfluxQLNode{}),
 				cmpopts.IgnoreUnexported(StatsNode{}),
 				cmpopts.IgnoreUnexported(UDFNode{}),
+				cmpopts.IgnoreUnexported(agent.Option{}),
+				cmpopts.IgnoreUnexported(agent.OptionValue{}),
 				cmpopts.IgnoreUnexported(node{}),
 				cmpopts.IgnoreFields(InfluxQLNode{}, "ReduceCreater"),
 			}
