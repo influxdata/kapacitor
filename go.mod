@@ -12,10 +12,8 @@ require (
 	github.com/armon/go-metrics v0.3.4 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.8.16
-	github.com/benbjohnson/tmpl v1.0.0 // indirect
 	github.com/blang/semver v3.5.0+incompatible // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
-	github.com/boltdb/bolt v1.3.1
 	github.com/cenkalti/backoff v1.0.0
 	github.com/coreos/go-oidc v0.0.0-20170307191026-be73733bb8cc // indirect
 	github.com/coreos/pkg v0.0.0-20160727233714-3ac0863d7acf // indirect
@@ -93,8 +91,11 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v0.0.0-20170409015612-8c81ea47d4c4 // indirect
 	github.com/ugorji/go v0.0.0-20170312112114-708a42d24682 // indirect
+	go.etcd.io/bbolt v1.3.5
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
-	golang.org/x/tools/gopls v0.6.5 // indirect
+	golang.org/x/sys v0.0.0-20210305215415-5cdee2b1b5a0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/api v0.0.0-20170421051952-fbbaff182731 // indirect
 	google.golang.org/appengine v1.0.0 // indirect
 	google.golang.org/grpc v1.2.1 // indirect

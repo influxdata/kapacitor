@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Error used to specifically trigger a rollback for tests.
