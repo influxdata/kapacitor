@@ -46,7 +46,8 @@ func NewMockInfluxDBService(h http.Handler) *MockInfluxDBService {
 
 func (m *MockInfluxDBService) NewNamedClient(name string) (influxdb.Client, error) {
 	return influxdb.NewHTTPClient(influxdb.Config{
-		URLs: []string{m.ts.URL},
+		URLs:        []string{m.ts.URL},
+		Compression: "none",
 	})
 }
 

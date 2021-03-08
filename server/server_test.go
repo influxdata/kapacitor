@@ -1,7 +1,9 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -4730,7 +4732,9 @@ func TestServer_ReplayQuery(t *testing.T) {
 	got := make([]response, 0)
 	for dec.More() {
 		g := response{}
-		dec.Decode(&g)
+		if err := dec.Decode(&g); err != nil {
+			t.Error(err)
+		}
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -6302,6 +6306,7 @@ func TestServer_CreateReplay_ValidIDs(t *testing.T) {
 
 func TestServer_UpdateConfig(t *testing.T) {
 	type updateAction struct {
+		name         string
 		element      string
 		updateAction client.ConfigUpdateAction
 		expSection   client.ConfigSection
@@ -6310,6 +6315,80 @@ func TestServer_UpdateConfig(t *testing.T) {
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		return &iclient.Response{}
 	})
+	defMap := map[string]interface{}{
+		"default":                     false,
+		"disable-subscriptions":       false,
+		"enabled":                     true,
+		"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+		"http-port":                   float64(0),
+		"insecure-skip-verify":        false,
+		"kapacitor-hostname":          "",
+		"name":                        "default",
+		"password":                    true,
+		"ssl-ca":                      "",
+		"ssl-cert":                    "",
+		"ssl-key":                     "",
+		"startup-timeout":             "1h0m0s",
+		"subscription-protocol":       "http",
+		"subscription-mode":           "cluster",
+		"subscription-path":           "",
+		"subscriptions":               nil,
+		"subscriptions-sync-interval": "1m0s",
+		"timeout":                     "0s",
+		"udp-bind":                    "",
+		"udp-buffer":                  float64(1e3),
+		"udp-read-buffer":             float64(0),
+		"urls":                        []interface{}{db.URL()},
+		"username":                    "bob",
+		"compression":                 "gzip",
+	}
+
+	deepCopyMapWithReplace := func(m map[string]interface{}) func(replacements ...map[string]interface{}) map[string]interface{} {
+		var a interface{} = "" // we have to do this to prevent gob.Register from panicing
+		gob.Register([]string{})
+		gob.Register(map[string]interface{}{})
+		gob.Register([]interface{}{})
+		gob.Register(a)
+		return func(replacements ...map[string]interface{}) map[string]interface{} {
+			// we can't just use json here because json(foo) doesn't always equal decodedJson(foo)
+			var buf bytes.Buffer        // Stand-in for a network connection
+			enc := gob.NewEncoder(&buf) // Will write to network.
+			dec := gob.NewDecoder(&buf) // Will read from network.
+			if err := enc.Encode(m); err != nil {
+				t.Fatal(err)
+			}
+			mCopy := map[string]interface{}{}
+
+			if err := dec.Decode(&mCopy); err != nil {
+				t.Fatal(err)
+			}
+			for i := range replacements {
+				for k, v := range replacements[i] {
+					v := v
+					if err := enc.Encode(v); err != nil {
+						t.Fatal(err)
+					}
+					vCopy := reflect.Indirect(reflect.New(reflect.TypeOf(v)))
+					if err := dec.DecodeValue(vCopy); err != nil {
+						t.Fatal(err)
+					}
+					mCopy[k] = vCopy.Interface()
+				}
+			}
+			return mCopy
+		}
+	}
+	if !cmp.Equal(deepCopyMapWithReplace(defMap)(), defMap) {
+		t.Fatalf("deepCopyMapWithReplace is broken expected %v, got %v", defMap, deepCopyMapWithReplace(defMap)())
+	}
+	{ // new block to keep vars clean
+
+		mapReplaceRes := deepCopyMapWithReplace(map[string]interface{}{"1": []string{"ok"}, "2": 3})(map[string]interface{}{"1": []string{"oks"}})
+		if !cmp.Equal(mapReplaceRes, map[string]interface{}{"1": []string{"oks"}, "2": 3}) {
+			t.Fatal(cmp.Diff(mapReplaceRes, map[string]interface{}{"1": []string{"oks"}, "2": 3}))
+		}
+	}
+
 	testCases := []struct {
 		section           string
 		element           string
@@ -6332,153 +6411,55 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 				Elements: []client.ConfigElement{{
-					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-					Options: map[string]interface{}{
-						"default":                     false,
-						"disable-subscriptions":       false,
-						"enabled":                     true,
-						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-						"http-port":                   float64(0),
-						"insecure-skip-verify":        false,
-						"kapacitor-hostname":          "",
-						"name":                        "default",
-						"password":                    true,
-						"ssl-ca":                      "",
-						"ssl-cert":                    "",
-						"ssl-key":                     "",
-						"startup-timeout":             "1h0m0s",
-						"subscription-protocol":       "http",
-						"subscription-mode":           "cluster",
-						"subscription-path":           "",
-						"subscriptions":               nil,
-						"subscriptions-sync-interval": "1m0s",
-						"timeout":                     "0s",
-						"udp-bind":                    "",
-						"udp-buffer":                  float64(1e3),
-						"udp-read-buffer":             float64(0),
-						"urls":                        []interface{}{db.URL()},
-						"username":                    "bob",
-					},
+					Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+					Options: deepCopyMapWithReplace(defMap)(),
 					Redacted: []string{
 						"password",
 					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-				Options: map[string]interface{}{
-					"default":                     false,
-					"disable-subscriptions":       false,
-					"enabled":                     true,
-					"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-					"http-port":                   float64(0),
-					"insecure-skip-verify":        false,
-					"kapacitor-hostname":          "",
-					"name":                        "default",
-					"password":                    true,
-					"ssl-ca":                      "",
-					"ssl-cert":                    "",
-					"ssl-key":                     "",
-					"startup-timeout":             "1h0m0s",
-					"subscription-protocol":       "http",
-					"subscription-mode":           "cluster",
-					"subscription-path":           "",
-					"subscriptions":               nil,
-					"subscriptions-sync-interval": "1m0s",
-					"timeout":                     "0s",
-					"udp-bind":                    "",
-					"udp-buffer":                  float64(1e3),
-					"udp-read-buffer":             float64(0),
-					"urls":                        []interface{}{db.URL()},
-					"username":                    "bob",
-				},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+				Options: deepCopyMapWithReplace(defMap)(),
 				Redacted: []string{
 					"password",
 				},
 			},
 			updates: []updateAction{
 				{
+					name: "update url",
 					// Set Invalid URL to make sure we can fix it without waiting for connection timeouts
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"urls": []string{"http://192.0.2.0:8086"},
+							"urls": []interface{}{"http://192.0.2.0:8086"},
 						},
 					},
 					element: "default",
 					expSection: client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
-							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     false,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "http",
-								"subscription-mode":           "cluster",
-								"subscription-path":           "",
-								"subscriptions":               nil,
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{"http://192.0.2.0:8086"},
-								"username":                    "bob",
-							},
+							Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+							Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 							Redacted: []string{
 								"password",
 							},
 						}},
 					},
 					expElement: client.ConfigElement{
-						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     false,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "http",
-							"subscription-mode":           "cluster",
-							"subscription-path":           "",
-							"subscriptions":               nil,
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{"http://192.0.2.0:8086"},
-							"username":                    "bob",
-						},
+						Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+						Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "update default,  subscription-protocol, subscriptions",
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
 							"default":               true,
 							"subscription-protocol": "https",
-							"subscriptions":         map[string][]string{"_internal": []string{"monitor"}},
+							"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
 						},
 					},
 					element: "default",
@@ -6486,32 +6467,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     true,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "https",
-								"subscription-mode":           "cluster",
-								"subscription-path":           "",
-								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{"http://192.0.2.0:8086"},
-								"username":                    "bob",
-							},
+							Options: deepCopyMapWithReplace(defMap)(
+								map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}},
+								map[string]interface{}{
+									"default":               true,
+									"subscription-protocol": "https",
+									"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								}),
 							Redacted: []string{
 								"password",
 							},
@@ -6519,38 +6481,20 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     true,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "https",
-							"subscription-mode":           "cluster",
-							"subscription-path":           "",
-							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{"http://192.0.2.0:8086"},
-							"username":                    "bob",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}},
+							map[string]interface{}{
+								"default":               true,
+								"subscription-protocol": "https",
+								"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "delete urls",
 					updateAction: client.ConfigUpdateAction{
 						Delete: []string{"urls"},
 					},
@@ -6559,32 +6503,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     true,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "https",
-								"subscription-mode":           "cluster",
-								"subscription-path":           "",
-								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{db.URL()},
-								"username":                    "bob",
-							},
+							Options: deepCopyMapWithReplace(defMap)(
+								map[string]interface{}{
+									"default":               true,
+									"subscription-protocol": "https",
+									"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								}),
 							Redacted: []string{
 								"password",
 							},
@@ -6592,38 +6516,19 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     true,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "https",
-							"subscription-mode":           "cluster",
-							"subscription-path":           "",
-							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{db.URL()},
-							"username":                    "bob",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{
+								"default":               true,
+								"subscription-protocol": "https",
+								"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "new",
 					updateAction: client.ConfigUpdateAction{
 						Add: map[string]interface{}{
 							"name": "new",
@@ -6636,64 +6541,26 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{
 							{
 								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-								Options: map[string]interface{}{
-									"default":                     true,
-									"disable-subscriptions":       false,
-									"enabled":                     true,
-									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-									"http-port":                   float64(0),
-									"insecure-skip-verify":        false,
-									"kapacitor-hostname":          "",
-									"name":                        "default",
-									"password":                    true,
-									"ssl-ca":                      "",
-									"ssl-cert":                    "",
-									"ssl-key":                     "",
-									"startup-timeout":             "1h0m0s",
-									"subscription-protocol":       "https",
-									"subscription-mode":           "cluster",
-									"subscription-path":           "",
-									"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-									"subscriptions-sync-interval": "1m0s",
-									"timeout":                     "0s",
-									"udp-bind":                    "",
-									"udp-buffer":                  float64(1e3),
-									"udp-read-buffer":             float64(0),
-									"urls":                        []interface{}{db.URL()},
-									"username":                    "bob",
-								},
+								Options: deepCopyMapWithReplace(defMap)(
+									map[string]interface{}{
+										"default":               true,
+										"subscription-protocol": "https",
+										"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+									}),
 								Redacted: []string{
 									"password",
 								},
 							},
 							{
 								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
-								Options: map[string]interface{}{
-									"default":                     false,
-									"disable-subscriptions":       false,
-									"enabled":                     false,
-									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-									"http-port":                   float64(0),
-									"insecure-skip-verify":        false,
-									"kapacitor-hostname":          "",
-									"name":                        "new",
-									"password":                    false,
-									"ssl-ca":                      "",
-									"ssl-cert":                    "",
-									"ssl-key":                     "",
-									"startup-timeout":             "5m0s",
-									"subscription-protocol":       "http",
-									"subscription-mode":           "cluster",
-									"subscription-path":           "",
-									"subscriptions":               nil,
-									"subscriptions-sync-interval": "1m0s",
-									"timeout":                     "0s",
-									"udp-bind":                    "",
-									"udp-buffer":                  float64(1e3),
-									"udp-read-buffer":             float64(0),
-									"urls":                        []interface{}{db.URL()},
-									"username":                    "",
-								},
+								Options: deepCopyMapWithReplace(defMap)(
+									map[string]interface{}{
+										"name":            "new",
+										"enabled":         false,
+										"password":        false,
+										"startup-timeout": "5m0s",
+										"username":        "",
+									}),
 								Redacted: []string{
 									"password",
 								},
@@ -6702,32 +6569,14 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
-						Options: map[string]interface{}{
-							"default":                     false,
-							"disable-subscriptions":       false,
-							"enabled":                     false,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "new",
-							"password":                    false,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "5m0s",
-							"subscription-protocol":       "http",
-							"subscriptions":               nil,
-							"subscription-mode":           "cluster",
-							"subscription-path":           "",
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{db.URL()},
-							"username":                    "",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{
+								"name":            "new",
+								"enabled":         false,
+								"password":        false,
+								"startup-timeout": "5m0s",
+								"username":        "",
+							}),
 						Redacted: []string{
 							"password",
 						},
@@ -8721,26 +8570,17 @@ func TestServer_UpdateConfig(t *testing.T) {
 		if got.Link != exp.Link {
 			return fmt.Errorf("elements have different links, got %v exp %v", got.Link, exp.Link)
 		}
-		for k, v := range exp.Options {
-			if g, ok := got.Options[k]; !ok {
-				return fmt.Errorf("missing option %q", k)
-			} else if !reflect.DeepEqual(g, v) {
-				return fmt.Errorf("unexpected config option %q got %#v exp %#v types: got %T exp %T", k, g, v, g, v)
-			}
-		}
-		for k := range got.Options {
-			if v, ok := exp.Options[k]; !ok {
-				return fmt.Errorf("extra option %q with value %#v", k, v)
-			}
+		if !cmp.Equal(exp.Options, got.Options) {
+			return fmt.Errorf("unexpected config option difference \n %s", cmp.Diff(exp.Options, got.Options))
 		}
 		if len(got.Redacted) != len(exp.Redacted) {
-			return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
+			return fmt.Errorf("unexpected element redacted lists: %s, \n%s", got.Redacted, cmp.Diff(got.Redacted, exp.Redacted))
 		}
 		sort.Strings(got.Redacted)
 		sort.Strings(exp.Redacted)
 		for i := range exp.Redacted {
 			if got.Redacted[i] != exp.Redacted[i] {
-				return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
+				return fmt.Errorf("unexpected element redacted lists: %s, \n%s", got.Redacted, cmp.Diff(got.Redacted, exp.Redacted))
 			}
 		}
 		return nil
@@ -8812,23 +8652,26 @@ func TestServer_UpdateConfig(t *testing.T) {
 			}
 
 			for i, ua := range tc.updates {
-				link := cli.ConfigElementLink(tc.section, ua.element)
+				t.Run(ua.name, func(t *testing.T) {
+					link := cli.ConfigElementLink(tc.section, ua.element)
 
-				if len(ua.updateAction.Add) > 0 ||
-					len(ua.updateAction.Remove) > 0 {
-					link = cli.ConfigSectionLink(tc.section)
-				}
+					if len(ua.updateAction.Add) > 0 ||
+						len(ua.updateAction.Remove) > 0 {
+						link = cli.ConfigSectionLink(tc.section)
+					}
 
-				if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
-					t.Fatal(err)
-				}
-				if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
-					t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
-				}
+					if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
+						t.Fatal(err)
+					}
+					if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
+						t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
+					}
+				})
 			}
 		})
 	}
 }
+
 func TestServer_ListServiceTests(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
@@ -9846,7 +9689,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := bigpandatest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.BigPanda.Enabled = true
 				c.BigPanda.Token = "my-token-123"

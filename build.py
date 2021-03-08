@@ -207,10 +207,9 @@ def run_tests(race, parallel, timeout, no_vet):
             logging.error("Go vet failed. Please run '{}' and fix any errors.".format(' '.join(vet_cmd)))
             logging.error("{}".format(exc.output))
             return False
-        return True
     else:
         logging.info("Skipping 'go vet' call...")
-    test_command = "go test"
+    test_command = "go test -v"
     if race:
         test_command += " -race"
     if parallel is not None:

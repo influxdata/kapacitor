@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/boltdb/bolt"
 	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/httpd"
+	bolt "go.etcd.io/bbolt"
 )
 
 const (

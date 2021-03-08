@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestClient_Query(t *testing.T) {
@@ -198,7 +200,11 @@ func TestClient_Write(t *testing.T) {
 }
 
 func TestClient_WriteLarge(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test that writes a batch of 100,000 points")
+	}
 	expected := &bytes.Buffer{}
+	wg := sync.WaitGroup{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data Response
 		uncompressedBody, err := gzip.NewReader(r.Body)
@@ -213,10 +219,14 @@ func TestClient_WriteLarge(t *testing.T) {
 			t.Errorf("expected gzip Content-Encoding but got %s", r.Header.Get("Content-Encoding"))
 		}
 		if string(bod) != expected.String() {
-			t.Errorf("unexpected send, expected '%s', got '%s'", expected, string(bod))
+			t.Errorf("unexpected send:\n%s",
+				cmp.Diff(
+					strings.Split(expected.String(), "\n"),
+					strings.Split(string(bod), "\n")))
 		}
 		w.WriteHeader(http.StatusNoContent)
 		_ = json.NewEncoder(w).Encode(data)
+		wg.Done()
 	}))
 	defer ts.Close()
 
@@ -229,7 +239,7 @@ func TestClient_WriteLarge(t *testing.T) {
 	}
 
 	startT := time.Date(1999, 11, 9, 0, 0, 0, 3, time.UTC)
-	for i := 0; i < 1000000; i++ {
+	for i := 0; i < 100000; i++ {
 		pt := Point{
 			Name:   "testpt",
 			Tags:   map[string]string{"tag1": "tag1"},
@@ -243,11 +253,12 @@ func TestClient_WriteLarge(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
-
+	wg.Add(1)
 	err = c.Write(bp)
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
+	wg.Wait()
 }
 
 func TestClient_Write_noCompression(t *testing.T) {

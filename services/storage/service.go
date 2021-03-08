@@ -5,9 +5,9 @@ import (
 	"path"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 type Diagnostic interface {
