@@ -291,20 +291,16 @@ func (s *Service) Close() error {
 }
 
 type testOptions struct {
-	Cluster string      `json:"cluster"`
-	Target  WriteTarget `json:"target"`
-	Key     string      `json:"key"`
-	Message string      `json:"message"`
+	Cluster string `json:"cluster"`
+	Topic   string `json:"topic"`
+	Key     string `json:"key"`
+	Message string `json:"message"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Cluster: "example",
-		Target: WriteTarget{
-			Topic:              "test",
-			PartitionById:      true,
-			PartitionAlgorithm: "",
-		},
+		Topic: "test",
 		Key:     "key",
 		Message: "test kafka message",
 	}
@@ -319,7 +315,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unknown cluster %q", o.Cluster)
 	}
-	return c.WriteMessage(s.diag, o.Target, []byte(o.Key), []byte(o.Message))
+	return c.WriteMessage(s.diag, WriteTarget{Topic: o.Topic}, []byte(o.Key), []byte(o.Message))
 }
 
 type HandlerConfig struct {
