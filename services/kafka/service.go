@@ -300,7 +300,7 @@ type testOptions struct {
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Cluster: "example",
-		Topic: "test",
+		Topic:   "test",
 		Key:     "key",
 		Message: "test kafka message",
 	}
