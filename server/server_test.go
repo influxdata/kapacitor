@@ -8812,9 +8812,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Name: "kafka",
 				Options: client.ServiceTestOptions{
 					"cluster": "example",
-					"topic":   "test",
 					"key":     "key",
 					"message": "test kafka message",
+					"target": map[string]interface{}{
+						"PartitionAlgorithm": "",
+						"PartitionById":      true,
+						"Topic":              "test",
+					},
 				},
 			},
 			{
