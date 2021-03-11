@@ -51,7 +51,11 @@ type writer struct {
 	wg sync.WaitGroup
 
 	statsKey string
-	ticker   *time.Ticker
+
+	// time.Ticker doesn't expose any way to close its internal channel,
+	// so we have to use a side-channel to signal when it's been stopped.
+	ticker     *time.Ticker
+	tickerDone chan struct{}
 }
 
 func (w *writer) Open() {
@@ -71,6 +75,7 @@ func (w *writer) Open() {
 	statsMap.Set(statWriteMessageCount, writeMessages)
 
 	w.ticker = time.NewTicker(time.Second)
+	w.tickerDone = make(chan struct{}, 1)
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
@@ -80,6 +85,7 @@ func (w *writer) Open() {
 
 func (w *writer) Close() {
 	w.ticker.Stop()
+	close(w.tickerDone)
 	vars.DeleteStatistic(w.statsKey)
 	w.kafka.Close()
 	w.wg.Wait()
@@ -89,10 +95,15 @@ func (w *writer) Close() {
 // A read operation on the kafka.Writer.Stats() method causes the internal counters to be reset.
 // As a result we control all reads through this method.
 func (w *writer) pollStats() {
-	for range w.ticker.C {
-		stats := w.kafka.Stats()
-		atomic.AddInt64(&w.messageCount, stats.Messages)
-		atomic.AddInt64(&w.errorCount, stats.Errors)
+	for {
+		select {
+		case <-w.tickerDone:
+			return
+		case <-w.ticker.C:
+			stats := w.kafka.Stats()
+			atomic.AddInt64(&w.messageCount, stats.Messages)
+			atomic.AddInt64(&w.errorCount, stats.Errors)
+		}
 	}
 }
 
