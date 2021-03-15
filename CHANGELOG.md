@@ -1,5 +1,12 @@
 # Changelog
 
+
+
+## v1.5.9 [2021-01-11]
+
+### Bugfixes
+- [#2498](https://github.com/influxdata/kapacitor/pull/2498): avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
+
 ## v1.5.8 [2021-01-11]
 
 ### Bugfixes
