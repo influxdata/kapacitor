@@ -288,6 +288,11 @@ github.com/samuel/go-zookeeper v0.0.0-20161028232340-1d7be4effb13 h1:4AQBn5RJY4W
 github.com/samuel/go-zookeeper v0.0.0-20161028232340-1d7be4effb13/go.mod h1:gi+0XIa01GRL2eRQVjQkKGqKF3SF9vZR/HnPullcV2E=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 h1:nn5Wsu0esKSJiIVhscUtVbo7ada43DJhG55ua/hjS5I=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
+<<<<<<< HEAD
+=======
+github.com/segmentio/kafka-go v0.3.5 h1:2JVT1inno7LxEASWj+HflHh5sWGfM0gkRiLAxkXhGG4=
+github.com/segmentio/kafka-go v0.3.5/go.mod h1:OT5KXBPbaJJTcvokhWR2KFmm0niEx3mnccTwjmLvSi4=
+>>>>>>> feat(kafka): route alerts to partitions by ID, allow for configuring the hashing strategy (#2493)
 github.com/segmentio/kafka-go v0.3.10 h1:h/1aSu7gWp6DXLmp0csxm8wrYD6rRYyaqclu2aQ/PWo=
 github.com/segmentio/kafka-go v0.3.10/go.mod h1:8rEphJEczp+yDE/R5vwmaqZgF1wllrl4ioQcNKB8wVA=
 github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b h1:B6dcIy62mIVH3xZ+Alc5J4fLDWthEa1RPzK7L7/glTw=

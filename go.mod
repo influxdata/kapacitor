@@ -7,6 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v5.0.0-beta.0.20161028183111-bd73d950fa44+incompatible // indirect
 	github.com/Azure/go-autorest v7.3.1+incompatible // indirect
 	github.com/BurntSushi/toml v0.3.1
+	github.com/DataDog/zstd v1.4.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170324140228-bbf7a2afc14f // indirect
 	github.com/armon/go-metrics v0.3.4 // indirect
