@@ -76,7 +76,32 @@ func (c *Config) ApplyConditionalDefaults() {
 	}
 }
 
-func (c Config) WriterConfig(diagnostic Diagnostic) (kafka.WriterConfig, error) {
+type WriteTarget struct {
+	Topic              string
+	PartitionById      bool
+	PartitionAlgorithm string
+}
+
+func (c Config) WriterConfig(diagnostic Diagnostic, target WriteTarget) (kafka.WriterConfig, error) {
+	if target.Topic == "" {
+		return kafka.WriterConfig{}, errors.New("topic must not be empty")
+	}
+	var balancer kafka.Balancer
+	if target.PartitionById {
+		switch target.PartitionAlgorithm {
+		case "crc32c", "":
+			balancer = &kafka.CRC32Balancer{}
+		case "murmur2":
+			balancer = &kafka.Murmur2Balancer{}
+		case "fnv-1a":
+			balancer = &kafka.Hash{}
+		default:
+			return kafka.WriterConfig{}, fmt.Errorf("invalid partition algorithm: %q", target.PartitionAlgorithm)
+		}
+	} else {
+		balancer = &kafka.LeastBytes{}
+	}
+
 	var tlsCfg *tls.Config
 	if c.UseSSL {
 		t, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
@@ -90,9 +115,8 @@ func (c Config) WriterConfig(diagnostic Diagnostic) (kafka.WriterConfig, error) 
 		TLS:     tlsCfg,
 	}
 
-	return kafka.WriterConfig{
+	baseConfig := kafka.WriterConfig{
 		Brokers:      c.Brokers,
-		Balancer:     &kafka.LeastBytes{},
 		Dialer:       dialer,
 		ReadTimeout:  time.Duration(c.Timeout),
 		WriteTimeout: time.Duration(c.Timeout),
@@ -105,7 +129,11 @@ func (c Config) WriterConfig(diagnostic Diagnostic) (kafka.WriterConfig, error) 
 		ErrorLogger: kafka.LoggerFunc(func(s string, x ...interface{}) {
 			diagnostic.Error("kafka client error", fmt.Errorf(s, x...))
 		}),
-	}, nil
+		Topic:    target.Topic,
+		Balancer: balancer,
+	}
+
+	return baseConfig, nil
 }
 
 type Configs []Config

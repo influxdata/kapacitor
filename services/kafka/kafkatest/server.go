@@ -27,13 +27,14 @@ type Server struct {
 	brokerMessage []byte
 	nodeID        int32
 
-	partitionMessage []byte
+	partitionCount int32
 }
 
 func NewServer() (*Server, error) {
 	s := &Server{
-		closing: make(chan struct{}),
-		nodeID:  1,
+		closing:        make(chan struct{}),
+		nodeID:         1,
+		partitionCount: 3,
 	}
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -43,7 +44,6 @@ func NewServer() (*Server, error) {
 
 	// Prepare static message bytes
 	s.prepareBrokerMsg()
-	s.preparePartitionMsg()
 
 	// start server
 	s.wg.Add(1)
@@ -62,20 +62,6 @@ func (s *Server) prepareBrokerMsg() {
 	portN, _ := strconv.Atoi(port)
 	s.brokerMessage = writeInt32(s.brokerMessage, int32(portN))
 	s.brokerMessage = writeInt16(s.brokerMessage, -1)
-}
-
-func (s *Server) preparePartitionMsg() {
-	s.partitionMessage = make([]byte, 0, 2+4+4+4+4)
-	// Write error code
-	s.partitionMessage = writeInt16(s.partitionMessage, 0)
-	// Write partition ID
-	s.partitionMessage = writeInt32(s.partitionMessage, 1)
-	// Write leader ID
-	s.partitionMessage = writeInt32(s.partitionMessage, s.nodeID)
-	// Write 0 len replicas
-	s.partitionMessage = writeArrayHeader(s.partitionMessage, 0)
-	// Write 0 len Isr
-	s.partitionMessage = writeArrayHeader(s.partitionMessage, 0)
 }
 
 func (s *Server) Close() {
@@ -164,16 +150,19 @@ func (s *Server) handle(c net.Conn) error {
 
 	switch apiKey {
 	case 0: // ProduceRequest
-		topic, partition, offset := s.readProduceRequest(request)
+		topic, responses := s.readProduceRequest(request)
 
 		// Prepare success response
 		response = writeArrayHeader(response, 1)
 		response = writeStr(response, topic)
-		response = writeArrayHeader(response, 1)
-		response = writeInt32(response, partition)
-		response = writeInt16(response, 0) // Error Code
-		response = writeInt64(response, offset)
-		response = writeInt32(response, 0) // ThrottleTime
+		response = writeArrayHeader(response, int32(len(responses)))
+		for _, r := range responses {
+			response = writeInt32(response, r.partition)
+			response = writeInt16(response, 0) // Error Code
+			response = writeInt64(response, r.offset)
+			response = writeInt32(response, 0) // ThrottleTime
+		}
+
 	case 3: // Metadata
 		topics, _ := readStrList(request)
 
@@ -193,8 +182,20 @@ func (s *Server) handle(c net.Conn) error {
 			// Write is_internal
 			response = writeBool(response, false)
 
-			// Write partition
-			response = writeArray(response, [][]byte{s.partitionMessage})
+			// Write partitions
+			response = writeArrayHeader(response, s.partitionCount)
+			for i := int32(0); i < s.partitionCount; i++ {
+				// Write error code
+				response = writeInt16(response, 0)
+				// Write partition ID
+				response = writeInt32(response, i+1)
+				// Write leader ID
+				response = writeInt32(response, s.nodeID)
+				// Write 0 len replicas
+				response = writeArrayHeader(response, 0)
+				// Write 0 len Isr
+				response = writeArrayHeader(response, 0)
+			}
 		}
 	case 18:
 		// Hard code the api versions we are implementing to ensure
@@ -224,44 +225,57 @@ func (s *Server) handle(c net.Conn) error {
 	return err
 }
 
-// readProduceRequest, assume only a single message exists
-func (s *Server) readProduceRequest(request []byte) (topic string, partition int32, offset int64) {
+type produceResponse struct {
+	partition int32
+	offset    int64
+}
+
+// readProduceRequest, assume only a single message per partition exists
+func (s *Server) readProduceRequest(request []byte) (string, []produceResponse) {
+	buf := []produceResponse{}
+
 	pos := 2 + 4 + 4 // skip RequiredAcks and Timeout and array len
 
 	// Read topic name
 	topic, n := readStr(request[pos:])
 	pos += n
 
-	pos += 4 // skip array len
-
-	partition = readInt32(request[pos:])
+	// Read array len
+	arrayLen := readInt32(request[pos:])
 	pos += 4
 
-	pos += 4 // skip set size
+	for i := int32(0); i < arrayLen; i++ {
+		partition := readInt32(request[pos:])
+		pos += 4
 
-	offset = readInt64(request[pos:])
-	pos += 8
+		pos += 4 // skip set size
 
-	pos += 4 + 4 + 1 + 1 // skip size, crc, magic, attributes
+		offset := readInt64(request[pos:])
+		pos += 8
 
-	msecs := readInt64(request[pos:])
-	pos += 8
+		pos += 4 + 4 + 1 + 1 // skip size, crc, magic, attributes
 
-	key, n := readByteArray(request[pos:])
-	pos += n
+		msecs := readInt64(request[pos:])
+		pos += 8
 
-	message, n := readByteArray(request[pos:])
-	pos += n
+		key, n := readByteArray(request[pos:])
+		pos += n
 
-	s.saveMessage(Message{
-		Topic:     topic,
-		Partition: partition,
-		Offset:    offset,
-		Key:       string(key),
-		Message:   string(message),
-		Time:      time.Unix(msecs/1000, msecs%1000*1000000).UTC(),
-	})
-	return
+		message, n := readByteArray(request[pos:])
+		pos += n
+
+		s.saveMessage(Message{
+			Topic:     topic,
+			Partition: partition,
+			Offset:    offset,
+			Key:       string(key),
+			Message:   string(message),
+			Time:      time.Unix(msecs/1000, msecs%1000*1000000).UTC(),
+		})
+		buf = append(buf, produceResponse{partition, offset})
+	}
+
+	return topic, buf
 }
 
 func (s *Server) saveMessage(m Message) {
@@ -293,6 +307,9 @@ func readStr(buf []byte) (string, int) {
 }
 func readByteArray(buf []byte) ([]byte, int) {
 	n := int(int32(binary.BigEndian.Uint32(buf[:4])))
+	if n == -1 {
+		return nil, n + 4
+	}
 	return buf[4 : 4+n], n + 4
 }
 

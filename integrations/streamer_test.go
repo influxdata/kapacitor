@@ -8813,7 +8813,7 @@ stream
 	exp := []interface{}{
 		kafkatest.Message{
 			Topic:     "testTopic",
-			Partition: 1,
+			Partition: 2,
 			Offset:    0,
 			Key:       "kapacitor/cpu/serverA",
 			Message:   "kapacitor/cpu/serverA is CRITICAL",
@@ -8852,6 +8852,64 @@ stream
 	}
 	if err := compareListIgnoreOrder(got, exp, cmpF); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestStream_AlertKafka_Partitioning(t *testing.T) {
+	ts, err := kafkatest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+	|alert()
+		.id('{{ index .Tags "host" }}')
+		.crit(lambda: TRUE)
+		.kafka()
+		.cluster('default')
+		.kafkaTopic('testTopic')
+		.template('{{.Message}}')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		configs := kafka.Configs{{
+			Enabled:   true,
+			ID:        "default",
+			Brokers:   []string{ts.Addr.String()},
+			BatchSize: 1,
+		}}
+		d := diagService.NewKafkaHandler().WithContext(keyvalue.KV("test", "kafka"))
+		tm.KafkaService = kafka.NewService(configs, d)
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	// Wait for kakfa messages to be written
+	time.Sleep(time.Second)
+
+	ts.Close()
+	msgs, err := ts.Messages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]map[int32]struct{})
+	for _, m := range msgs {
+		// Record the partitions used per message key.
+		partitions, ok := got[m.Key]
+		if !ok {
+			got[m.Key] = make(map[int32]struct{})
+			partitions = got[m.Key]
+		}
+		partitions[m.Partition] = struct{}{}
+	}
+
+	for msg, partitions := range got {
+		if len(partitions) > 1 {
+			t.Fatalf("messages for %q were sent to %d partitions, expected only 1 partition", msg, len(partitions))
+		}
 	}
 }
 

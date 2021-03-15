@@ -210,6 +210,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.Dot("kafka").
 			Dot("cluster", h.Cluster).
 			Dot("kafkaTopic", h.KafkaTopic).
+			DotIf("disablePartitionById", h.IsDisablePartitionById).
+			Dot("partitionHashAlgorithm", h.PartitionHashAlgorithm).
 			Dot("template", h.Template)
 	}
 

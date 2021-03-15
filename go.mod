@@ -7,6 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v5.0.0-beta.0.20161028183111-bd73d950fa44+incompatible // indirect
 	github.com/Azure/go-autorest v7.3.1+incompatible // indirect
 	github.com/BurntSushi/toml v0.3.1
+	github.com/DataDog/zstd v1.4.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170324140228-bbf7a2afc14f // indirect
 	github.com/armon/go-metrics v0.3.4 // indirect
@@ -80,7 +81,7 @@ require (
 	github.com/russross/blackfriday v0.0.0-20151110051855-0b647d0506a6 // indirect
 	github.com/samuel/go-zookeeper v0.0.0-20161028232340-1d7be4effb13 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
-	github.com/segmentio/kafka-go v0.3.5
+	github.com/segmentio/kafka-go v0.3.10
 	github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b
 	github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 // indirect
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
