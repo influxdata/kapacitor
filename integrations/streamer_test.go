@@ -5773,7 +5773,6 @@ cpuT
 			},
 		},
 	}
-
 	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, false, nil)
 }
 
@@ -13617,7 +13616,6 @@ func testStreamerWithOutput(
 	if err != nil {
 		t.Error(err)
 	}
-
 	// Get the result
 	output, err := et.GetOutput(name)
 	if err != nil {
