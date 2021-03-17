@@ -377,7 +377,7 @@ func (tm *TaskMaster) Drain() {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
-	for id, _ := range tm.taskToForkKeys {
+	for id := range tm.taskToForkKeys {
 		tm.delFork(id)
 	}
 }
