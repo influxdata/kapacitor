@@ -790,3 +790,29 @@ func TestAlertSNMP(t *testing.T) {
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
+
+func TestAlertZenoss(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Zenoss()
+	handler.Action = "custom_add_event"
+	handler.Summary = "server alert"
+	handler.Device = "server-A"
+	handler.Component = "CPU"
+	handler.EventClass = "/App"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .zenoss()
+        .action('custom_add_event')
+        .summary('server alert')
+        .device('server-A')
+        .component('CPU')
+        .eventClass('/App')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}

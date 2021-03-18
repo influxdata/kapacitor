@@ -74,18 +74,32 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	Action string `json:"action"`
-	Method string `json:"method"`
-	Type   string `json:"type"`
-	TID    int64  `json:"tid"`
+	AlertID       string                 `json:"alert_id"`
+	Level         alert.Level            `json:"level"`
+	Message       string                 `json:"message"`
+	Action        string                 `json:"action"`
+	Method        string                 `json:"method"`
+	Type          string                 `json:"type"`
+	TID           int64                  `json:"tid"`
+	Summary       string                 `json:"summary"`
+	Device        string                 `json:"device"`
+	Component     string                 `json:"component"`
+	EventClassKey string                 `json:"event_class_key"`
+	EventClass    string                 `json:"event_class"`
+	Collector     string                 `json:"collector"`
+	CustomFields  map[string]interface{} `json:"custom_fields"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		Action: "EventsRouter",
-		Method: "add_event",
-		Type:   "rpc",
-		TID:    1,
+		AlertID:      "1001",
+		Level:        alert.Critical,
+		Message:      "test zenoss message",
+		Action:       "EventsRouter",
+		Method:       "add_event",
+		Type:         "rpc",
+		TID:          1,
+		CustomFields: map[string]interface{}{},
 	}
 }
 
@@ -106,9 +120,9 @@ func (s *Service) Test(options interface{}) error {
 		Tags:   map[string]string{},
 	}
 	state := &alert.EventState{
-		ID:      "ID 001",
-		Level:   alert.OK,
-		Message: "test message",
+		ID:      o.AlertID,
+		Level:   o.Level,
+		Message: o.Message,
 	}
 
 	return s.Alert(c.URL, state, data, hc)
