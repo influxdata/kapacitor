@@ -83,11 +83,13 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	AppKey    string          `json:"app_key"`
-	Message   string          `json:"message"`
-	Level     alert.Level     `json:"level"`
-	Data      alert.EventData `json:"event_data"`
-	Timestamp time.Time       `json:"timestamp"`
+	AppKey            string          `json:"app_key"`
+	Message           string          `json:"message"`
+	Level             alert.Level     `json:"level"`
+	Data              alert.EventData `json:"event_data"`
+	Timestamp         time.Time       `json:"timestamp"`
+	PrimaryProperty   string          `json:"primary_property"`
+	SecondaryProperty string          `json:"secondary_property"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -114,7 +116,9 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	hc := &HandlerConfig{
-		AppKey: o.AppKey,
+		AppKey:            o.AppKey,
+		PrimaryProperty:   o.PrimaryProperty,
+		SecondaryProperty: o.SecondaryProperty,
 	}
 	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc)
 }
