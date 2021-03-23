@@ -7,12 +7,12 @@ require (
 	github.com/Azure/azure-sdk-for-go v5.0.0-beta.0.20161028183111-bd73d950fa44+incompatible // indirect
 	github.com/Azure/go-autorest v7.3.1+incompatible // indirect
 	github.com/BurntSushi/toml v0.3.1
-	github.com/DataDog/zstd v1.4.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.0 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170324140228-bbf7a2afc14f // indirect
 	github.com/armon/go-metrics v0.3.4 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.8.16
+	github.com/benbjohnson/tmpl v1.0.0
 	github.com/blang/semver v3.5.0+incompatible // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
 	github.com/cenkalti/backoff v1.0.0
@@ -64,7 +64,7 @@ require (
 	github.com/k-sone/snmpgo v3.2.0+incompatible
 	github.com/kimor79/gollectd v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/mailru/easyjson v0.0.0-20201007175905-fca00f44f19d
+	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-runewidth v0.0.2 // indirect
 	github.com/miekg/dns v0.0.0-20170412184748-6ebcb714d369 // indirect
 	github.com/mitchellh/copystructure v0.0.0-20170116004449-f81071c9d77b
