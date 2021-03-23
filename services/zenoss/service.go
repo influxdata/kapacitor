@@ -110,10 +110,17 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	hc := &HandlerConfig{
-		Action: o.Action,
-		Method: o.Method,
-		Type:   o.Type,
-		TID:    o.TID,
+		Action:        o.Action,
+		Method:        o.Method,
+		Type:          o.Type,
+		TID:           o.TID,
+		Summary:       o.Summary,
+		Device:        o.Device,
+		Component:     o.Component,
+		EventClassKey: o.EventClassKey,
+		EventClass:    o.EventClass,
+		Collector:     o.Collector,
+		CustomFields:  o.CustomFields,
 	}
 	data := &alert.EventData{
 		Fields: map[string]interface{}{},
