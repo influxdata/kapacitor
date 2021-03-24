@@ -305,10 +305,6 @@ func (s *Service) preparePost(url string, state *alert.EventState, data *alert.E
 	}
 	severity := c.SeverityMap.ValueFor(state.Level)
 
-	if summary == "" { // fallback to default (ie. alert message)
-		summary = state.Message
-	}
-
 	eventData := &EventData{
 		Summary:    cutoff(summary, 256),
 		Device:     device,
