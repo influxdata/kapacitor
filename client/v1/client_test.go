@@ -48,6 +48,34 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "CreateUser",
+			fnc: func(c *client.Client) error {
+				_, err := c.CreateUser(client.CreateUserOptions{})
+				return err
+			},
+		},
+		{
+			name: "UpdateUser",
+			fnc: func(c *client.Client) error {
+				_, err := c.UpdateUser(c.UserLink(""), client.UpdateUserOptions{})
+				return err
+			},
+		},
+		{
+			name: "User",
+			fnc: func(c *client.Client) error {
+				_, err := c.User(c.UserLink(""))
+				return err
+			},
+		},
+		{
+			name: "DeleteUser",
+			fnc: func(c *client.Client) error {
+				err := c.DeleteUser(c.UserLink(""))
+				return err
+			},
+		},
+		{
 			name: "CreateTask",
 			fnc: func(c *client.Client) error {
 				_, err := c.CreateTask(client.CreateTaskOptions{})
@@ -3082,6 +3110,94 @@ func Test_LogLevel(t *testing.T) {
 	}
 }
 
+func Test_CreateUser(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var user client.CreateUserOptions
+		body, _ := ioutil.ReadAll(r.Body)
+		err := json.Unmarshal(body, &user)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if r.URL.Path == "/kapacitor/v1/users" && r.Method == "POST" {
+			exp := client.CreateUserOptions{
+				Name: "username",
+				Type: client.AdminUser,
+				Permissions: []client.Permission{
+					client.AllPermissions,
+				},
+			}
+			if !reflect.DeepEqual(exp, user) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, "unexpected CreateUser body: got:\n%v\nexp:\n%v\n", user, exp)
+			} else {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/users/username"}, "name":"username"}`)
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	user, err := c.CreateUser(client.CreateUserOptions{
+		Name:        "username",
+		Type:        client.AdminUser,
+		Permissions: []client.Permission{client.AllPermissions},
+	})
+	if got, exp := string(user.Link.Href), "/kapacitor/v1/users/username"; got != exp {
+		t.Errorf("unexpected user link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Name, "username"; got != exp {
+		t.Errorf("unexpected username got %s exp %s", got, exp)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_User(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/users/bob" && r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href":"/kapacitor/v1/users/bob"},
+	"name": "bob",
+	"type":"normal",
+	"permissions":["api","write_points"]
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	user, err := c.User(c.UserLink("bob"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.User{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/users/bob"},
+		Name: "bob",
+		Type: client.NormalUser,
+		Permissions: []client.Permission{
+			client.APIPermission,
+			client.WritePointsPermission,
+		},
+	}
+	if !reflect.DeepEqual(exp, user) {
+		t.Errorf("unexpected user:\ngot:\n%v\nexp:\n%v", user, exp)
+	}
+}
+
 func Test_Bad_Creds(t *testing.T) {
 	testCases := []struct {
 		creds *client.Credentials
@@ -3183,5 +3299,236 @@ func Test_BearerAuthentication(t *testing.T) {
 	}
 	if exp, got := "versionStr", version; exp != got {
 		t.Errorf("unexpected version: got: %s exp: %s", got, exp)
+	}
+}
+
+func Test_DeleteUser(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/users/username" && r.Method == "DELETE" {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	err = c.DeleteUser(c.UserLink("username"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_ListUsers(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/users" && r.Method == "GET" &&
+			r.URL.Query().Get("pattern") == "" &&
+			r.URL.Query().Get("fields") == "" &&
+			r.URL.Query().Get("offset") == "0" &&
+			r.URL.Query().Get("limit") == "100" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+"users":[
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/users/bob"},
+		"name": "bob",
+		"type":"admin"
+	},
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/users/jim"},
+		"name": "jim",
+		"type":"normal",
+		"permissions":["none"]
+	}
+]}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	users, err := c.ListUsers(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := []client.User{
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/users/bob"},
+			Name: "bob",
+			Type: client.AdminUser,
+		},
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/users/jim"},
+			Name: "jim",
+			Type: client.NormalUser,
+			Permissions: []client.Permission{
+				client.NoPermissions,
+			},
+		},
+	}
+	if !reflect.DeepEqual(exp, users) {
+		t.Errorf("unexpected user list: got:\n%v\nexp:\n%v", users, exp)
+	}
+}
+
+func Test_ListUsers_Fields(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/users" && r.Method == "GET" &&
+			r.URL.Query().Get("pattern") == "" &&
+			len(r.URL.Query()["fields"]) == 1 &&
+			r.URL.Query()["fields"][0] == "type" &&
+			r.URL.Query().Get("offset") == "0" &&
+			r.URL.Query().Get("limit") == "100" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+"users":[
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/users/bob"},
+		"name": "bob",
+		"type":"admin"
+	},
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/users/jim"},
+		"name": "jim",
+		"type":"normal"
+	}
+]}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	users, err := c.ListUsers(&client.ListUsersOptions{
+		Fields: []string{"type"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := []client.User{
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/users/bob"},
+			Name: "bob",
+			Type: client.AdminUser,
+		},
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/users/jim"},
+			Name: "jim",
+			Type: client.NormalUser,
+		},
+	}
+	if !reflect.DeepEqual(exp, users) {
+		t.Errorf("unexpected user list: got:\n%v\nexp:\n%v", users, exp)
+	}
+}
+
+func Test_Permission_MarshalText(t *testing.T) {
+	for _, tc := range []struct {
+		permission client.Permission
+		text       string
+		err        error
+	}{
+		{
+			permission: client.NoPermissions,
+			text:       "none",
+		},
+		{
+			permission: client.APIPermission,
+			text:       "api",
+		},
+		{
+			permission: client.WritePointsPermission,
+			text:       "write_points",
+		},
+		{
+			permission: client.AllPermissions,
+			text:       "all",
+		},
+		{
+			permission: -1,
+			text:       "test",
+			err:        errors.New("unknown Permission -1"),
+		},
+	} {
+		if text, err := tc.permission.MarshalText(); err != nil {
+			if tc.err == nil {
+				t.Errorf("unexpected error for permission %v: %s", tc.permission, err)
+			} else if got, exp := err.Error(), tc.err.Error(); got != exp {
+				t.Errorf("unexpected permission error: got %s exp %s", got, exp)
+			} else {
+				p := client.Permission(-1)
+				if err := p.UnmarshalText([]byte(tc.text)); err == nil {
+					t.Errorf("expected error unmarshaling userType text: %s", tc.text)
+				}
+			}
+		} else if got, exp := string(text), tc.text; got != exp {
+			t.Errorf("unexpected permission text: got %s exp %s", got, exp)
+		} else {
+			p := client.Permission(-1)
+			if err := p.UnmarshalText(text); err != nil {
+				t.Errorf("unexpected error unmarshaling permission text: %s", string(text))
+			} else if got, exp := p, tc.permission; got != exp {
+				t.Errorf("unexpected permission: got %v exp %v", got, exp)
+			}
+		}
+	}
+}
+
+func Test_UserType_MarshalText(t *testing.T) {
+	for _, tc := range []struct {
+		userType client.UserType
+		text     string
+		err      error
+	}{
+		{
+			userType: client.InvalidUser,
+			text:     "",
+		},
+		{
+			userType: client.NormalUser,
+			text:     "normal",
+		},
+		{
+			userType: client.AdminUser,
+			text:     "admin",
+		},
+		{
+			userType: -1,
+			text:     "test",
+			err:      errors.New("unknown UserType -1"),
+		},
+	} {
+		if text, err := tc.userType.MarshalText(); err != nil {
+			if tc.err == nil {
+				t.Errorf("unexpected error for userType %v: %s", tc.userType, err)
+			} else if got, exp := err.Error(), tc.err.Error(); got != exp {
+				t.Errorf("unexpected userType error: got %s exp %s", got, exp)
+			} else {
+				ut := client.UserType(-1)
+				if err := ut.UnmarshalText([]byte(tc.text)); err == nil {
+					t.Errorf("expected error unmarshaling userType text: %s", tc.text)
+				}
+			}
+		} else if got, exp := string(text), tc.text; got != exp {
+			t.Errorf("unexpected userType text: got %s exp %s", got, exp)
+		} else {
+			ut := client.UserType(-1)
+			if err := ut.UnmarshalText(text); err != nil {
+				t.Errorf("unexpected error unmarshaling userType text: %s", string(text))
+			} else if got, exp := ut, tc.userType; got != exp {
+				t.Errorf("unexpected userType: got %v exp %v", got, exp)
+			}
+		}
 	}
 }

@@ -16,6 +16,7 @@
 - [#2454](https://github.com/influxdata/kapacitor/pull/2454): Add PrimaryProperty and SecondaryProperty methods to BigPanda AlertNode.
 - [#2462](https://github.com/influxdata/kapacitor/pull/2462): BREAKING: we are forced to remove support for 386/darwin builds as go doesn't support them anymore.
 - [#2475](https://github.com/influxdata/kapacitor/pull/2475): Add default color theme to teams alerts
+- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise
 
 ## v1.5.7 [2020-10-27]
 

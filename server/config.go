@@ -11,9 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/services/collectd"
+	"github.com/influxdata/influxdb/services/graphite"
+	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/auth"
+	authservice "github.com/influxdata/kapacitor/services/auth"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
@@ -64,15 +69,12 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
-
-	"github.com/influxdata/influxdb/services/collectd"
-	"github.com/influxdata/influxdb/services/graphite"
-	"github.com/influxdata/influxdb/services/opentsdb"
 )
 
 // Config represents the configuration format for the kapacitord binary.
 type Config struct {
 	Alert          alert.Config      `toml:"alert"`
+	Auth           auth.Config       `toml:"auth"`
 	HTTP           httpd.Config      `toml:"http"`
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
@@ -152,6 +154,7 @@ func NewConfig() *Config {
 	}
 
 	c.Alert = alert.NewConfig()
+	c.Auth = authservice.NewDisabledConfig()
 	c.HTTP = httpd.NewConfig()
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
@@ -230,6 +233,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Replay.Validate(); err != nil {
 		return errors.Wrap(err, "replay")
+	}
+	if err := c.Auth.Validate(); err != nil {
+		return errors.Wrap(err, "auth")
 	}
 	if err := c.Storage.Validate(); err != nil {
 		return errors.Wrap(err, "storage")

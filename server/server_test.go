@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"net/mail"
 	"net/url"
 	"os"
@@ -39,6 +40,8 @@ import (
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/auth"
+	"github.com/influxdata/kapacitor/services/auth/meta"
 	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
@@ -77,6 +80,7 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var udfDir string
@@ -84,6 +88,117 @@ var udfDir string
 func init() {
 	dir, _ := os.Getwd()
 	udfDir = filepath.Clean(filepath.Join(dir, "../udf"))
+}
+
+func mustHash(hash []byte, err error) string {
+	if err != nil {
+		panic(err)
+	}
+	return string(hash)
+}
+
+func TestService_Authenticate(t *testing.T) {
+	type Users struct {
+		Users []meta.User `json:"users"`
+	}
+	newUsers := func(u ...meta.User) Users {
+		return Users{
+			Users: u,
+		}
+	}
+	cases := []struct {
+		name             string
+		userResult       Users
+		authorizedStatus int
+		shouldErr        bool
+		userName         string
+		password         string
+	}{{
+		name: "ok",
+		userResult: newUsers(meta.User{
+			Name:        "fred",
+			Hash:        mustHash(bcrypt.GenerateFromPassword([]byte(`fred_pw`), auth.NewEnabledConfig().BcryptCost)),
+			Permissions: map[string][]meta.Permission{"": {meta.KapacitorAPIPermission}},
+		}),
+		authorizedStatus: http.StatusOK,
+		shouldErr:        false,
+		userName:         `fred`,
+		password:         `fred_pw`,
+	},
+		{
+			name: "ldap badpass",
+			userResult: newUsers(meta.User{
+				Name:        "fred2",
+				Hash:        "",
+				Permissions: map[string][]meta.Permission{"": {meta.KapacitorAPIPermission}},
+			}),
+			authorizedStatus: http.StatusUnauthorized,
+			shouldErr:        true,
+			userName:         `fred2`,
+			password:         `badpass`,
+		},
+		{
+			name: "ldap ok",
+			userResult: newUsers(meta.User{
+				Name:        "fred3",
+				Hash:        "",
+				Permissions: map[string][]meta.Permission{"": {meta.KapacitorAPIPermission}},
+			}),
+			authorizedStatus: http.StatusOK,
+			shouldErr:        false,
+			userName:         `fred3`,
+			password:         `fred_pw`,
+		},
+		{
+			name:             "user dos not exist",
+			userResult:       newUsers(meta.User{}),
+			authorizedStatus: http.StatusNotFound,
+			shouldErr:        true,
+			userName:         `fred_not_exists`,
+			password:         `fred_pw`,
+		},
+	}
+	for _, testCase := range cases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/user":
+					if err := json.NewEncoder(w).Encode(testCase.userResult); err != nil {
+						t.Error("bad encoding for testCase.userResult")
+					}
+					//w.Write(testCase.userResult)
+				case "/authorized":
+					w.WriteHeader(testCase.authorizedStatus)
+				default:
+					t.Errorf("bad path %s", r.URL.Path)
+				}
+			}))
+			defer srv.Close()
+			c := NewConfig()
+			c.Auth = auth.NewEnabledConfig()
+			kserver := OpenServer(c)
+			url, err := url.Parse(srv.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kserver.Config.Auth.MetaAddr = url.Host
+			kserver.Restart()
+			defer kserver.Close()
+
+			_, err = kserver.AuthService.Authenticate(testCase.userName, testCase.password)
+			if (err != nil) != testCase.shouldErr {
+				if err == nil {
+					t.Log("expected an error but it didn't")
+				}
+				if err != nil {
+					t.Logf("expected no error but got %s", err.Error())
+				}
+				t.FailNow()
+			}
+		})
+	}
 }
 
 func TestServer_Ping(t *testing.T) {
@@ -307,6 +422,58 @@ func TestServer_Authenticate_Bearer(t *testing.T) {
 	}
 }
 
+func TestServer_CreateUser(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	username := "bob"
+	utype := client.NormalUser
+	permissions := []client.Permission{
+		client.APIPermission,
+	}
+	user, err := cli.CreateUser(client.CreateUserOptions{
+		Name:        username,
+		Password:    "hunter2",
+		Type:        utype,
+		Permissions: permissions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if !reflect.DeepEqual(user.Permissions, permissions) {
+		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+	}
+
+	user, err = cli.User(user.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if !reflect.DeepEqual(user.Permissions, permissions) {
+		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+	}
+}
 func TestServer_CreateTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
@@ -13049,4 +13216,679 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 		}
 	}
 	return nil
+}
+
+func TestServer_Authenticate_Fail_Enterprise(t *testing.T) {
+	t.Parallel()
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	defer s.Close()
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "unable to parse authentication credentials", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_User_Enterprise(t *testing.T) {
+	t.Parallel()
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	defer s.Close()
+	s.AuthService.(*auth.Service).CreateUser("root", "kapacitor", true, nil)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "root",
+			Password: "kapacitor",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     "bob",
+		Password: "secret",
+		Type:     client.AdminUser,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PingAsUser("bob", "secret"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServer_Authenticate_Bearer_Fail_Enterprise(t *testing.T) {
+	t.Parallel()
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(10 * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	// Use a different secret so the token is invalid
+	conf.HTTP.SharedSecret = secret + "extra secret"
+	s := OpenServer(conf)
+	defer s.Close()
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "invalid token: signature is invalid", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_Bearer_Expired_Enteprise(t *testing.T) {
+	t.Parallel()
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(-10 * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	conf.HTTP.SharedSecret = secret
+	s := OpenServer(conf)
+	defer s.Close()
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "invalid token: Token is expired", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_Bearer_Enterprise(t *testing.T) {
+	t.Parallel()
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(time.Minute).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	conf.HTTP.SharedSecret = secret
+	s := OpenServer(conf)
+	defer s.Close()
+	s.AuthService.(*auth.Service).CreateUser("root", "kapacitor", true, nil)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "root",
+			Password: "kapacitor",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     "bob",
+		Password: "secret",
+		Type:     client.AdminUser,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PingWithToken(tokenString); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServer_Authenticate_Bearer_PermissionDenied(t *testing.T) {
+	t.Parallel()
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(time.Minute).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	conf.HTTP.SharedSecret = secret
+	s := OpenServer(conf)
+	defer s.Close()
+	s.AuthService.(*auth.Service).CreateUser("root", "kapacitor", true, nil)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "root",
+			Password: "kapacitor",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     "bob",
+		Password: "secret",
+		Type:     client.NormalUser,
+		Permissions: []client.Permission{
+			client.WritePointsPermission,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bobsCLI, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		// Ping is allowed
+		if _, version, err := bobsCLI.Ping(); err != nil {
+			t.Fatal(err)
+		} else if version != "testServer" {
+			t.Fatal("unexpected version", version)
+		}
+		// Delete user is not allowed
+		if err := bobsCLI.DeleteUser(bobsCLI.UserLink("root")); err == nil {
+			t.Fatal("expected permission denied error")
+		} else if got, exp := err.Error(), `user bob does not have "delete" privilege for API endpoint "/kapacitor/v1/users/root"`; got != exp {
+			t.Errorf("unexpected error message: got %s exp %s", got, exp)
+		}
+	}
+}
+
+func TestServer_Authenticate_User_PermissionDenied(t *testing.T) {
+	t.Parallel()
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	defer s.Close()
+	s.AuthService.(*auth.Service).CreateUser("root", "kapacitor", true, nil)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "root",
+			Password: "kapacitor",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     "bob",
+		Password: "secret",
+		Type:     client.NormalUser,
+		Permissions: []client.Permission{
+			client.WritePointsPermission,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bobsCLI, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "bob",
+			Password: "secret",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		// Ping is allowed
+		if _, version, err := bobsCLI.Ping(); err != nil {
+			t.Fatal(err)
+		} else if version != "testServer" {
+			t.Fatal("unexpected version", version)
+		}
+		// Delete user is not allowed
+		if err := bobsCLI.DeleteUser(bobsCLI.UserLink("root")); err == nil {
+			t.Fatal("expected permission denied error")
+		} else if got, exp := err.Error(), `user bob does not have "delete" privilege for API endpoint "/kapacitor/v1/users/root"`; got != exp {
+			t.Errorf("unexpected error message: got %s exp %s", got, exp)
+		}
+	}
+}
+
+func TestServer_Authenticate_User_Multiple(t *testing.T) {
+	t.Parallel()
+	conf := NewConfig()
+	conf.Auth = auth.NewEnabledConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	defer s.Close()
+	s.AuthService.(*auth.Service).CreateUser("root", "kapacitor", true, nil)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "root",
+			Password: "kapacitor",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     "bob",
+		Password: "secret",
+		Type:     client.NormalUser,
+		Permissions: []client.Permission{
+			client.WritePointsPermission,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if bobsCLI, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "bob",
+			Password: "secret",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	} else {
+		count := 10
+		for i := 0; i < count; i++ {
+			// Ping is allowed
+			if _, version, err := bobsCLI.Ping(); err != nil {
+				t.Fatal(err)
+			} else if version != "testServer" {
+				t.Fatal("unexpected version", version)
+			}
+			// Delete user is not allowed
+			if err := bobsCLI.DeleteUser(bobsCLI.UserLink("root")); err == nil {
+				t.Fatal("expected permission denied error")
+			} else if got, exp := err.Error(), `user bob does not have "delete" privilege for API endpoint "/kapacitor/v1/users/root"`; got != exp {
+				t.Errorf("unexpected error message: got %s exp %s", got, exp)
+			}
+		}
+	}
+}
+
+func TestServer_UpdateUser_EmptyPermissions(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	username := "bob"
+	utype := client.NormalUser
+	permissions := []client.Permission{
+		client.APIPermission,
+	}
+	user, err := cli.CreateUser(client.CreateUserOptions{
+		Name:        username,
+		Password:    "hunter2",
+		Type:        utype,
+		Permissions: permissions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if !reflect.DeepEqual(user.Permissions, permissions) {
+		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+	}
+
+	user, err = cli.UpdateUser(user.Link, client.UpdateUserOptions{
+		Permissions: []client.Permission{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user, err = cli.User(user.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if got, exp := len(user.Permissions), 0; got != exp {
+		t.Fatalf("unexpected permission count got %d exp %d", got, exp)
+	}
+}
+
+func TestServer_UpdateUser_Password_IgnorePerms(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	username := "bob"
+	utype := client.NormalUser
+	password := "hunter2"
+	permissions := []client.Permission{client.WritePointsPermission}
+	user, err := cli.CreateUser(client.CreateUserOptions{
+		Name:        username,
+		Password:    password,
+		Type:        utype,
+		Permissions: permissions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PingAsUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if !reflect.DeepEqual(user.Permissions, permissions) {
+		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+	}
+
+	// Update password only, permissions should remain the same.
+	password = "*******"
+	user, err = cli.UpdateUser(user.Link, client.UpdateUserOptions{
+		Password: password,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PingAsUser(username, password); err != nil {
+		t.Fatal(err)
+	}
+
+	user, err = cli.User(user.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if !reflect.DeepEqual(user.Permissions, permissions) {
+		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+	}
+}
+
+func TestServer_UpdateUser_Type(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	username := "bob"
+	utype := client.AdminUser
+	user, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     username,
+		Password: "hunter2",
+		Type:     utype,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if got, exp := len(user.Permissions), 0; got != exp {
+		t.Fatalf("unexpected permission count got %d exp %d", got, exp)
+	}
+
+	utype = client.NormalUser
+	user, err = cli.UpdateUser(user.Link, client.UpdateUserOptions{
+		Type: utype,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user, err = cli.User(user.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if got, exp := len(user.Permissions), 0; got != exp {
+		t.Fatalf("unexpected permission count got %d exp %d", got, exp)
+	}
+}
+
+func TestServer_DeleteUser(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	username := "bob"
+	utype := client.AdminUser
+	user, err := cli.CreateUser(client.CreateUserOptions{
+		Name:     username,
+		Password: "hunter2",
+		Type:     utype,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := user.Name, username; got != exp {
+		t.Fatalf("unexpected username got %s exp %s", got, exp)
+	}
+	if got, exp := user.Link.Href, "/kapacitor/v1/users/bob"; got != exp {
+		t.Fatalf("unexpected link got %s exp %s", got, exp)
+	}
+	if got, exp := user.Type, utype; got != exp {
+		t.Fatalf("unexpected type got %v exp %v", got, exp)
+	}
+	if got, exp := len(user.Permissions), 0; got != exp {
+		t.Fatalf("unexpected permission count got %d exp %d", got, exp)
+	}
+
+	if err := cli.DeleteUser(user.Link); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.User(user.Link); err == nil {
+		t.Fatal("expected error for non existent user")
+	}
+}
+func TestServer_ListUsers(t *testing.T) {
+	t.Parallel()
+	config := NewConfig()
+	config.Auth = auth.NewEnabledConfig()
+	s := OpenServer(config)
+	cli := Client(s)
+	defer s.Close()
+
+	utype := client.NormalUser
+	permissions := []client.Permission{
+		client.APIPermission,
+	}
+	count := 20
+	for i := 0; i < count; i++ {
+		username := fmt.Sprintf("bob%02d", i)
+		user, err := cli.CreateUser(client.CreateUserOptions{
+			Name:        username,
+			Password:    "hunter2",
+			Type:        utype,
+			Permissions: permissions,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, exp := user.Name, username; got != exp {
+			t.Fatalf("unexpected username got %s exp %s", got, exp)
+		}
+		if got, exp := user.Link.Href, fmt.Sprintf("/kapacitor/v1/users/%s", username); got != exp {
+			t.Fatalf("unexpected link got %s exp %s", got, exp)
+		}
+		if got, exp := user.Type, utype; got != exp {
+			t.Fatalf("unexpected type got %v exp %v", got, exp)
+		}
+		if !reflect.DeepEqual(user.Permissions, permissions) {
+			t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+		}
+	}
+
+	// List only bob* users, aka exclude the root user
+	users, err := cli.ListUsers(&client.ListUsersOptions{
+		Pattern: "bob*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := len(users), count; got != exp {
+		t.Fatalf("unexpected user count got %d exp %d", got, exp)
+	}
+	for i, user := range users {
+		username := fmt.Sprintf("bob%02d", i)
+		if got, exp := user.Name, username; got != exp {
+			t.Fatalf("unexpected username got %s exp %s", got, exp)
+		}
+		if got, exp := user.Link.Href, fmt.Sprintf("/kapacitor/v1/users/%s", username); got != exp {
+			t.Fatalf("unexpected link got %s exp %s", got, exp)
+		}
+		if got, exp := user.Type, utype; got != exp {
+			t.Fatalf("unexpected type got %v exp %v", got, exp)
+		}
+		if !reflect.DeepEqual(user.Permissions, permissions) {
+			t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
+		}
+	}
+
+	// List only bob1* users at +2 offset
+	users, err = cli.ListUsers(&client.ListUsersOptions{
+		Pattern: "bob1*",
+		Fields:  []string{"type"},
+		Offset:  2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := len(users), 8; got != exp {
+		t.Fatalf("unexpected user count got %d exp %d", got, exp)
+	}
+	for i, user := range users {
+		username := fmt.Sprintf("bob%02d", i+12)
+		if got, exp := user.Name, username; got != exp {
+			t.Fatalf("unexpected username got %s exp %s", got, exp)
+		}
+		if got, exp := user.Link.Href, fmt.Sprintf("/kapacitor/v1/users/%s", username); got != exp {
+			t.Fatalf("unexpected link got %s exp %s", got, exp)
+		}
+		if got, exp := user.Type, utype; got != exp {
+			t.Fatalf("unexpected type got %v exp %v", got, exp)
+		}
+	}
 }
