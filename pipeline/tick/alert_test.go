@@ -118,6 +118,56 @@ func TestAlertHTTPPost(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertBigPanda(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().BigPanda()
+	handler.AppKey = "A"
+	handler.PrimaryProperty = "B"
+	handler.SecondaryProperty = "C"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .bigPanda()
+        .appKey('A')
+        .primaryProperty('B')
+        .secondaryProperty('C')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertServiceNow(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().ServiceNow()
+	handler.Source = "A"
+	handler.Node = "B"
+	handler.Type = "C"
+	handler.Resource = "D"
+	handler.MetricName = "E"
+	handler.MessageKey = "F"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .serviceNow()
+        .source('A')
+        .node('B')
+        .type('C')
+        .resource('D')
+        .metricName('E')
+        .messageKey('F')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertHTTPPostMultipleHeaders(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Post("")
@@ -224,6 +274,7 @@ func TestAlertTCPJSON(t *testing.T) {
         "pushover": null,
         "sensu": null,
         "slack": null,
+		"discord": null,
         "telegram": null,
         "hipChat": null,
         "alerta": null,
@@ -570,6 +621,7 @@ func TestAlertAlerta(t *testing.T) {
 	handler.Value = "Save the Galaxy"
 	handler.Origin = "Omega"
 	handler.Services("legion", "vent", "garrus", "distraction team", "grunt", "crew", "samara", "barrier")
+	handler.Correlated("Harbinger")
 	handler.Timeout = 10 * time.Second
 
 	want := `stream
@@ -588,6 +640,7 @@ func TestAlertAlerta(t *testing.T) {
         .value('Save the Galaxy')
         .origin('Omega')
         .services('legion', 'vent', 'garrus', 'distraction team', 'grunt', 'crew', 'samara', 'barrier')
+        .correlated('Harbinger')
         .timeout(10s)
 `
 	PipelineTickTestHelper(t, pipe, want)

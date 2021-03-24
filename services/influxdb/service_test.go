@@ -1152,6 +1152,7 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 			Default:              true,
 			SubscriptionProtocol: "http",
 			StartUpTimeout:       0,
+			Compression:          "gzip",
 			// Do not start syncing goroutines
 			SubscriptionSyncInterval: 0,
 		}

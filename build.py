@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 -u
+#!/usr/bin/python
 
 import argparse
 import hashlib
@@ -47,7 +47,7 @@ VENDOR = "InfluxData"
 DESCRIPTION = "Time series data processing engine"
 
 # SCRIPT START
-go_vet_command = "go tool vet -composites=false"
+go_vet_command = "go vet ./..."
 prereqs = [ 'git', 'go' ]
 optional_prereqs = [ 'fpm', 'rpmbuild', 'gpg' ]
 
@@ -92,7 +92,7 @@ targets = {
 }
 
 supported_builds = {
-    'darwin': [ "amd64", "i386" ],
+    'darwin': [ "amd64" ],
     'linux': [ "amd64", "i386", "armhf", "arm64", "armel", "static_i386", "static_amd64" ],
     'windows': [ "amd64", "i386" ]
 }
@@ -158,25 +158,18 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
-    run("go install ./vendor/github.com/benbjohnson/tmpl")
-    run("go install ./vendor/github.com/mailru/easyjson/easyjson")
-    generate_cmd = ["go", "generate"]
-    generate_cmd.extend(go_list())
-    p = subprocess.Popen(generate_cmd)
-    code = p.wait()
-    if code == 0:
-        logging.info("Generate succeeded.")
-        return True
-    else:
-        logging.error("Generate failed.")
+    run("go get github.com/golang/protobuf/protoc-gen-go/... github.com/benbjohnson/tmpl/... github.com/mailru/easyjson/easyjson/...")
+    try:
+         subprocess.check_output(["go", "generate", "./..."])
+    except subprocess.CalledProcessError as exc:
+        print("Status : FAIL", exc.returncode, exc.output)
         return False
+    return True
 
 def go_get():
     """
     Retrieve build dependencies or restore pinned dependencies.
     """
-    # Nothing to do, all dependencies are vendored.
     return True
 
 def check_nochanges():
@@ -201,17 +194,18 @@ def run_tests(race, parallel, timeout, no_vet):
         logging.info("Using parallel: {}".format(parallel))
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
-    out = run("go fmt {}".format(' '.join(go_list())))
+    out = run("go fmt ./...")
     if len(out) > 0:
         logging.error("Code not formatted. Please use 'go fmt ./...' to fix formatting errors.")
         logging.error("{}".format(out))
         return False
     if not no_vet:
-        vet_cmd = go_vet_command + " {}".format(" ".join(go_list(relative=True)))
-        out = run(vet_cmd)
-        if len(out) > 0:
-            logging.error("Go vet failed. Please run '{}' and fix any errors.".format(vet_cmd))
-            logging.error("{}".format(out))
+        try:
+            vet_cmd = ["go", "vet", "./..."]
+            subprocess.check_output(vet_cmd)
+        except subprocess.CalledProcessError as exc:
+            logging.error("Go vet failed. Please run '{}' and fix any errors.".format(' '.join(vet_cmd)))
+            logging.error("{}".format(exc.output))
             return False
     else:
         logging.info("Skipping 'go vet' call...")
@@ -222,7 +216,7 @@ def run_tests(race, parallel, timeout, no_vet):
         test_command += " -parallel {}".format(parallel)
     if timeout is not None:
         test_command += " -timeout {}".format(timeout)
-    test_command += " {}".format(' '.join(go_list()))
+    test_command += " ./..."
     logging.info("Running tests...")
     output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
@@ -389,6 +383,8 @@ def get_system_arch():
         arch = "amd64"
     elif arch == "386":
         arch = "i386"
+    elif arch == "aarch64":
+        arch = "arm64"
     elif 'arm' in arch:
         # Prevent uname from reporting full ARM arch (eg 'armv7l')
         arch = "arm"
@@ -488,32 +484,6 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
             logging.warn("Not uploading file {}, as it already exists in the target bucket.".format(name))
     return True
 
-def go_list(vendor=False, relative=False):
-    """
-    Return a list of packages
-    If vendor is False vendor package are not included
-    If relative is True the package prefix defined by PACKAGE_URL is stripped
-    """
-    p = subprocess.Popen(["go", "list", "./..."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = p.communicate()
-    packages = out.split('\n')
-    if packages[-1] == '':
-        packages = packages[:-1]
-    if not vendor:
-        non_vendor = []
-        for p in packages:
-            if '/vendor/' not in p:
-                non_vendor.append(p)
-        packages = non_vendor
-    if relative:
-        relative_pkgs = []
-        for p in packages:
-            r = p.replace(PACKAGE_URL, '.')
-            if r != '.':
-                relative_pkgs.append(r)
-        packages = relative_pkgs
-    return packages
-
 def build(version=None,
           platform=None,
           arch=None,
@@ -559,20 +529,23 @@ def build(version=None,
             build_command += "CGO_ENABLED=0 "
 
         # Handle variations in architecture output
+        fullarch = arch
         if arch == "i386" or arch == "i686":
             arch = "386"
+        elif arch == "aarch64" or arch == "arm64":
+            arch = "arm64"
         elif "arm" in arch:
             arch = "arm"
         build_command += "GOOS={} GOARCH={} ".format(platform, arch)
 
-        if "arm" in arch:
-            if arch == "armel":
+        if "arm" in fullarch:
+            if fullarch == "armel":
                 build_command += "GOARM=5 "
-            elif arch == "armhf" or arch == "arm":
+            elif fullarch == "armhf" or fullarch == "arm":
                 build_command += "GOARM=6 "
-            elif arch == "arm64":
-                # TODO(rossmcdonald) - Verify this is the correct setting for arm64
-                build_command += "GOARM=7 "
+            elif fullarch == "arm64":
+                # GOARM not used - see https://github.com/golang/go/wiki/GoArm
+                pass
             else:
                 logging.error("Invalid ARM architecture specified: {}".format(arch))
                 logging.error("Please specify either 'armel', 'armhf', or 'arm64'.")
@@ -613,10 +586,10 @@ def build(version=None,
         logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
     return True
 
-def generate_md5_from_file(path):
-    """Generate MD5 signature based on the contents of the file at path.
+def generate_sha256_from_file(path):
+    """Generate SHA256 signature based on the contents of the file at path.
     """
-    m = hashlib.md5()
+    m = hashlib.sha256()
     with open(path, 'rb') as f:
         for chunk in iter(lambda: f.read(4096), b""):
             m.update(chunk)
@@ -770,13 +743,6 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                                 new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), "nightly")
                                 os.rename(outfile, new_outfile)
                                 outfile = new_outfile
-                            else:
-                                if package_type == 'rpm':
-                                    # rpm's convert any dashes to underscores
-                                    package_version = package_version.replace("-", "_")
-                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
-                                os.rename(outfile, new_outfile)
-                                outfile = new_outfile
                             outfiles.append(os.path.join(os.getcwd(), outfile))
         logging.debug("Produced package files: {}".format(outfiles))
         return outfiles
@@ -913,8 +879,8 @@ def main(args):
                 return 1
         logging.info("Packages created:")
         for p in packages:
-            logging.info("{} (MD5={})".format(p.split('/')[-1:][0],
-                                              generate_md5_from_file(p)))
+            logging.info("{} (sha256={})".format(p.split('/')[-1:][0],
+                                              generate_sha256_from_file(p)))
 
 
     if orig_branch != get_current_branch():

@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -30,19 +31,19 @@ type Diagnostic interface {
 // Only one of name and url should be non-empty
 type Endpoint struct {
 	mu            sync.RWMutex
-	url           string
+	urlTemplate   *template.Template
 	headers       map[string]string
-	auth          BasicAuth
+	Auth          BasicAuth
 	alertTemplate *template.Template
 	rowTemplate   *template.Template
 	closed        bool
 }
 
-func NewEndpoint(url string, headers map[string]string, auth BasicAuth, at, rt *template.Template) *Endpoint {
+func NewEndpoint(urlt *template.Template, headers map[string]string, auth BasicAuth, at, rt *template.Template) *Endpoint {
 	return &Endpoint{
-		url:           url,
+		urlTemplate:   urlt,
 		headers:       headers,
-		auth:          auth,
+		Auth:          auth,
 		alertTemplate: at,
 		rowTemplate:   rt,
 	}
@@ -57,9 +58,13 @@ func (e *Endpoint) Close() {
 func (e *Endpoint) Update(c Config) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.url = c.URL
+	ut, err := c.getURLTemplate()
+	if err != nil {
+		return err
+	}
+	e.urlTemplate = ut
 	e.headers = c.Headers
-	e.auth = c.BasicAuth
+	e.Auth = c.BasicAuth
 	at, err := c.getAlertTemplate()
 	if err != nil {
 		return err
@@ -85,20 +90,30 @@ func (e *Endpoint) RowTemplate() *template.Template {
 	return e.rowTemplate
 }
 
-func (e *Endpoint) NewHTTPRequest(body io.Reader) (req *http.Request, err error) {
+func (e *Endpoint) URL() *template.Template {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.urlTemplate
+}
+
+func (e *Endpoint) NewHTTPRequest(body io.Reader, tmplCtx interface{}) (req *http.Request, err error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	if e.closed {
 		return nil, errors.New("endpoint was closed")
 	}
+	eURL := &strings.Builder{}
+	if err = e.URL().Execute(eURL, tmplCtx); err != nil {
+		return nil, errors.Wrap(err, "failed to execute url template")
+	}
 
-	req, err = http.NewRequest("POST", e.url, body)
+	req, err = http.NewRequest("POST", eURL.String(), body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create POST request: %v", err)
 	}
 
-	if e.auth.valid() {
-		req.SetBasicAuth(e.auth.Username, e.auth.Password)
+	if e.Auth.valid() {
+		req.SetBasicAuth(e.Auth.Username, e.Auth.Password)
 	}
 
 	for k, v := range e.headers {
@@ -154,7 +169,12 @@ func (s *Service) Update(newConfigs []interface{}) error {
 				if err != nil {
 					return errors.Wrapf(err, "failed to get row template for endpoint %q", c.Endpoint)
 				}
-				s.endpoints[c.Endpoint] = NewEndpoint(c.URL, c.Headers, c.BasicAuth, at, rt)
+				ut, err := c.getURLTemplate()
+				if err != nil {
+					return errors.Wrapf(err, "failed to get row template for endpoint %q", c.Endpoint)
+				}
+
+				s.endpoints[c.Endpoint] = NewEndpoint(ut, c.Headers, c.BasicAuth, at, rt)
 				continue
 			}
 			if err := e.Update(c); err != nil {
@@ -216,14 +236,17 @@ func (s *Service) Test(options interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal alert data json: %v", err)
 	}
-
+	ut, err := Config{URLTemplate: o.URL}.getURLTemplate()
+	if err != nil {
+		return err
+	}
 	// Create the HTTP request
 	var req *http.Request
 	e := &Endpoint{
-		url:     o.URL,
-		headers: o.Headers,
+		urlTemplate: ut,
+		headers:     o.Headers,
 	}
-	req, err = e.NewHTTPRequest(body)
+	req, err = e.NewHTTPRequest(body, ad)
 
 	// Execute the request
 	req.Header.Set("Content-Type", "application/json")
@@ -261,10 +284,18 @@ type handler struct {
 	hc *http.Client
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
+
 	e, ok := s.Endpoint(c.Endpoint)
 	if !ok {
-		e = NewEndpoint(c.URL, nil, BasicAuth{}, nil, nil)
+		if c.URL == "" {
+			return nil, errors.New("An appropriately formatted url must be specified if an endpoint is not specified")
+		}
+		tmpl, err := GetTemplate(c.URL, "")
+		if err != nil {
+			return nil, err
+		}
+		e = NewEndpoint(tmpl, nil, BasicAuth{}, nil, nil)
 	}
 	return &handler{
 		s:                   s,
@@ -274,11 +305,11 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 		captureResponse:     c.CaptureResponse,
 		timeout:             c.Timeout,
 		skipSSLVerification: c.SkipSSLVerification,
-	}
+	}, nil
 }
 
-func (h *handler) NewHTTPRequest(body io.Reader) (req *http.Request, err error) {
-	req, err = h.endpoint.NewHTTPRequest(body)
+func (h *handler) NewHTTPRequest(body io.Reader, tmplCTX interface{}) (req *http.Request, err error) {
+	req, err = h.endpoint.NewHTTPRequest(body, tmplCTX)
 	if err != nil {
 		return
 	}
@@ -313,7 +344,7 @@ func (h *handler) Handle(event alert.Event) {
 		contentType = "application/json"
 	}
 
-	req, err := h.NewHTTPRequest(body)
+	req, err := h.NewHTTPRequest(body, ad)
 	if err != nil {
 		h.diag.Error("failed to create HTTP request", err)
 		return

@@ -3088,6 +3088,434 @@ batch
 	testBatcherWithOutput(t, "TestBatch_HttpPost", script, 30*time.Second, er, false)
 }
 
+func TestBatch_HttpPost_URL_Template(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er struct {
+			models.Result
+			url string
+		}
+		switch rc {
+		case 1:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu-total"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+								90.38281469458698,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+								86.51447101892941,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								91.71877558217454,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+								87.10524436107617,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+								90.3900735196668,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu-total"
+		case 2:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu0"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+								83.56930693069836,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+								79.12871287128638,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								88.99559823928229,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+								85.50000000000182,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+								86.02860286029956,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu0"
+		case 3:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu1"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+								93.49999999999409,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+								91.44444444443974,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								93.44897959187637,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+								95.99999999995998,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+								97.00970097012197,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu1"
+		case 4:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu-total"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+								90.8919959776013,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+								86.54244306420236,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
+								91.01699558842134,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 16, 0, time.UTC),
+								85.66378399063848,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+								89.90919811320221,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu-total"
+		case 5:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu0"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+								81.72501716191164,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+								81.03810381037587,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
+								85.93434343435388,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 16, 0, time.UTC),
+								85.36734693878043,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+								83.01320528210614,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu0"
+		case 6:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu1"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+								95.98484848485191,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+								92.098039215696,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
+								92.99999999998363,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 16, 0, time.UTC),
+								86.54015887023496,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+								95.48979591840603,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu1"
+		case 7:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu-total"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+								91.06416290101595,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+								85.9694442394385,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+								90.62985736134186,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+								86.45443196005628,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+								88.97243107764031,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu-total"
+		case 8:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu0"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+								85.08910891088406,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+								78.00000000002001,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+								84.23607066586464,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+								80.85858585861834,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+								80.61224489791657,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu0"
+		case 9:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu_usage_idle",
+						Tags:    map[string]string{"cpu": "cpu1"},
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+								96.49999999996908,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+								93.46464646468584,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+								95.00950095007724,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+								92.99999999998636,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+								90.99999999998545,
+							},
+						},
+					},
+				},
+			}
+			er.url = "/cpu_usage_idle?cpu=cpu1"
+		}
+		if eq, msg := compareResults(er.Result, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+		if r.URL.String() != er.url {
+			t.Errorf("unexpected URL for request: %d expected: %s got: %s", rc, er.url, r.URL.String())
+		}
+
+	}))
+	defer ts.Close()
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|httpPost('` + ts.URL + `/{{ .Name }}?cpu={{ index .Tags "cpu"}}')
+	|httpOut('TestBatch_HttpPost')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						91.06416290101595,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						85.9694442394385,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						90.62985736134186,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						86.45443196005628,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						88.97243107764031,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						85.08910891088406,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						78.00000000002001,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						84.23607066586464,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						80.85858585861834,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						80.61224489791657,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						96.49999999996908,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						93.46464646468584,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						95.00950095007724,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						92.99999999998636,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						90.99999999998545,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_HttpPost", script, 30*time.Second, er, false)
+}
+
 func TestBatch_HttpPost_Timeout(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		result := models.Result{}

@@ -3,7 +3,7 @@ package storage
 import (
 	"bytes"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Bolt implementation of Store

@@ -16,7 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go"
 )
 
 const (
@@ -51,7 +51,11 @@ type writer struct {
 	wg sync.WaitGroup
 
 	statsKey string
-	ticker   *time.Ticker
+
+	// time.Ticker doesn't expose any way to close its internal channel,
+	// so we have to use a side-channel to signal when it's been stopped.
+	ticker     *time.Ticker
+	tickerDone chan struct{}
 }
 
 func (w *writer) Open() {
@@ -71,6 +75,7 @@ func (w *writer) Open() {
 	statsMap.Set(statWriteMessageCount, writeMessages)
 
 	w.ticker = time.NewTicker(time.Second)
+	w.tickerDone = make(chan struct{}, 1)
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
@@ -80,6 +85,7 @@ func (w *writer) Open() {
 
 func (w *writer) Close() {
 	w.ticker.Stop()
+	close(w.tickerDone)
 	vars.DeleteStatistic(w.statsKey)
 	w.kafka.Close()
 	w.wg.Wait()
@@ -89,10 +95,15 @@ func (w *writer) Close() {
 // A read operation on the kafka.Writer.Stats() method causes the internal counters to be reset.
 // As a result we control all reads through this method.
 func (w *writer) pollStats() {
-	for range w.ticker.C {
-		stats := w.kafka.Stats()
-		atomic.AddInt64(&w.messageCount, stats.Messages)
-		atomic.AddInt64(&w.errorCount, stats.Errors)
+	for {
+		select {
+		case <-w.tickerDone:
+			return
+		case <-w.ticker.C:
+			stats := w.kafka.Stats()
+			atomic.AddInt64(&w.messageCount, stats.Messages)
+			atomic.AddInt64(&w.errorCount, stats.Errors)
+		}
 	}
 }
 
@@ -127,8 +138,8 @@ func NewCluster(c Config) *Cluster {
 	}
 }
 
-func (c *Cluster) WriteMessage(topic string, key, msg []byte) error {
-	w, err := c.writer(topic)
+func (c *Cluster) WriteMessage(diagnostic Diagnostic, topic string, key, msg []byte) error {
+	w, err := c.writer(topic, diagnostic)
 	if err != nil {
 		return err
 	}
@@ -138,7 +149,7 @@ func (c *Cluster) WriteMessage(topic string, key, msg []byte) error {
 	})
 }
 
-func (c *Cluster) writer(topic string) (*writer, error) {
+func (c *Cluster) writer(topic string, diagnostic Diagnostic) (*writer, error) {
 	c.mu.RLock()
 	w, ok := c.writers[topic]
 	c.mu.RUnlock()
@@ -147,9 +158,12 @@ func (c *Cluster) writer(topic string) (*writer, error) {
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.WriterConfig()
+			wc, err := c.cfg.WriterConfig(diagnostic)
 			if err != nil {
 				return nil, err
+			}
+			if topic == "" {
+				return nil, errors.New("topic must not be empty")
 			}
 			wc.Topic = topic
 			kw := kafka.NewWriter(wc)
@@ -315,7 +329,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unknown cluster %q", o.Cluster)
 	}
-	return c.WriteMessage(o.Topic, []byte(o.Key), []byte(o.Message))
+	return c.WriteMessage(s.diag, o.Topic, []byte(o.Key), []byte(o.Message))
 }
 
 type HandlerConfig struct {
@@ -347,12 +361,15 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 			return nil, errors.Wrap(err, "failed to parse template")
 		}
 	}
+
+	diag := s.diag.WithContext(ctx...)
+
 	return &handler{
 		s:        s,
 		cluster:  cluster,
 		topic:    c.Topic,
 		template: t,
-		diag:     s.diag.WithContext(ctx...),
+		diag:     diag,
 	}, nil
 }
 
@@ -361,7 +378,7 @@ func (h *handler) Handle(event alert.Event) {
 	if err != nil {
 		h.diag.Error("failed to prepare kafka message body", err)
 	}
-	if err := h.cluster.WriteMessage(h.topic, []byte(event.State.ID), body); err != nil {
+	if err := h.cluster.WriteMessage(h.diag, h.topic, []byte(event.State.ID), body); err != nil {
 		h.diag.Error("failed to write message to kafka", err)
 	}
 }

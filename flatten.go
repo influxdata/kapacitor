@@ -61,7 +61,6 @@ type flattenBuffer struct {
 func (b *flattenBuffer) BeginBatch(begin edge.BeginBatchMessage) error {
 	b.n.timer.Start()
 	defer b.n.timer.Stop()
-
 	b.name = begin.Name()
 	b.time = time.Time{}
 	if s := begin.SizeHint(); s > cap(b.points) {
@@ -122,7 +121,6 @@ func (b *flattenBuffer) EndBatch(end edge.EndBatchMessage) error {
 		}
 		b.points = b.points[0:0]
 	}
-
 	b.n.timer.Pause()
 	err := edge.Forward(b.n.outs, end)
 	b.n.timer.Resume()
@@ -153,6 +151,10 @@ func (b *flattenBuffer) Point(p edge.PointMessage) error {
 		b.groupInfo.Tags,
 		t,
 	)
+	// update the time
+	if t.After(b.time) {
+		b.time = t
+	}
 	b.n.timer.Pause()
 	err = edge.Forward(b.n.outs, flatP)
 	b.n.timer.Resume()
@@ -178,11 +180,40 @@ func (b *flattenBuffer) addPoint(p edge.FieldsTagsTimeGetter) (next time.Time, f
 }
 
 func (b *flattenBuffer) Barrier(barrier edge.BarrierMessage) error {
-	return edge.Forward(b.n.outs, barrier)
+	b.n.timer.Start()
+	defer b.n.timer.Stop()
+
+	if barrier.Time().After(b.time) && len(b.points) > 0 {
+		fields, err := b.n.flatten(b.points)
+		if err != nil {
+			return err
+		}
+		msg := edge.NewPointMessage(
+			b.name, "", "",
+			b.groupInfo.Dimensions,
+			fields,
+			b.groupInfo.Tags,
+			b.time,
+		)
+		b.n.timer.Pause()
+		err = edge.Forward(b.n.outs, msg)
+		b.n.timer.Resume()
+		if err != nil {
+			return err
+		}
+		b.points = b.points[0:0]
+	}
+	b.n.timer.Pause()
+	err := edge.Forward(b.n.outs, barrier)
+	b.n.timer.Resume()
+	return err
 }
+
 func (b *flattenBuffer) DeleteGroup(d edge.DeleteGroupMessage) error {
+	b.points = b.points[0:0]
 	return edge.Forward(b.n.outs, d)
 }
+
 func (b *flattenBuffer) Done() {}
 
 func (n *FlattenNode) flatten(points []edge.FieldsTagsTimeGetter) (models.Fields, error) {

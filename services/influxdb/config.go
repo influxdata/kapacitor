@@ -58,6 +58,8 @@ type Config struct {
 	UDPReadBuffer            int                 `toml:"udp-read-buffer" override:"udp-read-buffer"`
 	StartUpTimeout           toml.Duration       `toml:"startup-timeout" override:"startup-timeout"`
 	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-sync-interval" override:"subscriptions-sync-interval"`
+	SubscriptionPath         string              `toml:"subscription-path" override:"subscription-path"`
+	Compression              string              `toml:"compression" override:"compression"`
 }
 
 func NewConfig() Config {
@@ -78,6 +80,8 @@ func (c *Config) Init() {
 	c.SubscriptionProtocol = DefaultSubscriptionProtocol
 	c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
 	c.SubscriptionMode = ClusterMode
+	c.SubscriptionPath = ""
+	c.Compression = "gzip"
 }
 
 func (c *Config) ApplyConditionalDefaults() {
@@ -92,6 +96,9 @@ func (c *Config) ApplyConditionalDefaults() {
 	}
 	if c.SubscriptionSyncInterval == toml.Duration(0) {
 		c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
+	}
+	if c.Compression == "" {
+		c.Compression = "gzip"
 	}
 }
 
@@ -122,6 +129,12 @@ func (c Config) Validate() error {
 	default:
 		return fmt.Errorf("invalid subscription protocol, must be one of 'udp', 'http' or 'https', got %q: %v", c.SubscriptionProtocol, c)
 	}
+	switch c.Compression {
+	case "gzip", "none":
+	default:
+		return fmt.Errorf("Invalid compression, must be one of 'gzip' or 'none', got %s", c.Compression)
+	}
+
 	return nil
 }
 

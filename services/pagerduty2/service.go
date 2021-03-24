@@ -253,35 +253,6 @@ func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc s
 	return nil
 }
 
-func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.Reader, error) {
-	// create a new AlertPayload for us to fire off
-	type Resolve struct {
-		RoutingKey  string `json:"routing_key"`
-		DedupKey    string `json:"dedup_key"`
-		EventAction string `json:"event_action"`
-	}
-
-	ap := Resolve{}
-
-	if routingKey == "" {
-		ap.RoutingKey = c.RoutingKey
-	} else {
-		ap.RoutingKey = routingKey
-	}
-
-	ap.DedupKey = alertID
-	ap.EventAction = "resolve"
-
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
-	err := enc.Encode(ap)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return c.URL, &post, nil
-}
-
 // preparePost is a helper method that sets up the payload for transmission to PagerDuty
 func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
 	c := s.config()
@@ -300,8 +271,10 @@ func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, 
 	case alert.Info:
 		severity = "info"
 	default:
-		// default is a 'resolve' function
-		return s.sendResolve(c, routingKey, alertID)
+		// On resolve, we also want to send the full payload
+		eventType = "resolve"
+		// the severity field is required even for resolve event
+		severity = "info"
 	}
 
 	// create a new AlertPayload for us to fire off

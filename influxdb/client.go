@@ -2,6 +2,7 @@ package influxdb
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,6 +80,9 @@ type Config struct {
 	// Transport is the HTTP transport to use for requests
 	// If nil, a default transport will be used.
 	Transport *http.Transport
+
+	// Which compression should we use for writing to influxdb, defaults to "gzip".
+	Compression string
 }
 
 // AuthenticationMethod defines the type of authentication used.
@@ -106,11 +111,12 @@ type Credentials struct {
 
 // HTTPClient is safe for concurrent use.
 type HTTPClient struct {
-	mu     sync.RWMutex
-	config Config
-	urls   []url.URL
-	client *http.Client
-	index  int32
+	mu          sync.RWMutex
+	config      Config
+	urls        []url.URL
+	client      *http.Client
+	index       int32
+	compression string
 }
 
 // NewHTTPClient returns a new Client from the provided config.
@@ -133,6 +139,14 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 			Timeout:   conf.Timeout,
 			Transport: conf.Transport,
 		},
+	}
+	switch compression := strings.ToLower(strings.TrimSpace(conf.Compression)); compression {
+	case "none":
+		return c, nil
+	case "gzip", "": // treat gzip as default
+		c.compression = "gzip"
+	default:
+		return nil, fmt.Errorf("%s is not a supported compression type", compression)
 	}
 	return c, nil
 }
@@ -310,17 +324,8 @@ func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
 }
 
 func (c *HTTPClient) Write(bp BatchPoints) error {
-	var b bytes.Buffer
+	b := &bytes.Buffer{}
 	precision := bp.Precision()
-	for _, p := range bp.Points() {
-		if _, err := b.Write(p.Bytes(precision)); err != nil {
-			return err
-		}
-
-		if err := b.WriteByte('\n'); err != nil {
-			return err
-		}
-	}
 
 	u := c.url()
 	u.Path = "write"
@@ -330,11 +335,34 @@ func (c *HTTPClient) Write(bp BatchPoints) error {
 	v.Set("precision", bp.Precision())
 	v.Set("consistency", bp.WriteConsistency())
 	u.RawQuery = v.Encode()
-	req, err := http.NewRequest("POST", u.String(), &b)
+
+	if c.compression == "gzip" {
+		bodyWriteCloser := gzip.NewWriter(b)
+		for _, p := range bp.Points() {
+			if _, err := bodyWriteCloser.Write(p.BytesWithLineFeed(precision)); err != nil {
+				return err
+			}
+		}
+		if err := bodyWriteCloser.Close(); err != nil {
+			return err
+		}
+
+	} else {
+		for _, p := range bp.Points() {
+			if _, err := b.Write(p.BytesWithLineFeed(precision)); err != nil {
+				return err
+			}
+		}
+	}
+
+	req, err := http.NewRequest("POST", u.String(), b)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
+	if c.compression == "gzip" {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 
 	_, err = c.do(req, nil, http.StatusNoContent, http.StatusOK)
 	return err
@@ -538,6 +566,33 @@ func (p Point) Bytes(precision string) []byte {
 	}
 
 	return bytes
+}
+
+func (p Point) BytesWithLineFeed(precision string) []byte {
+	key := imodels.MakeKey([]byte(p.Name), imodels.NewTags(p.Tags))
+	fields := imodels.Fields(p.Fields).MarshalBinary()
+	kl := len(key)
+	fl := len(fields)
+	var bytes []byte
+
+	if p.Time.IsZero() {
+		bytes = make([]byte, fl+kl+2)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+	} else {
+		timeStr := strconv.FormatInt(p.Time.UnixNano()/imodels.GetPrecisionMultiplier(precision), 10)
+		tl := len(timeStr)
+		bytes = make([]byte, fl+kl+tl+3)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+		bytes[kl+fl+1] = ' '
+		copy(bytes[kl+fl+2:], []byte(timeStr))
+	}
+	bytes[len(bytes)-1] = '\n'
+	return bytes
+
 }
 
 // Simple type to create github.com/influxdata/kapacitor/influxdb clients.

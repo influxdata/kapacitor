@@ -1,12 +1,18 @@
 package influxdb
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestClient_Query(t *testing.T) {
@@ -154,6 +160,21 @@ func TestClient_Concurrent_Use(t *testing.T) {
 func TestClient_Write(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data Response
+		uncompressedBody, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		bod, err := ioutil.ReadAll(uncompressedBody)
+		if err != nil {
+			t.Error(err)
+		}
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Errorf("expected gzip Content-Encoding but got %s", r.Header.Get("Content-Encoding"))
+		}
+		expected := "testpt,tag1=tag1 value=1i 942105600000000003\n"
+		if string(bod) != expected {
+			t.Errorf("unexpected send, expected '%s', got '%s'", expected, string(bod))
+		}
 		w.WriteHeader(http.StatusNoContent)
 		_ = json.NewEncoder(w).Encode(data)
 	}))
@@ -163,9 +184,116 @@ func TestClient_Write(t *testing.T) {
 	c, _ := NewHTTPClient(config)
 
 	bp, err := NewBatchPoints(BatchPointsConfig{})
+	bp.AddPoint(Point{
+		Name:   "testpt",
+		Tags:   map[string]string{"tag1": "tag1"},
+		Fields: map[string]interface{}{"value": 1},
+		Time:   time.Date(1999, 11, 9, 0, 0, 0, 3, time.UTC),
+	})
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
+	err = c.Write(bp)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClient_WriteLarge(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test that writes a batch of 100,000 points")
+	}
+	expected := &bytes.Buffer{}
+	wg := sync.WaitGroup{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		uncompressedBody, err := gzip.NewReader(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		bod, err := ioutil.ReadAll(uncompressedBody)
+		if err != nil {
+			t.Error(err)
+		}
+		if r.Header.Get("Content-Encoding") != "gzip" {
+			t.Errorf("expected gzip Content-Encoding but got %s", r.Header.Get("Content-Encoding"))
+		}
+		if string(bod) != expected.String() {
+			t.Errorf("unexpected send:\n%s",
+				cmp.Diff(
+					strings.Split(expected.String(), "\n"),
+					strings.Split(string(bod), "\n")))
+		}
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+		wg.Done()
+	}))
+	defer ts.Close()
+
+	config := Config{URLs: []string{ts.URL}}
+	c, _ := NewHTTPClient(config)
+
+	bp, err := NewBatchPoints(BatchPointsConfig{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+
+	startT := time.Date(1999, 11, 9, 0, 0, 0, 3, time.UTC)
+	for i := 0; i < 100000; i++ {
+		pt := Point{
+			Name:   "testpt",
+			Tags:   map[string]string{"tag1": "tag1"},
+			Fields: map[string]interface{}{"value": 1},
+			Time:   startT.Add(time.Second * time.Duration(i)),
+		}
+		bp.AddPoint(pt)
+		expected.Write(pt.BytesWithLineFeed(bp.Precision()))
+	}
+
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+	wg.Add(1)
+	err = c.Write(bp)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+	wg.Wait()
+}
+
+func TestClient_Write_noCompression(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		bod, err := ioutil.ReadAll(r.Body)
+		expected := "testpt,tag1=tag1 value=1i 942105600000000003\n"
+		if string(bod) != expected {
+			t.Errorf("unexpected send, expected '%s', got '%s'", expected, string(bod))
+		}
+		if err != nil {
+			t.Error(err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	config := Config{
+		URLs:        []string{ts.URL},
+		Compression: "none",
+	}
+	c, _ := NewHTTPClient(config)
+
+	bp, err := NewBatchPoints(BatchPointsConfig{})
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+
+	bp.AddPoint(Point{
+		Name:   "testpt",
+		Tags:   map[string]string{"tag1": "tag1"},
+		Fields: map[string]interface{}{"value": 1},
+		Time:   time.Date(1999, 11, 9, 0, 0, 0, 3, time.UTC),
+	})
 	err = c.Write(bp)
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)

@@ -54,8 +54,7 @@ func (ec *consumer) Consume() error {
 				return err
 			}
 		case BufferedBatchMessage:
-			err := receiveBufferedBatch(ec.r, m)
-			if err != nil {
+			if err := receiveBufferedBatch(ec.r, m); err != nil {
 				return err
 			}
 		case PointMessage:

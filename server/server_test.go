@@ -1,7 +1,9 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,6 +39,8 @@ import (
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
@@ -54,12 +58,16 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/servicenow"
+	"github.com/influxdata/kapacitor/services/servicenow/servicenowtest"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
 	"github.com/influxdata/kapacitor/services/snmptrap/snmptraptest"
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
+	"github.com/influxdata/kapacitor/services/teams"
+	"github.com/influxdata/kapacitor/services/teams/teamstest"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -4724,7 +4732,9 @@ func TestServer_ReplayQuery(t *testing.T) {
 	got := make([]response, 0)
 	for dec.More() {
 		g := response{}
-		dec.Decode(&g)
+		if err := dec.Decode(&g); err != nil {
+			t.Error(err)
+		}
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -5320,6 +5330,21 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 				},
 			},
 		},
+		// Python 2
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    Python2Executable,
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
 	}
 	for _, agent := range agents {
 		err := agent.buildFunc()
@@ -5497,6 +5522,33 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
+		// Python 2
+		{
+			startFunc: func() *exec.Cmd {
+				cmd := exec.Command(
+					Python2Executable,
+					"-u",
+					filepath.Join(udfDir, "agent/examples/mirror/mirror.py"),
+					filepath.Join(tdir, "mirror.py.sock"),
+				)
+				cmd.Stderr = os.Stderr
+				env := os.Environ()
+				env = append(env, fmt.Sprintf(
+					"%s=%s",
+					"PYTHONPATH",
+					strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				))
+				cmd.Env = env
+				return cmd
+			},
+			config: udf.FunctionConfig{
+				Socket:  filepath.Join(tdir, "mirror.py.sock"),
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
 	}
 	for _, agent := range agents {
 		cmd := agent.startFunc()
@@ -5635,6 +5687,21 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    PythonExecutable,
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
+		// Python 2
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    Python2Executable,
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
 				Timeout: toml.Duration(time.Minute),
 				Env: map[string]string{
@@ -6239,6 +6306,7 @@ func TestServer_CreateReplay_ValidIDs(t *testing.T) {
 
 func TestServer_UpdateConfig(t *testing.T) {
 	type updateAction struct {
+		name         string
 		element      string
 		updateAction client.ConfigUpdateAction
 		expSection   client.ConfigSection
@@ -6247,6 +6315,80 @@ func TestServer_UpdateConfig(t *testing.T) {
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		return &iclient.Response{}
 	})
+	defMap := map[string]interface{}{
+		"default":                     false,
+		"disable-subscriptions":       false,
+		"enabled":                     true,
+		"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+		"http-port":                   float64(0),
+		"insecure-skip-verify":        false,
+		"kapacitor-hostname":          "",
+		"name":                        "default",
+		"password":                    true,
+		"ssl-ca":                      "",
+		"ssl-cert":                    "",
+		"ssl-key":                     "",
+		"startup-timeout":             "1h0m0s",
+		"subscription-protocol":       "http",
+		"subscription-mode":           "cluster",
+		"subscription-path":           "",
+		"subscriptions":               nil,
+		"subscriptions-sync-interval": "1m0s",
+		"timeout":                     "0s",
+		"udp-bind":                    "",
+		"udp-buffer":                  float64(1e3),
+		"udp-read-buffer":             float64(0),
+		"urls":                        []interface{}{db.URL()},
+		"username":                    "bob",
+		"compression":                 "gzip",
+	}
+
+	deepCopyMapWithReplace := func(m map[string]interface{}) func(replacements ...map[string]interface{}) map[string]interface{} {
+		var a interface{} = "" // we have to do this to prevent gob.Register from panicing
+		gob.Register([]string{})
+		gob.Register(map[string]interface{}{})
+		gob.Register([]interface{}{})
+		gob.Register(a)
+		return func(replacements ...map[string]interface{}) map[string]interface{} {
+			// we can't just use json here because json(foo) doesn't always equal decodedJson(foo)
+			var buf bytes.Buffer        // Stand-in for a network connection
+			enc := gob.NewEncoder(&buf) // Will write to network.
+			dec := gob.NewDecoder(&buf) // Will read from network.
+			if err := enc.Encode(m); err != nil {
+				t.Fatal(err)
+			}
+			mCopy := map[string]interface{}{}
+
+			if err := dec.Decode(&mCopy); err != nil {
+				t.Fatal(err)
+			}
+			for i := range replacements {
+				for k, v := range replacements[i] {
+					v := v
+					if err := enc.Encode(v); err != nil {
+						t.Fatal(err)
+					}
+					vCopy := reflect.Indirect(reflect.New(reflect.TypeOf(v)))
+					if err := dec.DecodeValue(vCopy); err != nil {
+						t.Fatal(err)
+					}
+					mCopy[k] = vCopy.Interface()
+				}
+			}
+			return mCopy
+		}
+	}
+	if !cmp.Equal(deepCopyMapWithReplace(defMap)(), defMap) {
+		t.Fatalf("deepCopyMapWithReplace is broken expected %v, got %v", defMap, deepCopyMapWithReplace(defMap)())
+	}
+	{ // new block to keep vars clean
+
+		mapReplaceRes := deepCopyMapWithReplace(map[string]interface{}{"1": []string{"ok"}, "2": 3})(map[string]interface{}{"1": []string{"oks"}})
+		if !cmp.Equal(mapReplaceRes, map[string]interface{}{"1": []string{"oks"}, "2": 3}) {
+			t.Fatal(cmp.Diff(mapReplaceRes, map[string]interface{}{"1": []string{"oks"}, "2": 3}))
+		}
+	}
+
 	testCases := []struct {
 		section           string
 		element           string
@@ -6269,149 +6411,55 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 				Elements: []client.ConfigElement{{
-					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-					Options: map[string]interface{}{
-						"default":                     false,
-						"disable-subscriptions":       false,
-						"enabled":                     true,
-						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-						"http-port":                   float64(0),
-						"insecure-skip-verify":        false,
-						"kapacitor-hostname":          "",
-						"name":                        "default",
-						"password":                    true,
-						"ssl-ca":                      "",
-						"ssl-cert":                    "",
-						"ssl-key":                     "",
-						"startup-timeout":             "1h0m0s",
-						"subscription-protocol":       "http",
-						"subscription-mode":           "cluster",
-						"subscriptions":               nil,
-						"subscriptions-sync-interval": "1m0s",
-						"timeout":                     "0s",
-						"udp-bind":                    "",
-						"udp-buffer":                  float64(1e3),
-						"udp-read-buffer":             float64(0),
-						"urls":                        []interface{}{db.URL()},
-						"username":                    "bob",
-					},
+					Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+					Options: deepCopyMapWithReplace(defMap)(),
 					Redacted: []string{
 						"password",
 					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-				Options: map[string]interface{}{
-					"default":                     false,
-					"disable-subscriptions":       false,
-					"enabled":                     true,
-					"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-					"http-port":                   float64(0),
-					"insecure-skip-verify":        false,
-					"kapacitor-hostname":          "",
-					"name":                        "default",
-					"password":                    true,
-					"ssl-ca":                      "",
-					"ssl-cert":                    "",
-					"ssl-key":                     "",
-					"startup-timeout":             "1h0m0s",
-					"subscription-protocol":       "http",
-					"subscription-mode":           "cluster",
-					"subscriptions":               nil,
-					"subscriptions-sync-interval": "1m0s",
-					"timeout":                     "0s",
-					"udp-bind":                    "",
-					"udp-buffer":                  float64(1e3),
-					"udp-read-buffer":             float64(0),
-					"urls":                        []interface{}{db.URL()},
-					"username":                    "bob",
-				},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+				Options: deepCopyMapWithReplace(defMap)(),
 				Redacted: []string{
 					"password",
 				},
 			},
 			updates: []updateAction{
 				{
+					name: "update url",
 					// Set Invalid URL to make sure we can fix it without waiting for connection timeouts
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"urls": []string{"http://192.0.2.0:8086"},
+							"urls": []interface{}{"http://192.0.2.0:8086"},
 						},
 					},
 					element: "default",
 					expSection: client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
-							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     false,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "http",
-								"subscription-mode":           "cluster",
-								"subscriptions":               nil,
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{"http://192.0.2.0:8086"},
-								"username":                    "bob",
-							},
+							Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+							Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 							Redacted: []string{
 								"password",
 							},
 						}},
 					},
 					expElement: client.ConfigElement{
-						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     false,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "http",
-							"subscription-mode":           "cluster",
-							"subscriptions":               nil,
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{"http://192.0.2.0:8086"},
-							"username":                    "bob",
-						},
+						Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+						Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "update default,  subscription-protocol, subscriptions",
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
 							"default":               true,
 							"subscription-protocol": "https",
-							"subscriptions":         map[string][]string{"_internal": []string{"monitor"}},
+							"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
 						},
 					},
 					element: "default",
@@ -6419,31 +6467,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     true,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "https",
-								"subscription-mode":           "cluster",
-								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{"http://192.0.2.0:8086"},
-								"username":                    "bob",
-							},
+							Options: deepCopyMapWithReplace(defMap)(
+								map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}},
+								map[string]interface{}{
+									"default":               true,
+									"subscription-protocol": "https",
+									"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								}),
 							Redacted: []string{
 								"password",
 							},
@@ -6451,37 +6481,20 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     true,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "https",
-							"subscription-mode":           "cluster",
-							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{"http://192.0.2.0:8086"},
-							"username":                    "bob",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}},
+							map[string]interface{}{
+								"default":               true,
+								"subscription-protocol": "https",
+								"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "delete urls",
 					updateAction: client.ConfigUpdateAction{
 						Delete: []string{"urls"},
 					},
@@ -6490,31 +6503,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-							Options: map[string]interface{}{
-								"default":                     true,
-								"disable-subscriptions":       false,
-								"enabled":                     true,
-								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-								"http-port":                   float64(0),
-								"insecure-skip-verify":        false,
-								"kapacitor-hostname":          "",
-								"name":                        "default",
-								"password":                    true,
-								"ssl-ca":                      "",
-								"ssl-cert":                    "",
-								"ssl-key":                     "",
-								"startup-timeout":             "1h0m0s",
-								"subscription-protocol":       "https",
-								"subscription-mode":           "cluster",
-								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-								"subscriptions-sync-interval": "1m0s",
-								"timeout":                     "0s",
-								"udp-bind":                    "",
-								"udp-buffer":                  float64(1e3),
-								"udp-read-buffer":             float64(0),
-								"urls":                        []interface{}{db.URL()},
-								"username":                    "bob",
-							},
+							Options: deepCopyMapWithReplace(defMap)(
+								map[string]interface{}{
+									"default":               true,
+									"subscription-protocol": "https",
+									"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								}),
 							Redacted: []string{
 								"password",
 							},
@@ -6522,37 +6516,19 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-						Options: map[string]interface{}{
-							"default":                     true,
-							"disable-subscriptions":       false,
-							"enabled":                     true,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "default",
-							"password":                    true,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "1h0m0s",
-							"subscription-protocol":       "https",
-							"subscription-mode":           "cluster",
-							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{db.URL()},
-							"username":                    "bob",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{
+								"default":               true,
+								"subscription-protocol": "https",
+								"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							}),
 						Redacted: []string{
 							"password",
 						},
 					},
 				},
 				{
+					name: "new",
 					updateAction: client.ConfigUpdateAction{
 						Add: map[string]interface{}{
 							"name": "new",
@@ -6565,62 +6541,26 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{
 							{
 								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
-								Options: map[string]interface{}{
-									"default":                     true,
-									"disable-subscriptions":       false,
-									"enabled":                     true,
-									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-									"http-port":                   float64(0),
-									"insecure-skip-verify":        false,
-									"kapacitor-hostname":          "",
-									"name":                        "default",
-									"password":                    true,
-									"ssl-ca":                      "",
-									"ssl-cert":                    "",
-									"ssl-key":                     "",
-									"startup-timeout":             "1h0m0s",
-									"subscription-protocol":       "https",
-									"subscription-mode":           "cluster",
-									"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
-									"subscriptions-sync-interval": "1m0s",
-									"timeout":                     "0s",
-									"udp-bind":                    "",
-									"udp-buffer":                  float64(1e3),
-									"udp-read-buffer":             float64(0),
-									"urls":                        []interface{}{db.URL()},
-									"username":                    "bob",
-								},
+								Options: deepCopyMapWithReplace(defMap)(
+									map[string]interface{}{
+										"default":               true,
+										"subscription-protocol": "https",
+										"subscriptions":         map[string]interface{}{"_internal": []interface{}{"monitor"}},
+									}),
 								Redacted: []string{
 									"password",
 								},
 							},
 							{
 								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
-								Options: map[string]interface{}{
-									"default":                     false,
-									"disable-subscriptions":       false,
-									"enabled":                     false,
-									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-									"http-port":                   float64(0),
-									"insecure-skip-verify":        false,
-									"kapacitor-hostname":          "",
-									"name":                        "new",
-									"password":                    false,
-									"ssl-ca":                      "",
-									"ssl-cert":                    "",
-									"ssl-key":                     "",
-									"startup-timeout":             "5m0s",
-									"subscription-protocol":       "http",
-									"subscription-mode":           "cluster",
-									"subscriptions":               nil,
-									"subscriptions-sync-interval": "1m0s",
-									"timeout":                     "0s",
-									"udp-bind":                    "",
-									"udp-buffer":                  float64(1e3),
-									"udp-read-buffer":             float64(0),
-									"urls":                        []interface{}{db.URL()},
-									"username":                    "",
-								},
+								Options: deepCopyMapWithReplace(defMap)(
+									map[string]interface{}{
+										"name":            "new",
+										"enabled":         false,
+										"password":        false,
+										"startup-timeout": "5m0s",
+										"username":        "",
+									}),
 								Redacted: []string{
 									"password",
 								},
@@ -6629,31 +6569,14 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
-						Options: map[string]interface{}{
-							"default":                     false,
-							"disable-subscriptions":       false,
-							"enabled":                     false,
-							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
-							"http-port":                   float64(0),
-							"insecure-skip-verify":        false,
-							"kapacitor-hostname":          "",
-							"name":                        "new",
-							"password":                    false,
-							"ssl-ca":                      "",
-							"ssl-cert":                    "",
-							"ssl-key":                     "",
-							"startup-timeout":             "5m0s",
-							"subscription-protocol":       "http",
-							"subscriptions":               nil,
-							"subscription-mode":           "cluster",
-							"subscriptions-sync-interval": "1m0s",
-							"timeout":                     "0s",
-							"udp-bind":                    "",
-							"udp-buffer":                  float64(1e3),
-							"udp-read-buffer":             float64(0),
-							"urls":                        []interface{}{db.URL()},
-							"username":                    "",
-						},
+						Options: deepCopyMapWithReplace(defMap)(
+							map[string]interface{}{
+								"name":            "new",
+								"enabled":         false,
+								"password":        false,
+								"startup-timeout": "5m0s",
+								"username":        "",
+							}),
 						Redacted: []string{
 							"password",
 						},
@@ -6753,8 +6676,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 			element: "test",
 			setDefaults: func(c *server.Config) {
 				apc := httppost.Config{
-					Endpoint: "test",
-					URL:      "http://httppost.example.com",
+					Endpoint:    "test",
+					URLTemplate: "http://httppost.example.com",
 					Headers: map[string]string{
 						"testing": "works",
 					},
@@ -7299,6 +7222,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"api-key":         false,
 						"enabled":         false,
 						"global":          false,
+						"details":         false,
 						"recipients":      nil,
 						"teams":           nil,
 						"url":             "http://opsgenie2.example.com",
@@ -7315,6 +7239,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"api-key":         false,
 					"enabled":         false,
 					"global":          false,
+					"details":         false,
 					"recipients":      nil,
 					"teams":           nil,
 					"url":             "http://opsgenie2.example.com",
@@ -7341,6 +7266,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"api-key":         true,
 								"enabled":         false,
 								"global":          true,
+								"details":         false,
 								"recipients":      nil,
 								"teams":           []interface{}{"teamA", "teamB"},
 								"url":             "http://opsgenie2.example.com",
@@ -7357,6 +7283,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"api-key":         true,
 							"enabled":         false,
 							"global":          true,
+							"details":         false,
 							"recipients":      nil,
 							"teams":           []interface{}{"teamA", "teamB"},
 							"url":             "http://opsgenie2.example.com",
@@ -7667,6 +7594,93 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"handlers": nil,
 						},
 						Redacted: nil,
+					},
+				},
+			},
+		},
+		{
+			section: "servicenow",
+			setDefaults: func(c *server.Config) {
+				c.ServiceNow.URL = "https://instance.service-now.com/api/global/em/jsonv2"
+				c.ServiceNow.Source = "Kapacitor"
+				c.ServiceNow.Username = ""
+				c.ServiceNow.Password = ""
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"global":             false,
+						"state-changes-only": false,
+						"url":                "https://instance.service-now.com/api/global/em/jsonv2",
+						"source":             "Kapacitor",
+						"username":           "",
+						"password":           false,
+					},
+					Redacted: []string{
+						"password",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"global":             false,
+					"state-changes-only": false,
+					"url":                "https://instance.service-now.com/api/global/em/jsonv2",
+					"source":             "Kapacitor",
+					"username":           "",
+					"password":           false,
+				},
+				Redacted: []string{
+					"password",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled":  true,
+							"url":      "https://dev12345.service-now.com/api/global/em/jsonv2",
+							"username": "dev",
+							"password": "12345",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+							Options: map[string]interface{}{
+								"enabled":            true,
+								"global":             false,
+								"state-changes-only": false,
+								"url":                "https://dev12345.service-now.com/api/global/em/jsonv2",
+								"source":             "Kapacitor",
+								"username":           "dev",
+								"password":           true,
+							},
+							Redacted: []string{
+								"password",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/servicenow/"},
+						Options: map[string]interface{}{
+							"enabled":            true,
+							"global":             false,
+							"state-changes-only": false,
+							"url":                "https://dev12345.service-now.com/api/global/em/jsonv2",
+							"source":             "Kapacitor",
+							"username":           "dev",
+							"password":           true,
+						},
+						Redacted: []string{
+							"password",
+						},
 					},
 				},
 			},
@@ -8322,6 +8336,65 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "teams",
+			setDefaults: func(c *server.Config) {
+				c.Teams.ChannelURL = "http://teams.example.com/abcde"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"global":             false,
+						"state-changes-only": false,
+						"channel-url":        "http://teams.example.com/abcde",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"global":             false,
+					"state-changes-only": false,
+					"channel-url":        "http://teams.example.com/abcde",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"global":             true,
+							"state-changes-only": true,
+							"channel-url":        "http://teams.example.com/12345",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams/"},
+							Options: map[string]interface{}{
+								"enabled":            false,
+								"global":             true,
+								"state-changes-only": true,
+								"channel-url":        "http://teams.example.com/12345",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/teams/"},
+						Options: map[string]interface{}{
+							"enabled":            false,
+							"global":             true,
+							"state-changes-only": true,
+							"channel-url":        "http://teams.example.com/12345",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "telegram",
 			setDefaults: func(c *server.Config) {
 				c.Telegram.ChatId = "kapacitor"
@@ -8497,26 +8570,17 @@ func TestServer_UpdateConfig(t *testing.T) {
 		if got.Link != exp.Link {
 			return fmt.Errorf("elements have different links, got %v exp %v", got.Link, exp.Link)
 		}
-		for k, v := range exp.Options {
-			if g, ok := got.Options[k]; !ok {
-				return fmt.Errorf("missing option %q", k)
-			} else if !reflect.DeepEqual(g, v) {
-				return fmt.Errorf("unexpected config option %q got %#v exp %#v types: got %T exp %T", k, g, v, g, v)
-			}
-		}
-		for k := range got.Options {
-			if v, ok := exp.Options[k]; !ok {
-				return fmt.Errorf("extra option %q with value %#v", k, v)
-			}
+		if !cmp.Equal(exp.Options, got.Options) {
+			return fmt.Errorf("unexpected config option difference \n %s", cmp.Diff(exp.Options, got.Options))
 		}
 		if len(got.Redacted) != len(exp.Redacted) {
-			return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
+			return fmt.Errorf("unexpected element redacted lists: %s, \n%s", got.Redacted, cmp.Diff(got.Redacted, exp.Redacted))
 		}
 		sort.Strings(got.Redacted)
 		sort.Strings(exp.Redacted)
 		for i := range exp.Redacted {
 			if got.Redacted[i] != exp.Redacted[i] {
-				return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
+				return fmt.Errorf("unexpected element redacted lists: %s, \n%s", got.Redacted, cmp.Diff(got.Redacted, exp.Redacted))
 			}
 		}
 		return nil
@@ -8588,23 +8652,26 @@ func TestServer_UpdateConfig(t *testing.T) {
 			}
 
 			for i, ua := range tc.updates {
-				link := cli.ConfigElementLink(tc.section, ua.element)
+				t.Run(ua.name, func(t *testing.T) {
+					link := cli.ConfigElementLink(tc.section, ua.element)
 
-				if len(ua.updateAction.Add) > 0 ||
-					len(ua.updateAction.Remove) > 0 {
-					link = cli.ConfigSectionLink(tc.section)
-				}
+					if len(ua.updateAction.Add) > 0 ||
+						len(ua.updateAction.Remove) > 0 {
+						link = cli.ConfigSectionLink(tc.section)
+					}
 
-				if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
-					t.Fatal(err)
-				}
-				if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
-					t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
-				}
+					if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
+						t.Fatal(err)
+					}
+					if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
+						t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
+					}
+				})
 			}
 		})
 	}
 }
+
 func TestServer_ListServiceTests(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
@@ -8631,6 +8698,10 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"testServiceA",
 						"testServiceB",
 					},
+					"correlate": []interface{}{
+						"testServiceX",
+						"testServiceY",
+					},
 					"timeout": "24h0m0s",
 				},
 			},
@@ -8642,10 +8713,45 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
+				Name: "bigpanda",
+				Options: client.ServiceTestOptions{
+					"app_key":   "my-app-key-123456",
+					"level":     "CRITICAL",
+					"message":   "test bigpanda message",
+					"timestamp": "1970-01-01T00:00:01Z",
+					"event_data": map[string]interface{}{
+						"Fields": map[string]interface{}{},
+						"Result": map[string]interface{}{
+							"series": interface{}(nil),
+						},
+						"Name":        "testBigPanda",
+						"TaskName":    "",
+						"Group":       "",
+						"Tags":        map[string]interface{}{},
+						"Recoverable": false,
+						"Category":    "",
+					},
+				},
+			},
+			{
 				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/consul"},
 				Name: "consul",
 				Options: client.ServiceTestOptions{
 					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/discord"},
+				Name: "discord",
+				Options: client.ServiceTestOptions{
+					"workspace":   "",
+					"avatar-url":  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+					"level":       "INFO",
+					"message":     "test discord message",
+					"username":    "Kapacitor",
+					"embed-title": "Kapacitor Alert",
+					"time-val":    "1970-01-01T00:00:01Z",
 				},
 			},
 			{
@@ -8758,11 +8864,12 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie2"},
 				Name: "opsgenie2",
 				Options: client.ServiceTestOptions{
-					"teams":        nil,
-					"recipients":   nil,
-					"message-type": "CRITICAL",
-					"message":      "test opsgenie message",
-					"entity-id":    "testEntityID",
+					"teams":           nil,
+					"recipients":      nil,
+					"message-type":    "CRITICAL",
+					"message":         "test opsgenie message",
+					"entity-id":       "testEntityID",
+					"recovery_action": "notes",
 				},
 			},
 			{
@@ -8848,6 +8955,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
+				Name: "servicenow",
+				Options: client.ServiceTestOptions{
+					"alert_id": "id",
+					"source":   "Kapacitor",
+					"level":    "CRITICAL",
+					"message":  "test servicenow alert",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
@@ -8902,6 +9019,17 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Options: client.ServiceTestOptions{
 					"title": "testTitle",
 					"text":  "test talk text",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/teams"},
+				Name: "teams",
+				Options: client.ServiceTestOptions{
+					"channel_url": "",
+					"alert_topic": "test kapacitor alert topic",
+					"alert_id":    "foo/bar/bat",
+					"message":     "test teams message",
+					"level":       "CRITICAL",
 				},
 			},
 			{
@@ -8985,6 +9113,16 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Name: "serverset",
 				Options: client.ServiceTestOptions{
 					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
+				Name: "servicenow",
+				Options: client.ServiceTestOptions{
+					"alert_id": "id",
+					"source":   "Kapacitor",
+					"level":    "CRITICAL",
+					"message":  "test servicenow alert",
 				},
 			},
 			{
@@ -9175,6 +9313,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 			},
 		},
 		{
+			service: "servicenow",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
 			service: "slack",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
@@ -9208,6 +9354,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "talk",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "teams",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -9495,7 +9649,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alertatest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Alerta.Enabled = true
 				c.Alerta.URL = ts.URL
@@ -9516,11 +9670,93 @@ func TestServer_AlertHandlers(t *testing.T) {
 						Text:        "message",
 						Origin:      "kapacitor",
 						Service:     []string{"alert"},
+						Correlate:   []string{"alert"},
 						Timeout:     86400,
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "bigpanda",
+				Options: map[string]interface{}{
+					"app-key": "my-app-key-123456",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := bigpandatest.NewServer()
+				ctxt := context.WithValue(context.Background(), "server", ts)
+
+				c.BigPanda.Enabled = true
+				c.BigPanda.Token = "my-token-123"
+				c.BigPanda.AppKey = "my-app-key"
+				c.BigPanda.URL = ts.URL + "/test/bigpanda/alert"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*bigpandatest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []bigpandatest.Request{{
+					URL: "/test/bigpanda/alert",
+					PostData: bigpandatest.PostData{
+						AppKey:      "my-app-key-123456",
+						Check:       "id",
+						Status:      "critical",
+						Timestamp:   0,
+						Task:        "testAlertHandlers:alert",
+						Description: "message",
+						Details:     "details",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected bigpanda request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "discord",
+				Options: map[string]interface{}{
+					"username":    "Kapacitor",
+					"avatar-url":  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+					"embed-title": "Kapacitor Alert",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := discordtest.NewServer()
+				ctxt := context.WithValue(context.Background(), "server", ts)
+
+				c.Discord[0].Enabled = true
+				c.Discord[0].URL = ts.URL + "/test/discord/url"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*discordtest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []discordtest.Request{{
+					URL: "/test/discord/url",
+					PostData: discordtest.PostData{
+						Username:  "Kapacitor",
+						AvatarURL: "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+						Embeds: []discordtest.Embed{
+							{
+								Color:       0xF95F53,
+								Title:       "Kapacitor Alert",
+								Timestamp:   "",
+								Description: "message",
+							},
+						},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected discord request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},
@@ -9535,7 +9771,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				te := alerttest.NewExec()
-				ctxt := context.WithValue(nil, "exec", te)
+				ctxt := context.WithValue(context.Background(), "exec", te)
 				c.Commander = te.Commander
 				return ctxt, nil
 			},
@@ -9573,7 +9809,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := hipchattest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.HipChat.Enabled = true
 				c.HipChat.URL = ts.URL
@@ -9611,7 +9847,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Kafka = kafka.Configs{{
 					Enabled: true,
@@ -9634,8 +9870,22 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Offset:    0,
 					Key:       "id",
 					Message:   string(adJSON) + "\n",
+					Time:      time.Now().UTC(),
 				}}
-				if !cmp.Equal(exp, got) {
+				cmpopts := []cmp.Option{
+					cmp.Comparer(func(a, b time.Time) bool {
+						diff := a.Sub(b)
+						if diff < 0 {
+							diff = -diff
+						}
+						// It is ok as long as the timestamp is within
+						// 5 seconds of the current time. If we are that close,
+						// then it likely means the timestamp was correctly
+						// written.
+						return diff < 5*time.Second
+					}),
+				}
+				if !cmp.Equal(exp, got, cmpopts...) {
 					return fmt.Errorf("unexpected kafka messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
@@ -9656,7 +9906,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				l := alerttest.NewLog(p)
 
-				ctxt := context.WithValue(nil, "tdir", tdir)
+				ctxt := context.WithValue(context.Background(), "tdir", tdir)
 				ctxt = context.WithValue(ctxt, "log", l)
 				return ctxt, nil
 			},
@@ -9695,7 +9945,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
-				ctxt := context.WithValue(nil, "clientCreator", cc)
+				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
 				cfg := &mqtt.Config{
 					Enabled: true,
 					Name:    "test",
@@ -9733,6 +9983,53 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "mqtt",
+				Options: map[string]interface{}{
+					"topic":    "test/{{.TaskName}}",
+					"qos":      "at-least-once",
+					"retained": true,
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				cc := new(mqtttest.ClientCreator)
+				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
+				cfg := &mqtt.Config{
+					Enabled: true,
+					Name:    "test",
+					URL:     "tcp://mqtt.example.com:1883",
+				}
+
+				cfg.SetNewClientF(cc.NewClient)
+
+				c.MQTT = mqtt.Configs{*cfg}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				s := ctxt.Value("clientCreator").(*mqtttest.ClientCreator)
+				if got, exp := len(s.Clients), 1; got != exp {
+					return fmt.Errorf("unexpected number of clients created : exp %d got: %d", exp, got)
+				}
+				if got, exp := len(s.Configs), 1; got != exp {
+					return fmt.Errorf("unexpected number of configs received: exp %d got: %d", exp, got)
+				}
+				if got, exp := s.Configs[0].URL, "tcp://mqtt.example.com:1883"; exp != got {
+					return fmt.Errorf("unexpected config URL: exp %q got %q", exp, got)
+				}
+				got := s.Clients[0].PublishData
+				exp := []mqtttest.PublishData{{
+					Topic:    "test/testAlertHandlers",
+					QoS:      mqtt.AtLeastOnce,
+					Retained: true,
+					Message:  []byte("message"),
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected mqtt publish data:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "opsgenie",
 				Options: map[string]interface{}{
 					"teams-list":      []string{"A team", "B team"},
@@ -9741,7 +10038,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenietest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.OpsGenie.Enabled = true
 				c.OpsGenie.URL = ts.URL
@@ -9785,9 +10082,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenie2test.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.OpsGenie2.Enabled = true
+				c.OpsGenie2.Details = false
 				c.OpsGenie2.URL = ts.URL
 				c.OpsGenie2.RecoveryAction = "notes"
 				c.OpsGenie2.APIKey = "api_key"
@@ -9835,7 +10133,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerdutytest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.PagerDuty.Enabled = true
 				c.PagerDuty.URL = ts.URL
@@ -9882,7 +10180,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerduty2test.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.PagerDuty2.Enabled = true
 				c.PagerDuty2.URL = ts.URL
@@ -9944,7 +10242,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"url": ts.URL}
 
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -9967,10 +10265,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := httpposttest.NewAlertServer(nil, true)
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				c.HTTPPost = httppost.Configs{{
 					Endpoint:      "test",
-					URL:           ts.URL,
+					URLTemplate:   ts.URL,
 					AlertTemplate: `{{.Message}}`,
 				}}
 				return ctxt, nil
@@ -9995,7 +10293,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pushovertest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Pushover.Enabled = true
 				c.Pushover.URL = ts.URL
@@ -10037,7 +10335,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Sensu.Enabled = true
 				c.Sensu.Addr = ts.Addr
@@ -10066,6 +10364,45 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "servicenow",
+				Options: map[string]interface{}{
+					"source": "Kapacitor",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := servicenowtest.NewServer()
+				ctxt := context.WithValue(context.Background(), "server", ts)
+
+				c.ServiceNow.Enabled = true
+				c.ServiceNow.URL = ts.URL + "/api/global/em/jsonv2"
+				c.ServiceNow.Source = "Kapacitor"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*servicenowtest.Server)
+				ts.Close()
+				exp := []servicenowtest.Request{{
+					URL: "/api/global/em/jsonv2",
+					Alerts: servicenow.Events{
+						Records: []servicenow.Event{
+							{
+								Source:      "Kapacitor",
+								Severity:    "1",
+								Description: "message",
+								MessageKey:  "id",
+							},
+						},
+					},
+				}}
+				got := ts.Requests()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected servicenow request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "slack",
 				Options: map[string]interface{}{
 					"channel": "#test",
@@ -10073,7 +10410,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := slacktest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Slack[0].Enabled = true
 				c.Slack[0].URL = ts.URL + "/test/slack/url"
@@ -10117,7 +10454,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.SMTP.Enabled = true
 				c.SMTP.Host = ts.Host
@@ -10182,7 +10519,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.SNMPTrap.Enabled = true
 				c.SNMPTrap.Addr = ts.Addr
@@ -10234,7 +10571,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := talktest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Talk.Enabled = true
 				c.Talk.URL = ts.URL
@@ -10271,7 +10608,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"address": ts.Addr}
 
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -10287,6 +10624,39 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "teams",
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := teamstest.NewServer()
+				ctxt := context.WithValue(context.Background(), "server", ts)
+
+				c.Teams.Enabled = true
+				c.Teams.ChannelURL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*teamstest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []teamstest.Request{{
+					URL: "/",
+					Card: teams.Card{
+						CardType:   "MessageCard",
+						Context:    "http://schema.org/extensions",
+						Title:      "CRITICAL: [id]",
+						Text:       "message",
+						Summary:    "CRITICAL: [id] - message...",
+						ThemeColor: "CC4A31",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected teams request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "telegram",
 				Options: map[string]interface{}{
 					"chat-id":                  "chat id",
@@ -10295,7 +10665,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := telegramtest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.Telegram.Enabled = true
 				c.Telegram.URL = ts.URL + "/bot"
@@ -10331,7 +10701,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := victoropstest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
+				ctxt := context.WithValue(context.Background(), "server", ts)
 
 				c.VictorOps.Enabled = true
 				c.VictorOps.URL = ts.URL

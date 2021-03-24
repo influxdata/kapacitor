@@ -19,6 +19,8 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/bigpanda"
+	"github.com/influxdata/kapacitor/services/discord"
 	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -32,11 +34,13 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -119,7 +123,7 @@ type TaskMaster struct {
 		Handler(smtp.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	MQTTService interface {
-		Handler(mqtt.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(mqtt.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 
 	OpsGenieService interface {
@@ -146,8 +150,18 @@ type TaskMaster struct {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	HTTPPostService interface {
-		Handler(httppost.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(httppost.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 		Endpoint(string) (*httppost.Endpoint, bool)
+	}
+	DiscordService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
+	BigPandaService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(bigpanda.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SlackService interface {
 		Global() bool
@@ -194,7 +208,18 @@ type TaskMaster struct {
 	}
 
 	SideloadService interface {
-		Source(dir string) (sideload.Source, error)
+		Source(*httppost.Endpoint) (sideload.Source, error)
+	}
+
+	TeamsService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	ServiceNowService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(servicenow.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 
 	Commander command.Commander
@@ -279,6 +304,8 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PagerDuty2Service = tm.PagerDuty2Service
 	n.PushoverService = tm.PushoverService
 	n.HTTPPostService = tm.HTTPPostService
+	n.DiscordService = tm.DiscordService
+	n.BigPandaService = tm.BigPandaService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService
@@ -290,6 +317,8 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.K8sService = tm.K8sService
 	n.Commander = tm.Commander
 	n.SideloadService = tm.SideloadService
+	n.TeamsService = tm.TeamsService
+	n.ServiceNowService = tm.ServiceNowService
 	return n
 }
 
@@ -348,7 +377,7 @@ func (tm *TaskMaster) Drain() {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
-	for id, _ := range tm.taskToForkKeys {
+	for id := range tm.taskToForkKeys {
 		tm.delFork(id)
 	}
 }

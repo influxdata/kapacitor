@@ -50,6 +50,10 @@ required = [
   name = "github.com/eclipse/paho.mqtt.golang"
   version = "~1.0.0"
 
+[[constraint]]
+  name = "github.com/gorhill/cronexpr"
+  branch = "master"
+
 # Pin BurntSushi/toml to the same version used in influxdb
 # This also avoids using a version with the WTFPL license
 [[constraint]]

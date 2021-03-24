@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/sideload"
 )
 
@@ -22,7 +23,13 @@ func TestService_Source_Lookup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := s.Source(fmt.Sprintf("file://%s/testdata/src0", wd))
+	conf := httppost.Config{URLTemplate: fmt.Sprintf("file://%s/testdata/src0", wd)}
+	e := &httppost.Endpoint{}
+	if err := e.Update(conf); err != nil {
+		t.Fatal(err)
+	}
+
+	src, err := s.Source(e)
 	if err != nil {
 		t.Fatal(err)
 	}
