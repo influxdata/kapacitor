@@ -10888,8 +10888,18 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Event: zenoss.Event{
 						Action: "EventsRouter",
 						Method: "add_event",
-						Type:   "rpc",
-						TID:    1,
+						Data: []map[string]interface{}{
+							{
+								"component":  "",
+								"device":     "",
+								"evclass":    "",
+								"evclasskey": "",
+								"severity":   "Critical",
+								"summary":    "message",
+							},
+						},
+						Type: "rpc",
+						TID:  1,
 					},
 				}}
 				got := ts.Requests()
@@ -10903,9 +10913,6 @@ func TestServer_AlertHandlers(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%s-%d", tc.handler.Kind, i), func(t *testing.T) {
 			kind := tc.handler.Kind
-			if kind == "zenoss" {
-				t.Skipf("Skipping the Zenoss test, this needs to be fixed and unskipped before 1.6")
-			}
 
 			// Create default config
 			c := NewConfig()
