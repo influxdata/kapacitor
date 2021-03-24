@@ -158,7 +158,7 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go get github.com/golang/protobuf/protoc-gen-go/... github.com/benbjohnson/tmpl/... github.com/mailru/easyjson/easyjson/...")
+    run("go install -mod=mod github.com/golang/protobuf/protoc-gen-go github.com/benbjohnson/tmpl github.com/mailru/easyjson/easyjson")
     try:
          subprocess.check_output(["go", "generate", "./..."])
     except subprocess.CalledProcessError as exc:
