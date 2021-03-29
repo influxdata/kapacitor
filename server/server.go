@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	authservice "github.com/influxdata/kapacitor/services/auth"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
@@ -223,7 +224,15 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	// Append Kapacitor services.
 	s.initHTTPDService()
 	s.appendStorageService()
-	s.appendAuthService()
+
+	if c.Auth.Enabled {
+		if err := s.appendEnabledAuthService(); err != nil {
+			return nil, err
+		}
+	} else {
+		s.appendNoAuthService()
+	}
+
 	s.appendConfigOverrideService()
 	s.appendTesterService()
 	s.appendSideloadService()
@@ -580,13 +589,30 @@ func (s *Server) appendUDFService() {
 	s.AppendService("udf", srv)
 }
 
-func (s *Server) appendAuthService() {
+func (s *Server) appendNoAuthService() {
 	d := s.DiagService.NewNoAuthHandler()
 	srv := noauth.NewService(d)
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
 	s.AppendService("auth", srv)
+}
+
+func (s *Server) appendEnabledAuthService() error {
+	d := s.DiagService.NewAuthHandler()
+
+	srv, err := authservice.NewService(s.config.Auth, d)
+	if err != nil {
+		return err
+	}
+	srv.HTTPDService = s.HTTPDService
+	srv.StorageService = s.StorageService
+
+	s.AuthService = srv
+	s.HTTPDService.Handler.AuthService = srv
+
+	s.AppendService("auth", srv)
+	return nil
 }
 
 func (s *Server) appendMQTTService() error {

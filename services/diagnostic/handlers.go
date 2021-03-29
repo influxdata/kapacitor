@@ -1034,6 +1034,17 @@ func (h *NoAuthHandler) FakedSubscriptionUserToken() {
 	h.l.Info("using noauth auth backend. Faked authentication for subscription user token")
 }
 
+type AuthHandler struct {
+	l Logger
+}
+
+func (h *AuthHandler) Error(msg string, err error, ctx ...keyvalue.T) {
+	Err(h.l, msg, err, ctx)
+}
+func (h *AuthHandler) Debug(msg string, ctx ...keyvalue.T) {
+	Debug(h.l, msg, ctx)
+}
+
 // Stats handler
 
 type StatsHandler struct {

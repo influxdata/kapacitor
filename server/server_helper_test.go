@@ -203,6 +203,37 @@ func (s *Server) MustWrite(db, rp, body string, params url.Values) string {
 	return results
 }
 
+func (s *Server) PingAsUser(username, password string) error {
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: username,
+			Password: password,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	_, _, err = cli.Ping()
+	return err
+}
+
+func (s *Server) PingWithToken(token string) error {
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  token,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	_, _, err = cli.Ping()
+	return err
+}
+
 type stats struct {
 	NumEnabledTasks int `json:"num_enabled_tasks"`
 	NumTasks        int `json:"num_tasks"`

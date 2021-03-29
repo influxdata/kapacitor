@@ -93,6 +93,7 @@ require (
 	github.com/syndtr/goleveldb v0.0.0-20170409015612-8c81ea47d4c4 // indirect
 	github.com/ugorji/go v0.0.0-20170312112114-708a42d24682 // indirect
 	go.etcd.io/bbolt v1.3.5
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
 	golang.org/x/sys v0.0.0-20210305215415-5cdee2b1b5a0 // indirect

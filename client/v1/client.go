@@ -45,6 +45,7 @@ const (
 	replaysPath       = basePath + "/replays"
 	replayBatchPath   = basePath + "/replays/batch"
 	replayQueryPath   = basePath + "/replays/query"
+	usersPath         = basePath + "/users"
 	configPath        = basePath + "/config"
 	serviceTestsPath  = basePath + "/service-tests"
 	alertsPath        = basePath + "/alerts"
@@ -55,6 +56,276 @@ const (
 	storesPath        = storagePath + "/stores"
 	backupPath        = storagePath + "/backup"
 )
+
+type UserType int
+
+const (
+	InvalidUser UserType = iota
+	NormalUser
+	AdminUser
+)
+
+func (ut UserType) MarshalText() ([]byte, error) {
+	switch ut {
+	case InvalidUser:
+		return []byte{}, nil
+	case NormalUser:
+		return []byte("normal"), nil
+	case AdminUser:
+		return []byte("admin"), nil
+	default:
+		return nil, fmt.Errorf("unknown UserType %d", ut)
+	}
+}
+
+func (ut *UserType) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "":
+		*ut = InvalidUser
+	case "normal":
+		*ut = NormalUser
+	case "admin":
+		*ut = AdminUser
+	default:
+		return fmt.Errorf("unknown UserType %s", s)
+	}
+	return nil
+}
+
+func (ut UserType) String() string {
+	s, err := ut.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type Permission int
+
+const (
+	NoPermissions Permission = iota
+
+	APIPermission
+	ConfigAPIPermission
+	WritePointsPermission
+
+	AllPermissions
+)
+
+func (p Permission) MarshalText() ([]byte, error) {
+	switch p {
+	case NoPermissions:
+		return []byte("none"), nil
+	case APIPermission:
+		return []byte("api"), nil
+	case ConfigAPIPermission:
+		return []byte("config_api"), nil
+	case WritePointsPermission:
+		return []byte("write_points"), nil
+	case AllPermissions:
+		return []byte("all"), nil
+	default:
+		return nil, fmt.Errorf("unknown Permission %d", p)
+	}
+}
+
+func (p *Permission) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "none":
+		*p = NoPermissions
+	case "api":
+		*p = APIPermission
+	case "config_api":
+		*p = ConfigAPIPermission
+	case "write_points":
+		*p = WritePointsPermission
+	case "all":
+		*p = AllPermissions
+	default:
+		return fmt.Errorf("unknown Permission  %s", s)
+	}
+	return nil
+}
+
+func (p Permission) String() string {
+	s, err := p.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type CreateUserOptions struct {
+	Name        string       `json:"name"`
+	Password    string       `json:"password"`
+	Type        UserType     `json:"type"`
+	Permissions []Permission `json:"permissions"`
+}
+
+type UpdateUserOptions struct {
+	Password    string       `json:"password,omitempty"`
+	Type        UserType     `json:"type,omitempty"`
+	Permissions []Permission `json:"permissions"` // NOTE: do not set omitempty, so we can distingush unset vs empty.
+}
+
+type User struct {
+	Link        Link         `json:"link"`
+	Name        string       `json:"name"`
+	Type        UserType     `json:"type"`
+	Permissions []Permission `json:"permissions"`
+}
+
+func (c *Client) UserLink(username string) Link {
+	return Link{Relation: Self, Href: path.Join(usersPath, username)}
+}
+
+// Create a new user.
+// Errors if the user already exists.
+func (c *Client) CreateUser(opt CreateUserOptions) (User, error) {
+	user := User{}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return user, err
+	}
+
+	u := c.BaseURL()
+	u.Path = usersPath
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return user, err
+	}
+
+	_, err = c.Do(req, &user, http.StatusOK)
+	return user, err
+}
+
+// Update an existing user.
+// Only fields that are not their default value will be updated.
+// An empty list of permissions is different from a nil list of permissions.
+// An empty list updates the user to have no permissions, while an nil list of permissions leaves the user's permissions unmodified.
+func (c *Client) UpdateUser(link Link, opt UpdateUserOptions) (User, error) {
+	user := User{}
+	if link.Href == "" {
+		return user, fmt.Errorf("invalid link %v", link)
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return user, err
+	}
+
+	u := c.BaseURL()
+	u.Path = link.Href
+
+	req, err := http.NewRequest("PATCH", u.String(), &buf)
+	if err != nil {
+		return user, err
+	}
+
+	_, err = c.Do(req, &user, http.StatusOK)
+	if err != nil {
+		return user, err
+	}
+	return user, nil
+}
+
+// Get information about a user.
+func (c *Client) User(link Link) (User, error) {
+	user := User{}
+	if link.Href == "" {
+		return user, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := c.BaseURL()
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return user, err
+	}
+
+	_, err = c.Do(req, &user, http.StatusOK)
+	if err != nil {
+		return user, err
+	}
+	return user, nil
+}
+
+// Delete a user.
+func (c *Client) DeleteUser(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+
+	u := c.BaseURL()
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type ListUsersOptions struct {
+	Pattern string
+	Fields  []string
+	Offset  int
+	Limit   int
+}
+
+func (o *ListUsersOptions) Default() {
+	if o.Limit == 0 {
+		o.Limit = 100
+	}
+}
+
+func (o *ListUsersOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	for _, field := range o.Fields {
+		v.Add("fields", field)
+	}
+	v.Set("offset", strconv.FormatInt(int64(o.Offset), 10))
+	v.Set("limit", strconv.FormatInt(int64(o.Limit), 10))
+	return v
+}
+
+// Get users.
+func (c *Client) ListUsers(opt *ListUsersOptions) ([]User, error) {
+	if opt == nil {
+		opt = new(ListUsersOptions)
+	}
+	opt.Default()
+	u := c.BaseURL()
+	u.Path = usersPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Response type
+	type response struct {
+		Users []User `json:"users"`
+	}
+
+	r := &response{}
+
+	_, err = c.Do(req, r, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	return r.Users, nil
+}
 
 // HTTP configuration for connecting to Kapacitor
 type Config struct {

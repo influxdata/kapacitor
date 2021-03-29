@@ -342,6 +342,12 @@ func (s *Service) NewNoAuthHandler() *NoAuthHandler {
 	}
 }
 
+func (s *Service) NewAuthHandler() *AuthHandler {
+	return &AuthHandler{
+		l: s.Logger.With(String("service", "auth")),
+	}
+}
+
 func (s *Service) NewStatsHandler() *StatsHandler {
 	return &StatsHandler{
 		l: s.Logger.With(String("service", "stats")),
