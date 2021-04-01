@@ -3,9 +3,9 @@
 ## Unreleased
 
 ### Bugfixes
-- [#2479](https://github.com/influxdata/kapacitor/pull/2479): Fix: influx gzip writes for large writes.
+- [#2479](https://github.com/influxdata/kapacitor/pull/2479): Fix influx gzip writes for large writes.
 - [#2488](https://github.com/influxdata/kapacitor/pull/2488): Fix function node name for ServiceNow handler so it is properly camelcased. 
-- [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix: memory leaks in JoinNode and UnionNode.
+- [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix memory leaks in JoinNode and UnionNode.
 - [#2498](https://github.com/influxdata/kapacitor/pull/2498): Avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
 
 ### Features
