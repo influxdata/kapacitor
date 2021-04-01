@@ -9,7 +9,7 @@
 - [#2498](https://github.com/influxdata/kapacitor/pull/2498): Avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
 
 ### Features
-- [#2472](https://github.com/influxdata/kapacitor/pull2472): Send full event payload on pagerduty resolve, thanks @asvinours!
+- [#2472](https://github.com/influxdata/kapacitor/pull/2472): Send full event payload on pagerduty resolve, thanks @asvinours!
 - [#2474](https://github.com/influxdata/kapacitor/pull/2474): Add barrier handling to FlattenNode.
 - [#2475](https://github.com/influxdata/kapacitor/pull/2475): Added default color theme to teams alerts, thanks @NoamShaish!
 - [#2491](https://github.com/influxdata/kapacitor/pull/2491): Fix TICKScript AST for bigpanda. 
