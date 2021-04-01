@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.9
 
 ### Bugfixes
 - [#2479](https://github.com/influxdata/kapacitor/pull/2479): Fix: influx gzip writes for large writes.
