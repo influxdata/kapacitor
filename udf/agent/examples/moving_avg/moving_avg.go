@@ -32,7 +32,7 @@ func (a *avgState) update(value float64) float64 {
 	l := len(a.Window)
 	if a.Size == l {
 		a.Avg += value/float64(l) - a.Window[0]/float64(l)
-		a.Window = a.Window[1:]
+		a.Window = append(a.Window[:0], a.Window[1:]...)
 	} else {
 		a.Avg = (value + float64(l)*a.Avg) / float64(l+1)
 	}
