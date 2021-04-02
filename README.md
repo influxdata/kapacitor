@@ -3,6 +3,10 @@ Open source framework for processing, monitoring, and alerting on time series da
 
 # Installation
 
+
+
+TESTETETSDTETETETETE
+
 Kapacitor has two binaries:
 
 * kapacitor – a CLI program for calling the Kapacitor API.
