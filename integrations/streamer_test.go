@@ -10727,9 +10727,9 @@ Value: {{ index .Fields "count" }}
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":      []string{"user1@example.com, user2@example.com"},
-				"From":    []string{"test@example.com"},
-				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":                        []string{"user1@example.com, user2@example.com"},
+				"From":                      []string{"test@example.com"},
+				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
@@ -10743,9 +10743,9 @@ Value: 10
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":      []string{"user1@example.com, user2@example.com"},
-				"From":    []string{"test@example.com"},
-				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":                        []string{"user1@example.com, user2@example.com"},
+				"From":                      []string{"test@example.com"},
+				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
