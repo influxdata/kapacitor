@@ -213,7 +213,7 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 				responseRecorder := httptest.NewRecorder()
 				httpdService.Handler.ServeHTTP(responseRecorder, writeRequest)
 				if responseRecorder.Code != http.StatusNoContent {
-					b.Fatalf("failed to write test data %s", responseRecorder.Body.String())
+					b.Errorf("failed to write test data %s", responseRecorder.Body.String())
 				}
 			}(write.request, write.seeker)
 		}

@@ -133,7 +133,7 @@ func TestClient_Concurrent_Use(t *testing.T) {
 
 		for i := 0; i < n; i++ {
 			if err = c.Write(bp); err != nil {
-				t.Fatalf("got error %v", err)
+				t.Errorf("got error %v", err)
 			}
 		}
 	}()
@@ -143,7 +143,7 @@ func TestClient_Concurrent_Use(t *testing.T) {
 		var q Query
 		for i := 0; i < n; i++ {
 			if _, err := c.Query(q); err != nil {
-				t.Fatalf("got error %v", err)
+				t.Errorf("got error %v", err)
 			}
 		}
 	}()
