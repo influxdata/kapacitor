@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Features
-- [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert avent handler.
+- [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
 - [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring he hashing strategy.
 
@@ -1454,5 +1454,4 @@ Some bug fixes including one that cause Kapacitor to deadlock.
 ### Release Notes
 
 Major public release.
-
 
