@@ -81,7 +81,7 @@ require (
 	github.com/russross/blackfriday v0.0.0-20151110051855-0b647d0506a6 // indirect
 	github.com/samuel/go-zookeeper v0.0.0-20161028232340-1d7be4effb13 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
-	github.com/segmentio/kafka-go v0.3.5
+	github.com/segmentio/kafka-go v0.3.10
 	github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b
 	github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 // indirect
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
@@ -93,6 +93,7 @@ require (
 	github.com/syndtr/goleveldb v0.0.0-20170409015612-8c81ea47d4c4 // indirect
 	github.com/ugorji/go v0.0.0-20170312112114-708a42d24682 // indirect
 	go.etcd.io/bbolt v1.3.5
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
 	golang.org/x/sys v0.0.0-20210305215415-5cdee2b1b5a0 // indirect

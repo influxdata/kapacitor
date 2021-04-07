@@ -1407,6 +1407,10 @@ GET /kapacitor/v1/replays
 }
 ```
 
+## Users
+
+This section is under construction.
+
 ## Alerts
 
 Kapacitor can generate and handle alerts.

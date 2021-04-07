@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	authservice "github.com/influxdata/kapacitor/services/auth"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
@@ -74,6 +75,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
@@ -222,7 +224,15 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	// Append Kapacitor services.
 	s.initHTTPDService()
 	s.appendStorageService()
-	s.appendAuthService()
+
+	if c.Auth.Enabled {
+		if err := s.appendEnabledAuthService(); err != nil {
+			return nil, err
+		}
+	} else {
+		s.appendNoAuthService()
+	}
+
 	s.appendConfigOverrideService()
 	s.appendTesterService()
 	s.appendSideloadService()
@@ -274,6 +284,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendSensuService()
 	s.appendTalkService()
 	s.appendVictorOpsService()
+	s.appendZenossService()
 
 	// Append alert service
 	s.appendAlertService()
@@ -578,13 +589,30 @@ func (s *Server) appendUDFService() {
 	s.AppendService("udf", srv)
 }
 
-func (s *Server) appendAuthService() {
+func (s *Server) appendNoAuthService() {
 	d := s.DiagService.NewNoAuthHandler()
 	srv := noauth.NewService(d)
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
 	s.AppendService("auth", srv)
+}
+
+func (s *Server) appendEnabledAuthService() error {
+	d := s.DiagService.NewAuthHandler()
+
+	srv, err := authservice.NewService(s.config.Auth, d)
+	if err != nil {
+		return err
+	}
+	srv.HTTPDService = s.HTTPDService
+	srv.StorageService = s.StorageService
+
+	s.AuthService = srv
+	s.HTTPDService.Handler.AuthService = srv
+
+	s.AppendService("auth", srv)
+	return nil
 }
 
 func (s *Server) appendMQTTService() error {
@@ -1033,6 +1061,18 @@ func (s *Server) appendServiceNowService() {
 
 	s.SetDynamicService("servicenow", srv)
 	s.AppendService("servicenow", srv)
+}
+
+func (s *Server) appendZenossService() {
+	c := s.config.Zenoss
+	d := s.DiagService.NewZenossHandler()
+	srv := zenoss.NewService(c, d)
+
+	s.TaskMaster.ZenossService = srv
+	s.AlertService.ZenossService = srv
+
+	s.SetDynamicService("zenoss", srv)
+	s.AppendService("zenoss", srv)
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.

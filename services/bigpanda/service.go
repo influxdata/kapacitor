@@ -5,8 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	khttp "github.com/influxdata/kapacitor/http"
-	"github.com/influxdata/kapacitor/models"
 	"html"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +14,9 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/pkg/errors"
 )
 

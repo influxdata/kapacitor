@@ -26,7 +26,12 @@ func TestWriter_UpdateConfig(t *testing.T) {
 	defer diag.Close()
 
 	// Write a message to generate a writer.
-	require.NoError(t, cluster.WriteMessage(diag.NewKafkaHandler(), "testTopic", []byte{1, 2, 3, 4}, []byte{1, 2, 3, 4}))
+	require.NoError(t, cluster.WriteMessage(diag.NewKafkaHandler(),
+		kafka.WriteTarget{
+			Topic:              "testTopic",
+			PartitionById:      false,
+			PartitionAlgorithm: "",
+		}, []byte{1, 2, 3, 4}, []byte{1, 2, 3, 4}))
 
 	// Update the config in a way that requires shutting down all active writers.
 	c.UseSSL = true

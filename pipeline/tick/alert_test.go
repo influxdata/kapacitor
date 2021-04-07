@@ -588,12 +588,13 @@ func TestAlertHipchat(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
-func TestAlertKafka(t *testing.T) {
+func TestAlertKafka_PartitionById(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Kafka()
 	handler.Cluster = "default"
 	handler.KafkaTopic = "test"
 	handler.Template = "tmpl"
+	handler.PartitionHashAlgorithm = "murmur2"
 
 	want := `stream
     |from()
@@ -605,6 +606,31 @@ func TestAlertKafka(t *testing.T) {
         .kafka()
         .cluster('default')
         .kafkaTopic('test')
+        .partitionHashAlgorithm('murmur2')
+        .template('tmpl')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertKafka_NoPartitionById(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Kafka()
+	handler.Cluster = "default"
+	handler.KafkaTopic = "test"
+	handler.Template = "tmpl"
+	handler.IsDisablePartitionById = true
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .kafka()
+        .cluster('default')
+        .kafkaTopic('test')
+        .disablePartitionById()
         .template('tmpl')
 `
 	PipelineTickTestHelper(t, pipe, want)
@@ -761,6 +787,32 @@ func TestAlertSNMP(t *testing.T) {
         .snmpTrap('trap')
         .data('Petrov\'s Defence', 't', 'Marshall Trap')
         .data('Queen\'s Gambit Declined', 't', 'Rubinstein Trap')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertZenoss(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Zenoss()
+	handler.Action = "custom_add_event"
+	handler.Summary = "server alert"
+	handler.Device = "server-A"
+	handler.Component = "CPU"
+	handler.EventClass = "/App"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .zenoss()
+        .action('custom_add_event')
+        .summary('server alert')
+        .device('server-A')
+        .component('CPU')
+        .eventClass('/App')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }

@@ -342,6 +342,12 @@ func (s *Service) NewNoAuthHandler() *NoAuthHandler {
 	}
 }
 
+func (s *Service) NewAuthHandler() *AuthHandler {
+	return &AuthHandler{
+		l: s.Logger.With(String("service", "auth")),
+	}
+}
+
 func (s *Service) NewStatsHandler() *StatsHandler {
 	return &StatsHandler{
 		l: s.Logger.With(String("service", "stats")),
@@ -488,5 +494,11 @@ func (s *Service) NewTeamsHandler() *TeamsHandler {
 func (s *Service) NewServiceNowHandler() *ServiceNowHandler {
 	return &ServiceNowHandler{
 		l: s.Logger.With(String("service", "serviceNow")),
+	}
+}
+
+func (s *Service) NewZenossHandler() *ZenossHandler {
+	return &ZenossHandler{
+		l: s.Logger.With(String("service", "zenoss")),
 	}
 }

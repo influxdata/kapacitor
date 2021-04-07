@@ -11,9 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/services/collectd"
+	"github.com/influxdata/influxdb/services/graphite"
+	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/auth"
+	authservice "github.com/influxdata/kapacitor/services/auth"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
@@ -61,17 +66,15 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
-
-	"github.com/influxdata/influxdb/services/collectd"
-	"github.com/influxdata/influxdb/services/graphite"
-	"github.com/influxdata/influxdb/services/opentsdb"
 )
 
 // Config represents the configuration format for the kapacitord binary.
 type Config struct {
 	Alert          alert.Config      `toml:"alert"`
+	Auth           auth.Config       `toml:"auth"`
 	HTTP           httpd.Config      `toml:"http"`
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
@@ -110,6 +113,7 @@ type Config struct {
 	Teams      teams.Config      `toml:"teams" override:"teams"`
 	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
 	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
+	Zenoss     zenoss.Config     `toml:"zenoss" override:"zenoss"`
 
 	// Discovery for scraping
 	Scraper         []scraper.Config          `toml:"scraper" override:"scraper,element-key=name"`
@@ -150,6 +154,7 @@ func NewConfig() *Config {
 	}
 
 	c.Alert = alert.NewConfig()
+	c.Auth = authservice.NewDisabledConfig()
 	c.HTTP = httpd.NewConfig()
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
@@ -183,6 +188,7 @@ func NewConfig() *Config {
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
+	c.Zenoss = zenoss.NewConfig()
 
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
@@ -227,6 +233,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Replay.Validate(); err != nil {
 		return errors.Wrap(err, "replay")
+	}
+	if err := c.Auth.Validate(); err != nil {
+		return errors.Wrap(err, "auth")
 	}
 	if err := c.Storage.Validate(); err != nil {
 		return errors.Wrap(err, "storage")
@@ -343,6 +352,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.VictorOps.Validate(); err != nil {
 		return errors.Wrap(err, "victorops")
+	}
+	if err := c.Zenoss.Validate(); err != nil {
+		return errors.Wrap(err, "zenoss")
 	}
 
 	if err := c.UDF.Validate(); err != nil {

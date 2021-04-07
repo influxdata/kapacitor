@@ -43,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/uuid"
 	plog "github.com/prometheus/common/log"
@@ -1033,6 +1034,17 @@ func (h *NoAuthHandler) FakedSubscriptionUserToken() {
 	h.l.Info("using noauth auth backend. Faked authentication for subscription user token")
 }
 
+type AuthHandler struct {
+	l Logger
+}
+
+func (h *AuthHandler) Error(msg string, err error, ctx ...keyvalue.T) {
+	Err(h.l, msg, err, ctx)
+}
+func (h *AuthHandler) Debug(msg string, ctx ...keyvalue.T) {
+	Debug(h.l, msg, ctx)
+}
+
 // Stats handler
 
 type StatsHandler struct {
@@ -1399,5 +1411,22 @@ func (h *ServiceNowHandler) WithContext(ctx ...keyvalue.T) servicenow.Diagnostic
 }
 
 func (h *ServiceNowHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+// Zenoss handler
+type ZenossHandler struct {
+	l Logger
+}
+
+func (h *ZenossHandler) WithContext(ctx ...keyvalue.T) zenoss.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &ZenossHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *ZenossHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }

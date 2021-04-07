@@ -336,7 +336,7 @@ func TestUDF_SnapshotRestore(t *testing.T) {
 		// Snapshot
 		req = <-u.Requests
 		if req == nil {
-			t.Fatal("expected snapshot message got nil")
+			t.Error("expected snapshot message got nil")
 		}
 		_, ok = req.Message.(*agent.Request_Snapshot)
 		if !ok {
@@ -351,7 +351,7 @@ func TestUDF_SnapshotRestore(t *testing.T) {
 		// Restore
 		req = <-u.Requests
 		if req == nil {
-			t.Fatal("expected restore message got nil")
+			t.Error("expected restore message got nil")
 		}
 		restore, ok := req.Message.(*agent.Request_Restore)
 		if !ok {

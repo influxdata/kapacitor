@@ -210,6 +210,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.Dot("kafka").
 			Dot("cluster", h.Cluster).
 			Dot("kafkaTopic", h.KafkaTopic).
+			DotIf("disablePartitionById", h.IsDisablePartitionById).
+			Dot("partitionHashAlgorithm", h.PartitionHashAlgorithm).
 			Dot("template", h.Template)
 	}
 
@@ -253,6 +255,32 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.DotRemoveZeroValue("snmpTrap", h.TrapOid)
 		for _, d := range h.DataList {
 			n.Dot("data", d.Oid, d.Type, d.Value)
+		}
+	}
+
+	for _, h := range a.ZenossHandlers {
+		n.Dot("zenoss").
+			Dot("action", h.Action).
+			Dot("method", h.Method).
+			Dot("type", h.Type).
+			Dot("TID", h.TID).
+			// standard event data element fields
+			Dot("summary", h.Summary).
+			Dot("device", h.Device).
+			Dot("component", h.Component).
+			Dot("eventClassKey", h.EventClassKey).
+			Dot("eventClass", h.EventClass).
+			Dot("collector", h.Collector).
+			Dot("message", h.Message)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.CustomFieldsMap))
+		for k := range h.CustomFieldsMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("customField", k, h.CustomFieldsMap[k])
 		}
 	}
 

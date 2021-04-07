@@ -404,6 +404,10 @@ type AlertNodeData struct {
 	// Send alert to ServiceNow.
 	// tick:ignore
 	ServiceNowHandlers []*ServiceNowHandler `tick:"ServiceNow" json:"serviceNow"`
+
+	// Send alert to Zenoss.
+	// tick:ignore
+	ZenossHandlers []*ZenossHandler `tick:"Zenoss" json:"zenoss"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -2155,9 +2159,33 @@ type KafkaHandler struct {
 	// Kafka Topic
 	KafkaTopic string `json:"kafka-topic"`
 
+	// If false (default), messages will be routed to partitions based on their IDs
+	// If true, messages will be routed to the partition with the least data regardless of IDs
+	// tick:ignore
+	IsDisablePartitionById bool `tick:"DisablePartitionById" json:"disable-partition-by-id"`
+
+	// Algorithm used to hash message IDs when determining a target partition
+	//
+	// Valid values are:
+	//
+	//    * "crc32"   - Compatible with librdkafka and confluent-kafka-go
+	//    * "murmur2" - Compatible with the default Java partitioner
+	//    * "fnv-1a"  - Compatible with Shopify's sarama producer
+	//
+	// Default: crc32
+	PartitionHashAlgorithm string `json:"partition-hash-algorithm,omitempty"`
+
 	// Template used to construct the message body
 	// If empty the alert data in JSON is sent as the message body.
-	Template string `json:"template"`
+	// tick:ignore
+	Template string `json:"template,omitempty"`
+}
+
+// Disables use of message IDs when determining target Kafka partitions.
+// tick:property
+func (k *KafkaHandler) DisablePartitionById() *KafkaHandler {
+	k.IsDisablePartitionById = true
+	return k
 }
 
 // Send the alert to a Microsoft Teams channel.
@@ -2311,5 +2339,122 @@ func (s *ServiceNowHandler) AdditionalInfo(key string, value interface{}) *Servi
 		s.AdditionalInfoMap = make(map[string]interface{})
 	}
 	s.AdditionalInfoMap[key] = value
+	return s
+}
+
+// Send the alert to Zenoss.
+//
+// Example:
+//    [zenoss]
+//      enabled = true
+//      url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted.
+//
+// Example:
+//    stream
+//         |alert()
+//             .zenoss()
+//                 .summary('Alert {{ .ID }}')
+//                 .message('{{ .Message }}')
+//                 .eventClass('/App')
+//
+// If the 'zenoss' section in the configuration has the option: global = true
+// then all alerts are sent to Zenoss without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [zenoss]
+//      enabled = true
+//      url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//             .zenoss()
+//                 .summary('Alert {{ .ID }}')
+//                 .message('{{ .Message }}')
+//                 .eventClass('/App')
+//
+// Send alert to Zenoss using default url.
+// tick:property
+func (n *AlertNodeData) Zenoss() *ZenossHandler {
+	zenoss := &ZenossHandler{
+		AlertNodeData: n,
+		Summary:       "{{ .Message }}", // default mapping
+	}
+	n.ZenossHandlers = append(n.ZenossHandlers, zenoss)
+	return zenoss
+}
+
+// tick:embedded:AlertNode.Zenoss
+type ZenossHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// Zenoss API URL to post alerts.
+	// If empty uses the URL from the configuration.
+	URL string `json:"url"`
+
+	// Username for BASIC authentication.
+	// If empty uses username from the configuration.
+	Username string `json:"username"`
+
+	// Password for BASIC authentication.
+	// If empty uses password from the configuration.
+	Password string `json:"password"`
+
+	// Action (router name).
+	// If empty uses value from the configuration.
+	Action string `json:"action"`
+
+	// Router method.
+	// If empty uses value from the configuration.
+	Method string `json:"method"`
+
+	// Event type.
+	// If empty uses value from the configuration.
+	Type string `json:"type"`
+
+	// Temporary transaction ID.
+	// If empty uses value from the configuration.
+	TID int64 `json:"tid"`
+
+	// Summary of the event.
+	Summary string `json:"summary"`
+
+	// Device (typically IP or hostname).
+	Device string `json:"device"`
+
+	// Component related to the event.
+	Component string `json:"component"`
+
+	// Event class key.
+	EventClassKey string `json:"evclasskey"`
+
+	// Event class.
+	EventClass string `json:"evclass"`
+
+	// Message related to the event.
+	Message string `json:"message"`
+
+	// Collector.
+	Collector string `json:"collector"`
+
+	// Custom fields.
+	// tick:ignore
+	CustomFieldsMap map[string]interface{} `tick:"CustomField" json:"customField"`
+}
+
+// CustomField adds a field to event data.
+// tick:property
+func (s *ZenossHandler) CustomField(key string, value interface{}) *ZenossHandler {
+	if s.CustomFieldsMap == nil {
+		s.CustomFieldsMap = make(map[string]interface{})
+	}
+	s.CustomFieldsMap[key] = value
 	return s
 }
