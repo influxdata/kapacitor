@@ -1,4 +1,5 @@
 .*.swp
+/.idea/
 dist/*
 /build/*
 /*.conf
