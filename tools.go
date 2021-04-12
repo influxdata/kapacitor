@@ -9,4 +9,6 @@ import (
 	_ "github.com/benbjohnson/tmpl"
 	_ "github.com/golang/protobuf/protoc-gen-go"
 	_ "github.com/mailru/easyjson/easyjson"
+	// FIXME: remove once we take a real dep
+	_ "github.com/influxdata/influxdb/v2"
 )
