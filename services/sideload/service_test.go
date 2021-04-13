@@ -78,9 +78,13 @@ func TestService_Source_Lookup(t *testing.T) {
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
 			got := src.Lookup(tc.order, tc.key)
 			if !cmp.Equal(got, tc.want) {
 				t.Errorf("unexpected values: -want/+got:\n%s", cmp.Diff(tc.want, got))
+			}
+			if err := e.Update(conf); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

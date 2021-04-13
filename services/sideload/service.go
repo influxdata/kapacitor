@@ -203,6 +203,8 @@ func (s *fileSource) Close() {
 }
 
 func (s *fileSource) UpdateCache() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.cache = make(map[string]map[string]interface{})
 	err := filepath.Walk(s.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -258,7 +260,10 @@ type httpSource struct {
 }
 
 func (s *httpSource) UpdateCache() error {
-	s.cache = make(map[string]map[string]interface{})
+	s.fileSource.mu.Lock()
+	defer s.fileSource.mu.Unlock()
+	s.fileSource.cache = make(map[string]map[string]interface{})
+
 	req, err := http.NewRequest("GET", s.dir, nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate request to update sideload cache for source %q", s.dir)
@@ -281,7 +286,7 @@ func (s *httpSource) UpdateCache() error {
 		return errors.Wrapf(err, "failed to load body to update sideload cache for source %q", s.dir)
 	}
 	for k, v := range values {
-		s.cache[k] = v
+		s.fileSource.cache[k] = v
 	}
 	return nil
 }
