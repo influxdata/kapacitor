@@ -3,9 +3,9 @@ package scraper_test
 import (
 	"testing"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/file_discovery"
 	"github.com/influxdata/kapacitor/services/scraper"
-	"github.com/prometheus/common/log"
 )
 
 func TestConfig_MultiConfig(t *testing.T) {
@@ -37,7 +37,7 @@ func TestConfig_MultiConfig(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		diag := scraper.Diagnostic(log.NewNopLogger())
+		diag := scraper.Diagnostic(diagnostic.NoOpScraperHandler())
 		for i := range tt.discoveryConfig {
 			tt.discoveryConfig[i].Init()
 		}

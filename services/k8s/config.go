@@ -9,7 +9,9 @@ import (
 	"github.com/influxdata/kapacitor/listmap"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/kubernetes"
 )
 
 type Config struct {
@@ -114,33 +116,34 @@ func (cs Configs) Validate() error {
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (c Config) Prom(conf *config.ScrapeConfig) {
 	if len(c.APIServers) == 0 {
-		conf.ServiceDiscoveryConfig.KubernetesSDConfigs = []*config.KubernetesSDConfig{
-			&config.KubernetesSDConfig{
-				Role:        config.KubernetesRole(c.Resource),
-				BearerToken: c.Token,
-				TLSConfig: config.TLSConfig{
+		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs, &kubernetes.SDConfig{
+			Role: kubernetes.Role(c.Resource),
+			HTTPClientConfig: config2.HTTPClientConfig{
+				BearerToken: config2.Secret(c.Token),
+				TLSConfig: config2.TLSConfig{
 					CAFile: c.CAPath,
 				},
 			},
-		}
+		})
 		return
 	}
 
-	sds := make([]*config.KubernetesSDConfig, len(c.APIServers))
-	for i, srv := range c.APIServers {
+	for _, srv := range c.APIServers {
 		url, _ := url.Parse(srv)
-		sds[i] = &config.KubernetesSDConfig{
-			APIServer: config.URL{
-				URL: url,
-			},
-			Role:        config.KubernetesRole(c.Resource),
-			BearerToken: c.Token,
-			TLSConfig: config.TLSConfig{
-				CAFile: c.CAPath,
-			},
-		}
+		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs,
+			&kubernetes.SDConfig{
+				APIServer: config2.URL{
+					URL: url,
+				},
+				Role: kubernetes.Role(c.Resource),
+				HTTPClientConfig: config2.HTTPClientConfig{
+					BearerToken: config2.Secret(c.Token),
+					TLSConfig: config2.TLSConfig{
+						CAFile: c.CAPath,
+					},
+				},
+			})
 	}
-	conf.ServiceDiscoveryConfig.KubernetesSDConfigs = sds
 }
 
 // Service return discoverer type

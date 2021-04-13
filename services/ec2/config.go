@@ -6,8 +6,10 @@ import (
 
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/services/ec2/client"
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/ec2"
 )
 
 // Config is EC2 service discovery configuration
@@ -41,9 +43,7 @@ func (e Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (e Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.EC2SDConfigs = []*config.EC2SDConfig{
-		e.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, e.PromConfig())
 }
 
 func (c Config) ClientConfig() (client.Config, error) {
@@ -55,11 +55,11 @@ func (c Config) ClientConfig() (client.Config, error) {
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (e Config) PromConfig() *config.EC2SDConfig {
-	return &config.EC2SDConfig{
+func (e Config) PromConfig() *ec2.SDConfig {
+	return &ec2.SDConfig{
 		Region:          e.Region,
 		AccessKey:       e.AccessKey,
-		SecretKey:       e.SecretKey,
+		SecretKey:       config2.Secret(e.SecretKey),
 		Profile:         e.Profile,
 		RefreshInterval: model.Duration(e.RefreshInterval),
 		Port:            e.Port,

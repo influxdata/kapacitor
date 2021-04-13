@@ -341,6 +341,10 @@ func (w *overrideWalker) SliceElem(idx int, v reflect.Value) error {
 
 var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 
+type CustomMapStructurer interface {
+	CustomMapStructure(map[string]interface{}) error
+}
+
 // weakCopyValue copies the value of dst into src, where numeric and interface types are copied weakly.
 func weakCopyValue(dst, src reflect.Value) (err error) {
 	defer func() {
@@ -444,6 +448,12 @@ func weakCopyValue(dst, src reflect.Value) (err error) {
 			return fmt.Errorf("cannot convert string %q into %s", str, dstK)
 		}
 	} else if dstK == reflect.Struct && srcK == reflect.Map {
+		addrDstI := addrDst.Interface()
+		if custom, ok := addrDstI.(CustomMapStructurer); ok {
+			if src, ok := src.Interface().(map[string]interface{}); ok {
+				return custom.CustomMapStructure(src)
+			}
+		}
 		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			ErrorUnused: true,
 			Result:      addrDst.Interface(),

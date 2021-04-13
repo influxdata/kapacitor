@@ -1119,6 +1119,26 @@ type ScraperHandler struct {
 	l   Logger
 }
 
+func NoOpScraperHandler() *ScraperHandler {
+	return &ScraperHandler{
+		buf: bytes.NewBuffer(nil),
+		l:   &NoOpLogger{},
+	}
+}
+
+func (h *ScraperHandler) Log(keyvals ...interface{}) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	for i := 0; i < len(keyvals)-1; i += 2 {
+		key := keyvals[i]
+		val := keyvals[i+1]
+		fmt.Fprintf(h.buf, "%v=%v", key, val)
+	}
+	h.l.Info(h.buf.String())
+	return nil
+}
+
 func (h *ScraperHandler) Debug(ctx ...interface{}) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

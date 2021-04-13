@@ -1,6 +1,7 @@
 package zenoss
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/influxdata/kapacitor/alert"
@@ -16,6 +17,26 @@ type SeverityMap struct {
 	Warning interface{} `toml:"Warning" json:"warning"`
 	// Critical level mapping to severity (number or string)
 	Critical interface{} `toml:"Critical" json:"critical"`
+}
+
+// Implements override.CustomMapStructurer because newer versions of github.com/mitchellh/mapstructure do
+// not handle overwriting interface values inside structs with a new type.
+func (s *SeverityMap) CustomMapStructure(m map[string]interface{}) error {
+	for k, v := range m {
+		switch k {
+		case "ok":
+			s.OK = v
+		case "info":
+			s.Info = v
+		case "warning":
+			s.Warning = v
+		case "critical":
+			s.Critical = v
+		default:
+			return fmt.Errorf("Unknown field %s for SeverityMap", k)
+		}
+	}
+	return nil
 }
 
 func (s *SeverityMap) ValueFor(level alert.Level) interface{} {

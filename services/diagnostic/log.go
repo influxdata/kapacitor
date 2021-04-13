@@ -25,6 +25,18 @@ type Logger interface {
 	With(ctx ...Field) Logger
 }
 
+type NoOpLogger struct{}
+
+func (l *NoOpLogger) Error(msg string, ctx ...Field) {}
+
+func (l *NoOpLogger) Debug(msg string, ctx ...Field) {}
+
+func (l *NoOpLogger) Info(msg string, ctx ...Field) {}
+
+func (l *NoOpLogger) With(ctx ...Field) Logger {
+	return l
+}
+
 type Writer interface {
 	Write([]byte) (int, error)
 	WriteByte(byte) error

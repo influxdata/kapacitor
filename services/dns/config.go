@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/dns"
 )
 
 // Config is a DNS service discovery configuration
@@ -45,14 +46,12 @@ func (d Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (d Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.DNSSDConfigs = []*config.DNSSDConfig{
-		d.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, d.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (d Config) PromConfig() *config.DNSSDConfig {
-	return &config.DNSSDConfig{
+func (d Config) PromConfig() *dns.SDConfig {
+	return &dns.SDConfig{
 		Names:           d.RecordNames,
 		RefreshInterval: model.Duration(d.RefreshInterval),
 		Type:            d.Type,

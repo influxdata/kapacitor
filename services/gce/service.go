@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	"github.com/prometheus/prometheus/config"
 	pgce "github.com/prometheus/prometheus/discovery/gce"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
 type Diagnostic scraper.Diagnostic
@@ -127,13 +127,13 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := pgce.NewDiscovery(sd, s.diag)
+	discoverer, err := pgce.NewDiscovery(*sd, s.diag)
 	if err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	updates := make(chan []*config.TargetGroup)
+	updates := make(chan []*targetgroup.Group)
 	go discoverer.Run(ctx, updates)
 
 	select {

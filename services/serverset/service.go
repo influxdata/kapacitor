@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 	pzookeeper "github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
@@ -127,13 +127,12 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pzookeeper.NewServersetDiscovery(sd, s.diag)
+	discoverer, err := pzookeeper.NewServersetDiscovery(sd, s.diag)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	updates := make(chan []*config.TargetGroup)
+	updates := make(chan []*targetgroup.Group)
 	go discoverer.Run(ctx, updates)
 
-	var err error
 	select {
 	case _, ok := <-updates:
 		// Handle the case that a target provider exits and closes the channel

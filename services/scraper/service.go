@@ -1,27 +1,35 @@
 package scraper
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	plog "github.com/prometheus/common/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/retrieval"
+	"github.com/prometheus/prometheus/discovery"
+	"github.com/prometheus/prometheus/pkg/exemplar"
+	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/scrape"
 	"github.com/prometheus/prometheus/storage"
 )
 
 var (
-	_ Registry               = &Service{}
-	_ storage.SampleAppender = &Service{}
+	_ Registry         = &Service{}
+	_ storage.Appender = &ServiceAppenderAdapter{}
 )
 
 // Prometheus logger
-type Diagnostic plog.Logger
+type Diagnostic interface {
+	plog.Logger
+	Log(...interface{}) error
+}
 
 // Service represents the scraper manager
 type Service struct {
@@ -32,7 +40,6 @@ type Service struct {
 	wg sync.WaitGroup
 
 	open     bool
-	running  bool
 	closing  chan struct{}
 	updating chan *config.Config
 
@@ -42,13 +49,23 @@ type Service struct {
 
 	discoverers []Discoverer
 
-	// TargetManager represents a scraping/discovery manager
-	mgr interface {
-		ApplyConfig(cfg *config.Config) error
-		Stop()
-		Start()
-		Wait()
-	}
+	cancelScrape     context.CancelFunc
+	scrapeManager    *scrape.Manager
+	discoveryManager *discovery.Manager
+}
+
+// ServiceAppenderAdapter exposes the service's Append method, but hides the
+// Commit method used by the registry to commit config
+type ServiceAppenderAdapter struct {
+	Wrapped *Service
+}
+
+type appendable struct {
+	svc *ServiceAppenderAdapter
+}
+
+func (a *appendable) Appender(ctx context.Context) storage.Appender {
+	return a.svc
 }
 
 // NewService creates a new scraper service
@@ -57,7 +74,11 @@ func NewService(c []Config, d Diagnostic) *Service {
 		diag: d,
 	}
 	s.storeConfigs(c)
-	s.mgr = retrieval.NewTargetManager(s, d)
+	var ctxScrape context.Context
+	ctxScrape, s.cancelScrape = context.WithCancel(context.Background())
+	s.discoveryManager = discovery.NewManager(ctxScrape, d, discovery.Name("discoveryScrapeManager"))
+	s.scrapeManager = scrape.NewManager(d, &appendable{&ServiceAppenderAdapter{s}})
+
 	return s
 }
 
@@ -70,9 +91,33 @@ func (s *Service) Open() error {
 	}
 
 	s.open = true
-	s.updating = make(chan *config.Config)
+	// Roughly match the number of scraper services, so each config change doesn't have to wait.
+	s.updating = make(chan *config.Config, 100)
 	s.closing = make(chan struct{})
 
+	pairs := s.pairs()
+	conf := s.prom(pairs)
+	err := s.scrapeManager.ApplyConfig(conf)
+	if err != nil {
+		return err
+	}
+	c := make(map[string]discovery.Configs)
+	for _, v := range conf.ScrapeConfigs {
+		c[v.JobName] = v.ServiceDiscoveryConfigs
+	}
+	err = s.discoveryManager.ApplyConfig(c)
+	if err != nil {
+		return err
+	}
+	s.wg.Add(2)
+	go func() {
+		defer s.wg.Done()
+		s.discoveryManager.Run()
+	}()
+	go func() {
+		defer s.wg.Done()
+		s.scrapeManager.Run(s.discoveryManager.SyncCh())
+	}()
 	go s.scrape()
 
 	s.open = true
@@ -90,6 +135,9 @@ func (s *Service) Close() error {
 		return nil
 	}
 
+	s.cancelScrape()
+	s.scrapeManager.Stop()
+
 	close(s.closing)
 
 	s.wg.Wait()
@@ -106,51 +154,41 @@ func (s *Service) storeConfigs(c []Config) {
 }
 
 func (s *Service) scrape() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.mu.Lock()
-		pairs := s.pairs()
-		conf := s.prom(pairs)
-		s.mu.Unlock()
-
-		s.mgr.ApplyConfig(conf)
-
-		s.mu.Lock()
-		// Need to check open if service was stopped just before this lock
-		if s.open {
-			s.mgr.Start()
-			s.running = true
-		}
-		s.mu.Unlock()
-		// Wait will block until mgr.Stop has been called.
-		s.mgr.Wait()
-	}()
-
 	for {
 		select {
 		case <-s.closing:
-			s.mu.Lock()
-			// Need to check if the targetmanager is even running before Stopping
-			if s.running {
-				s.mgr.Stop()
-				s.running = false
-			}
-			s.mu.Unlock()
 			return
 		case conf := <-s.updating:
-			s.mgr.ApplyConfig(conf)
+			// only apply the most recent conf
+			for {
+				select {
+				case conf = <-s.updating:
+					continue
+				default:
+				}
+				break
+			}
+			s.scrapeManager.ApplyConfig(conf)
+			c := make(map[string]discovery.Configs)
+			for _, v := range conf.ScrapeConfigs {
+				c[v.JobName] = v.ServiceDiscoveryConfigs
+			}
+			s.discoveryManager.ApplyConfig(c)
 		}
 	}
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
-func (s *Service) Append(sample *model.Sample) error {
-	value := float64(sample.Value)
+func (s *ServiceAppenderAdapter) Append(ref uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
+	return s.Wrapped.Append(ref, labels, timestamp, value)
+}
+
+// Append tranforms prometheus samples and inserts data into the tasks pipeline
+func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
 	// Remove all NaN values
 	// TODO: Add counter stat for this variable
 	if math.IsNaN(value) {
-		return nil
+		return 0, nil
 	}
 
 	var err error
@@ -159,15 +197,15 @@ func (s *Service) Append(sample *model.Sample) error {
 	job := ""
 
 	tags := make(models.Tags)
-	for name, value := range sample.Metric {
-		if name == "job" {
-			db, rp, job, err = decodeJobName(string(value))
+	for _, kv := range labels {
+		if kv.Name == "job" {
+			db, rp, job, err = decodeJobName(string(kv.Value))
 			if err != nil {
-				return err
+				return 0, err
 			}
 			continue
 		}
-		tags[string(name)] = string(value)
+		tags[string(kv.Name)] = string(kv.Value)
 	}
 
 	// If instance is blacklisted then do not send to PointsWriter
@@ -176,7 +214,7 @@ func (s *Service) Append(sample *model.Sample) error {
 			if c.Name == job {
 				for _, listed := range c.Blacklist {
 					if instance == listed {
-						return nil
+						return 0, nil
 					}
 				}
 			}
@@ -187,19 +225,35 @@ func (s *Service) Append(sample *model.Sample) error {
 		"value": value,
 	}
 
-	return s.PointsWriter.WriteKapacitorPoint(edge.NewPointMessage(
+	return 0, s.PointsWriter.WriteKapacitorPoint(edge.NewPointMessage(
 		tags[model.MetricNameLabel],
 		db,
 		rp,
 		models.Dimensions{},
 		fields,
 		tags,
-		sample.Timestamp.Time(),
+		time.Unix(timestamp/1000, (timestamp%1000)*1000000), // TODO: confirm timestamp is milliseconds
 	))
 }
 
-// NeedsThrottling conforms to SampleAppender and never returns true currently.
-func (s *Service) NeedsThrottling() bool {
+// conforms to Appender interface
+func (s *ServiceAppenderAdapter) AppendExemplar(uint64, labels.Labels, exemplar.Exemplar) (uint64, error) {
+	// We don't support exemplars
+	return 0, nil
+}
+
+// conforms to Appender interface, but we don't support transactions
+func (s *ServiceAppenderAdapter) Rollback() error {
+	return nil
+}
+
+// conforms to Appender interface, but we don't support transactions
+func (s *ServiceAppenderAdapter) Commit() error {
+	return nil
+}
+
+// NeedsThrottling conforms to Appender and never returns true currently.
+func (s *ServiceAppenderAdapter) NeedsThrottling() bool {
 	return false
 }
 
