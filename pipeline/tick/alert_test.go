@@ -568,6 +568,7 @@ func TestAlertTelegram(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+// TestAlertHipchat must be kept to ensure we don't break marshaling of current alerts
 func TestAlertHipchat(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().HipChat()

@@ -1,10 +1,8 @@
 package hipchat
 
-import (
-	"net/url"
+import "errors"
 
-	"github.com/pkg/errors"
-)
+var configerr = errors.New("HipChat has been removed, please update your configs")
 
 type Config struct {
 	// Whether HipChat integration is enabled.
@@ -28,11 +26,5 @@ func NewConfig() Config {
 }
 
 func (c Config) Validate() error {
-	if c.Enabled && c.URL == "" {
-		return errors.New("must specify url")
-	}
-	if _, err := url.Parse(c.URL); err != nil {
-		return errors.Wrapf(err, "invalid url %q", c.URL)
-	}
-	return nil
+	return configerr
 }
