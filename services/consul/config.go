@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/consul"
 )
 
 // Config is a Consul service discovery configuration
@@ -51,23 +53,21 @@ func (c Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (c Config) Prom(conf *config.ScrapeConfig) {
-	conf.ServiceDiscoveryConfig.ConsulSDConfigs = []*config.ConsulSDConfig{
-		c.PromConfig(),
-	}
+	conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs, c.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (c Config) PromConfig() *config.ConsulSDConfig {
-	return &config.ConsulSDConfig{
+func (c Config) PromConfig() *consul.SDConfig {
+	return &consul.SDConfig{
 		Server:       c.Address,
-		Token:        c.Token,
+		Token:        config2.Secret(c.Token),
 		Datacenter:   c.Datacenter,
 		TagSeparator: c.TagSeparator,
 		Scheme:       c.Scheme,
 		Username:     c.Username,
-		Password:     c.Password,
+		Password:     config2.Secret(c.Password),
 		Services:     c.Services,
-		TLSConfig: config.TLSConfig{
+		TLSConfig: config2.TLSConfig{
 			CAFile:             c.SSLCA,
 			CertFile:           c.SSLCert,
 			KeyFile:            c.SSLKey,

@@ -8,8 +8,8 @@ import (
 
 	"github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/scraper"
-	"github.com/prometheus/prometheus/config"
 	pec2 "github.com/prometheus/prometheus/discovery/ec2"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
 type Diagnostic interface {
@@ -162,7 +162,7 @@ func (s *Service) Test(options interface{}) error {
 	discoverer := pec2.NewDiscovery(sd, s.diag)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	updates := make(chan []*config.TargetGroup)
+	updates := make(chan []*targetgroup.Group)
 	go discoverer.Run(ctx, updates)
 
 	var err error

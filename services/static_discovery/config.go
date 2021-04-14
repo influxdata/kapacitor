@@ -5,6 +5,7 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery"
 )
 
 // Config is a static list of  of labeled target groups
@@ -34,11 +35,11 @@ func (s Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (s Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.StaticConfigs = s.PromConfig()
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, s.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (s Config) PromConfig() []*config.TargetGroup {
+func (s Config) PromConfig() discovery.StaticConfig {
 	set := func(l map[string]string) model.LabelSet {
 		res := make(model.LabelSet)
 		for k, v := range l {
@@ -55,8 +56,8 @@ func (s Config) PromConfig() []*config.TargetGroup {
 		}
 		return res
 	}
-	return []*config.TargetGroup{
-		&config.TargetGroup{
+	return discovery.StaticConfig{
+		{
 			Targets: target(s.Targets),
 			Labels:  set(s.Labels),
 			Source:  s.ID,

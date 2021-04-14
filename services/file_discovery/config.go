@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/file"
 )
 
 // Config is a file service discovery configuration
@@ -41,14 +42,12 @@ func (f Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (f Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.FileSDConfigs = []*config.FileSDConfig{
-		f.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, f.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (f Config) PromConfig() *config.FileSDConfig {
-	return &config.FileSDConfig{
+func (f Config) PromConfig() *file.SDConfig {
+	return &file.SDConfig{
 		Files:           f.Files,
 		RefreshInterval: model.Duration(f.RefreshInterval),
 	}

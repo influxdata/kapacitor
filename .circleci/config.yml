@@ -24,7 +24,7 @@ jobs:
       build:
             docker:
                   - image: nathanielc/docker-client
-            parallelism: 3
+            parallelism: 2
             working_directory: ~/kapacitor
             steps:
                   - checkout

@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
 // Config is a Nerve service discovery configuration
@@ -39,14 +40,12 @@ func (n Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (n Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.NerveSDConfigs = []*config.NerveSDConfig{
-		n.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, n.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (n Config) PromConfig() *config.NerveSDConfig {
-	return &config.NerveSDConfig{
+func (n Config) PromConfig() *zookeeper.NerveSDConfig {
+	return &zookeeper.NerveSDConfig{
 		Servers: n.Servers,
 		Paths:   n.Paths,
 		Timeout: model.Duration(n.Timeout),

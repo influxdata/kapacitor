@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 )
@@ -96,16 +97,16 @@ func (c *Config) Prom() *config.ScrapeConfig {
 		Params:         c.Params,
 		ScrapeInterval: model.Duration(c.ScrapeInterval),
 		ScrapeTimeout:  model.Duration(c.ScrapeTimeout),
-		HTTPClientConfig: config.HTTPClientConfig{
-			BasicAuth: &config.BasicAuth{
+		HTTPClientConfig: config2.HTTPClientConfig{
+			BasicAuth: &config2.BasicAuth{
 				Username: c.Username,
-				Password: c.Password,
+				Password: config2.Secret(c.Password),
 			},
-			BearerToken: c.BearerToken,
-			ProxyURL: config.URL{
+			BearerToken: config2.Secret(c.BearerToken),
+			ProxyURL: config2.URL{
 				URL: c.ProxyURL,
 			},
-			TLSConfig: config.TLSConfig{
+			TLSConfig: config2.TLSConfig{
 				CAFile:             c.SSLCA,
 				CertFile:           c.SSLCert,
 				KeyFile:            c.SSLKey,

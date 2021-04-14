@@ -308,7 +308,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	}
 
 	// Append Scraper and discovery services
-	s.appendScraperService()
+	if err := s.appendScraperService(); err != nil {
+		return nil, errors.Wrap(err, "scraper service")
+	}
 
 	if err := s.appendK8sService(); err != nil {
 		return nil, errors.Wrap(err, "kubernetes service")
@@ -949,7 +951,7 @@ func (s *Server) appendReportingService() {
 	}
 }
 
-func (s *Server) appendScraperService() {
+func (s *Server) appendScraperService() error {
 	c := s.config.Scraper
 	d := s.DiagService.NewScraperHandler()
 	srv := scraper.NewService(c, d)
@@ -957,6 +959,7 @@ func (s *Server) appendScraperService() {
 	s.ScraperService = srv
 	s.SetDynamicService("scraper", srv)
 	s.AppendService("scraper", srv)
+	return nil
 }
 
 func (s *Server) appendAzureService() {

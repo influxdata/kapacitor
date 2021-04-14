@@ -14,6 +14,7 @@
 - [#2488](https://github.com/influxdata/kapacitor/pull/2488): Fix function node name for ServiceNow handler so it is properly camelcased. 
 - [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix memory leaks in JoinNode and UnionNode.
 - [#2498](https://github.com/influxdata/kapacitor/pull/2498): Avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
+- [#2536](https://github.com/influxdata/kapacitor/pull/2536): Update prometheus dependency for service discovery
 
 ### Features
 - [#2472](https://github.com/influxdata/kapacitor/pull/2472): Send full event payload on pagerduty resolve, thanks @asvinours!

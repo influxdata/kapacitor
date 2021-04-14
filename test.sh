@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # This is the Kapacitor test script.
 # This script can run tests in different environments.
@@ -6,7 +6,6 @@
 # Corresponding environments for environment_index:
 #      0: normal 64bit tests
 #      1: race enabled 64bit tests
-#      2: normal 32bit tests
 #      count: print the number of test environments
 #      *: to run all tests in parallel containers
 #
@@ -43,7 +42,7 @@ then
 fi
 
 # Update this value if you add a new test environment.
-ENV_COUNT=3
+ENV_COUNT=2
 
 # Default return code 0
 rc=0
@@ -116,11 +115,6 @@ case $ENVIRONMENT_INDEX in
         # 64 bit race tests
         GORACE="halt_on_error=1"
         run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --generate $no_uncommitted_arg --race
-        rc=$?
-        ;;
-    2)
-        # 32 bit tests
-        run_test_docker Dockerfile_build_ubuntu32 test_32bit --test --generate $no_uncommitted_arg --arch=i386
         rc=$?
         ;;
     "count")

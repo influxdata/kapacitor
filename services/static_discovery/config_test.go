@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
 func TestConfig_PromConfig(t *testing.T) {
@@ -18,7 +19,7 @@ func TestConfig_PromConfig(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   []*config.TargetGroup
+		want   discovery.StaticConfig
 	}{
 		{
 			name: "Test Address Label",
@@ -33,8 +34,8 @@ func TestConfig_PromConfig(t *testing.T) {
 					"metrics": "host",
 				},
 			},
-			want: []*config.TargetGroup{
-				&config.TargetGroup{
+			want: discovery.StaticConfig{
+				&targetgroup.Group{
 					Source: "mylocalhost",
 					Targets: []model.LabelSet{
 						{model.AddressLabel: "localhost:9100"},
