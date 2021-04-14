@@ -15,6 +15,7 @@ kapacitor*.zip
 *.test
 /test-logs
 *.prof
+/.idea/
 
 # Ignore any built binaries
 /kapacitor
