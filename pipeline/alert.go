@@ -1101,58 +1101,7 @@ func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handle
 	return pd2
 }
 
-// Send the alert to HipChat.
-// For step-by-step instructions on setting up Kapacitor with HipChat, see the [Event Handler Setup Guide](https://docs.influxdata.com//kapacitor/latest/guides/event-handler-setup/#hipchat-setup).
-// To allow Kapacitor to post to HipChat,
-// go to the URL https://www.hipchat.com/docs/apiv2 for
-// information on how to get your room id and tokens.
-//
-// Example:
-//    [hipchat]
-//      enabled = true
-//      url = "https://orgname.hipchat.com/v2/room"
-//      room = "4189212"
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//
-// In order to not post a message every alert interval
-// use AlertNode.StateChangesOnly so that only events
-// where the alert changed state are posted to the room.
-//
-// Example:
-//    stream
-//         |alert()
-//             .hipChat()
-//
-// Send alerts to HipChat room in the configuration file.
-//
-// Example:
-//    stream
-//         |alert()
-//             .hipChat()
-//             .room('Kapacitor')
-//
-// Send alerts to HipChat room 'Kapacitor'
-//
-//
-// If the 'hipchat' section in the configuration has the option: global = true
-// then all alerts are sent to HipChat without the need to explicitly state it
-// in the TICKscript.
-//
-// Example:
-//    [hipchat]
-//      enabled = true
-//      url = "https://orgname.hipchat.com/v2/room"
-//      room = "Test Room"
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//      global = true
-//      state-changes-only = true
-//
-// Example:
-//    stream
-//         |alert()
-//
-// Send alert to HipChat using default room 'Test Room'.
-// tick:property
+// HipChat is removed but this has to be kept as is to not break current alert marshalling
 func (n *AlertNodeData) HipChat() *HipChatHandler {
 	hipchat := &HipChatHandler{
 		AlertNodeData: n,
@@ -1161,6 +1110,7 @@ func (n *AlertNodeData) HipChat() *HipChatHandler {
 	return hipchat
 }
 
+// HipchatHandler has been removed but this struct is kept around for compatibility purposes.
 // tick:embedded:AlertNode.HipChat
 type HipChatHandler struct {
 	*AlertNodeData `json:"-"`

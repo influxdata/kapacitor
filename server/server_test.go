@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
@@ -44,7 +43,6 @@ import (
 	"github.com/influxdata/kapacitor/services/auth/meta"
 	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/discord/discordtest"
-	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	"github.com/influxdata/kapacitor/services/k8s"
@@ -60,6 +58,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
+	"github.com/influxdata/kapacitor/services/removed/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/servicenow/servicenowtest"
@@ -6763,12 +6762,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 					Options: map[string]interface{}{
-						"enabled":              false,
-						"environment":          "",
-						"origin":               "",
-						"token":                false,
-						"token-prefix":         "",
-						"url":                  "http://alerta.example.com",
+						"enabled":      false,
+						"environment":  "",
+						"origin":       "",
+						"token":        false,
+						"token-prefix": "",
+						"url":          "http://alerta.example.com",
 						"insecure-skip-verify": false,
 						"timeout":              "0s",
 					},
@@ -6780,12 +6779,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 				Options: map[string]interface{}{
-					"enabled":              false,
-					"environment":          "",
-					"origin":               "",
-					"token":                false,
-					"token-prefix":         "",
-					"url":                  "http://alerta.example.com",
+					"enabled":      false,
+					"environment":  "",
+					"origin":       "",
+					"token":        false,
+					"token-prefix": "",
+					"url":          "http://alerta.example.com",
 					"insecure-skip-verify": false,
 					"timeout":              "0s",
 				},
@@ -6807,12 +6806,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 							Options: map[string]interface{}{
-								"enabled":              false,
-								"environment":          "",
-								"origin":               "kapacitor",
-								"token":                true,
-								"token-prefix":         "",
-								"url":                  "http://alerta.example.com",
+								"enabled":      false,
+								"environment":  "",
+								"origin":       "kapacitor",
+								"token":        true,
+								"token-prefix": "",
+								"url":          "http://alerta.example.com",
 								"insecure-skip-verify": false,
 								"timeout":              "3h0m0s",
 							},
@@ -6824,12 +6823,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 						Options: map[string]interface{}{
-							"enabled":              false,
-							"environment":          "",
-							"origin":               "kapacitor",
-							"token":                true,
-							"token-prefix":         "",
-							"url":                  "http://alerta.example.com",
+							"enabled":      false,
+							"environment":  "",
+							"origin":       "kapacitor",
+							"token":        true,
+							"token-prefix": "",
+							"url":          "http://alerta.example.com",
 							"insecure-skip-verify": false,
 							"timeout":              "3h0m0s",
 						},
@@ -10786,9 +10785,9 @@ func TestServer_AlertHandlers(t *testing.T) {
 						"Mime-Version":              []string{"1.0"},
 						"Content-Type":              []string{"text/html; charset=UTF-8"},
 						"Content-Transfer-Encoding": []string{"quoted-printable"},
-						"To":                        []string{"oncall@example.com, backup@example.com"},
-						"From":                      []string{"test@example.com"},
-						"Subject":                   []string{"message"},
+						"To":      []string{"oncall@example.com, backup@example.com"},
+						"From":    []string{"test@example.com"},
+						"Subject": []string{"message"},
 					},
 					Body: "details\n",
 				}}

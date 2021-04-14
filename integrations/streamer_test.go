@@ -45,8 +45,6 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/hipchat"
-	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -88,7 +86,7 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
-	udf_test "github.com/influxdata/kapacitor/udf/test"
+	"github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
 	"github.com/k-sone/snmpgo"
 )
@@ -9046,76 +9044,6 @@ stream
 	}
 }
 
-func TestStream_AlertHipChat(t *testing.T) {
-	ts := hipchattest.NewServer()
-	defer ts.Close()
-
-	var script = `
-stream
-	|from()
-		.measurement('cpu')
-		.where(lambda: "host" == 'serverA')
-		.groupBy('host')
-	|window()
-		.period(10s)
-		.every(10s)
-	|count('value')
-	|alert()
-		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
-		.info(lambda: "count" > 6.0)
-		.warn(lambda: "count" > 7.0)
-		.crit(lambda: "count" > 8.0)
-		.hipChat()
-			.room('1234567')
-			.token('testtoken1234567')
-		.hipChat()
-			.room('Test Room')
-			.token('testtokenTestRoom')
-`
-	tmInit := func(tm *kapacitor.TaskMaster) {
-
-		c := hipchat.NewConfig()
-		c.Enabled = true
-		c.URL = ts.URL
-		c.Room = "1231234"
-		c.Token = "testtoken1231234"
-		sl := hipchat.NewService(c, diagService.NewHipChatHandler())
-		tm.HipChatService = sl
-	}
-	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
-
-	exp := []interface{}{
-		hipchattest.Request{
-			URL: "/1234567/notification?auth_token=testtoken1234567",
-			PostData: hipchattest.PostData{
-				From:    "kapacitor",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Color:   "red",
-				Notify:  true,
-			},
-		},
-		hipchattest.Request{
-			URL: "/Test%20Room/notification?auth_token=testtokenTestRoom",
-			PostData: hipchattest.PostData{
-				From:    "kapacitor",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Color:   "red",
-				Notify:  true,
-			},
-		},
-	}
-
-	ts.Close()
-	var got []interface{}
-	for _, g := range ts.Requests() {
-		got = append(got, g)
-	}
-
-	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestStream_AlertAlerta(t *testing.T) {
 	ts := alertatest.NewServer()
 	defer ts.Close()
@@ -10727,9 +10655,9 @@ Value: {{ index .Fields "count" }}
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":                        []string{"user1@example.com, user2@example.com"},
-				"From":                      []string{"test@example.com"},
-				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
@@ -10743,9 +10671,9 @@ Value: 10
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":                        []string{"user1@example.com, user2@example.com"},
-				"From":                      []string{"test@example.com"},
-				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>

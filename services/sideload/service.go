@@ -203,7 +203,9 @@ func (s *fileSource) Close() {
 }
 
 func (s *fileSource) UpdateCache() error {
+	s.mu.Lock()
 	s.cache = make(map[string]map[string]interface{})
+	s.mu.Unlock()
 	err := filepath.Walk(s.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -225,7 +227,9 @@ func (s *fileSource) UpdateCache() error {
 		if len(rel) == 0 || rel[0] == '.' {
 			return errors.New("invalid relative path")
 		}
+		s.mu.Lock()
 		s.cache[rel] = values
+		s.mu.Unlock()
 		return nil
 	})
 	return errors.Wrapf(err, "failed to update sideload cache for source file %q", s.dir)
@@ -258,7 +262,10 @@ type httpSource struct {
 }
 
 func (s *httpSource) UpdateCache() error {
-	s.cache = make(map[string]map[string]interface{})
+	s.fileSource.mu.Lock()
+	s.fileSource.cache = make(map[string]map[string]interface{})
+	s.fileSource.mu.Unlock()
+
 	req, err := http.NewRequest("GET", s.dir, nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate request to update sideload cache for source %q", s.dir)
@@ -281,7 +288,9 @@ func (s *httpSource) UpdateCache() error {
 		return errors.Wrapf(err, "failed to load body to update sideload cache for source %q", s.dir)
 	}
 	for k, v := range values {
-		s.cache[k] = v
+		s.fileSource.mu.Lock()
+		s.fileSource.cache[k] = v
+		s.fileSource.mu.Unlock()
 	}
 	return nil
 }
