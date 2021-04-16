@@ -758,9 +758,9 @@ def main(args):
         return 1
 
     if args.nightly:
-        args.version = increment_minor_version(args.version)
-        args.version = "{}~n{}".format(args.version,
-                                       datetime.utcnow().strftime("%Y%m%d%H%M"))
+        args.version = "n{}-{}".format(
+                                       datetime.utcnow().strftime("%Y%m%d%H%M"),
+                                       args.commit)
         args.iteration = 0
 
     # Validate version
