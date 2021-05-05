@@ -283,6 +283,10 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			n.Dot("customField", k, h.CustomFieldsMap[k])
 		}
 	}
+	for _, h := range a.TeamsHandlers {
+		n.Dot("teams").
+			Dot("channelURL", h.ChannelURL)
+	}
 
 	return n.prev, n.err
 }
