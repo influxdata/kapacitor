@@ -7855,6 +7855,91 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "bigpanda",
+			setDefaults: func(c *server.Config) {
+				c.BigPanda.URL = "https://api.bigpanda.io/data/v2/alerts"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+					Options: map[string]interface{}{
+						"enabled":              false,
+						"global":               false,
+						"state-changes-only":   false,
+						"url":                  "https://api.bigpanda.io/data/v2/alerts",
+						"insecure-skip-verify": false,
+						"token":                false,
+						"app-key":              "",
+					},
+					Redacted: []string{
+						"token",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+				Options: map[string]interface{}{
+					"enabled":              false,
+					"global":               false,
+					"state-changes-only":   false,
+					"url":                  "https://api.bigpanda.io/data/v2/alerts",
+					"insecure-skip-verify": false,
+					"token":                false,
+					"app-key":              "",
+				},
+				Redacted: []string{
+					"token",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"url":     "https://dev123456.bigpanda.io/data/v2/alerts",
+							"app-key": "appkey-123",
+							"token":   "token-123",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+							Options: map[string]interface{}{
+								"enabled":              true,
+								"global":               false,
+								"state-changes-only":   false,
+								"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
+								"token":                true,
+								"app-key":              "appkey-123",
+								"insecure-skip-verify": false,
+							},
+							Redacted: []string{
+								"token",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+						Options: map[string]interface{}{
+							"enabled":              true,
+							"global":               false,
+							"state-changes-only":   false,
+							"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
+							"app-key":              "appkey-123",
+							"token":                true,
+							"insecure-skip-verify": false,
+						},
+						Redacted: []string{
+							"token",
+						},
+					},
+				},
+			},
+		},
+
+		{
 			section: "slack",
 			setDefaults: func(c *server.Config) {
 				cfg := &slack.Config{
@@ -8998,10 +9083,12 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
 				Name: "bigpanda",
 				Options: client.ServiceTestOptions{
-					"app_key":   "my-app-key-123456",
-					"level":     "CRITICAL",
-					"message":   "test bigpanda message",
-					"timestamp": "1970-01-01T00:00:01Z",
+					"app_key":            "my-app-key-123456",
+					"level":              "CRITICAL",
+					"message":            "test bigpanda message",
+					"timestamp":          "1970-01-01T00:00:01Z",
+					"primary_property":   "",
+					"secondary_property": "",
 					"event_data": map[string]interface{}{
 						"Fields": map[string]interface{}{},
 						"Result": map[string]interface{}{
@@ -9518,6 +9605,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 	}{
 		{
 			service: "alerta",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "bigpanda",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
