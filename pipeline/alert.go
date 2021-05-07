@@ -2248,7 +2248,7 @@ type TeamsHandler struct {
 
 	// Teams channel webhook URL to post messages.
 	// If empty uses the URL from the configuration.
-	ChannelURL string `json:"channel_url"`
+	ChannelURL string `json:"channel-url"`
 }
 
 // Send the alert to ServiceNow.

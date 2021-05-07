@@ -9400,7 +9400,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/teams"},
 				Name: "teams",
 				Options: client.ServiceTestOptions{
-					"channel_url": "",
+					"channel-url": "",
 					"alert_topic": "test kapacitor alert topic",
 					"alert_id":    "foo/bar/bat",
 					"message":     "test teams message",
