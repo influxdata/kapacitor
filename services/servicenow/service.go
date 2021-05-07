@@ -73,18 +73,25 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	AlertID string      `json:"alert_id"`
-	Source  string      `json:"source"`
-	Level   alert.Level `json:"level"`
-	Message string      `json:"message"`
+	AlertID        string                 `json:"alert_id"`
+	Message        string                 `json:"message"`
+	Level          alert.Level            `json:"level"`
+	Source         string                 `json:"source"`
+	Node           string                 `json:"node"`
+	Type           string                 `json:"type"`
+	Resource       string                 `json:"resource"`
+	MetricName     string                 `json:"metric_name"`
+	MessageKey     string                 `json:"message_key"`
+	AdditionalInfo map[string]interface{} `json:"additional_info"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		AlertID: "id",
-		Source:  "Kapacitor",
-		Level:   alert.Critical,
-		Message: "test servicenow alert",
+		AlertID:        "1001",
+		Message:        "test servicenow message",
+		Level:          alert.Critical,
+		Source:         "Kapacitor",
+		AdditionalInfo: map[string]interface{}{},
 	}
 }
 
@@ -95,7 +102,13 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	hc := &HandlerConfig{
-		Source: o.Source,
+		Source:         o.Source,
+		Node:           o.Node,
+		Type:           o.Type,
+		Resource:       o.Resource,
+		MetricName:     o.MetricName,
+		MessageKey:     o.MessageKey,
+		AdditionalInfo: o.AdditionalInfo,
 	}
 	data := &alert.EventData{
 		Fields: map[string]interface{}{},
@@ -105,7 +118,7 @@ func (s *Service) Test(options interface{}) error {
 	return s.Alert(c.URL, o.AlertID, o.Message, o.Level, data, hc)
 }
 
-func (s *Service) Alert(url, alertID string, message string, level alert.Level, data *alert.EventData, hc *HandlerConfig) error {
+func (s *Service) Alert(url, alertID, message string, level alert.Level, data *alert.EventData, hc *HandlerConfig) error {
 	postUrl, post, err := s.preparePost(url, alertID, message, level, data, hc)
 	if err != nil {
 		return err
