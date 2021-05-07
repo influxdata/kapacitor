@@ -10,25 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/influxdata/flux"
-	"github.com/influxdata/influxdb/v2"
-	"github.com/influxdata/influxdb/v2/authorization"
-	icontext "github.com/influxdata/influxdb/v2/context"
-	"github.com/influxdata/influxdb/v2/inmem"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/influxdb/v2/kit/prom"
 	"github.com/influxdata/influxdb/v2/kit/prom/promtest"
 	tracetest "github.com/influxdata/influxdb/v2/kit/tracing/testing"
-	"github.com/influxdata/influxdb/v2/kv"
-	"github.com/influxdata/influxdb/v2/kv/migration/all"
-	"github.com/influxdata/influxdb/v2/query"
-	"github.com/influxdata/influxdb/v2/query/fluxlang"
-	"github.com/influxdata/influxdb/v2/task/backend"
-	"github.com/influxdata/influxdb/v2/task/backend/executor/mock"
-	"github.com/influxdata/influxdb/v2/task/backend/scheduler"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
-	"github.com/influxdata/influxdb/v2/tenant"
+	"github.com/influxdata/kapacitor/services/storage/storagetest"
+	"github.com/influxdata/kapacitor/task/backend"
+	"github.com/influxdata/kapacitor/task/backend/scheduler"
+	"github.com/influxdata/kapacitor/task/kv"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +31,6 @@ func TestMain(m *testing.M) {
 	var code int
 	func() {
 		defer tracetest.SetupInMemoryTracing("task_backend_tests")()
-
 		code = m.Run()
 	}()
 
@@ -53,50 +43,30 @@ type tes struct {
 	metrics *ExecutorMetrics
 	i       *kv.Service
 	tcs     *taskControlService
-	tc      testCreds
 }
 
 func taskExecutorSystem(t *testing.T) tes {
 	var (
-		aqs = newFakeQueryService()
-		qs  = query.QueryServiceBridge{
-			AsyncQueryService: aqs,
-		}
-		ctx    = context.Background()
-		logger = zaptest.NewLogger(t)
-		store  = inmem.NewKVStore()
+		qs = newFakeQueryService()
 	)
 
-	if err := all.Up(ctx, logger, store); err != nil {
-		t.Fatal(err)
-	}
-	ctrl := gomock.NewController(t)
-	ps := mock.NewMockPermissionService(ctrl)
-	ps.EXPECT().FindPermissionForUser(gomock.Any(), gomock.Any()).Return(influxdb.PermissionSet{}, nil).AnyTimes()
-
-	tenantStore := tenant.NewStore(store)
-	tenantSvc := tenant.NewService(tenantStore)
-
-	authStore, err := authorization.NewStore(store)
-	require.NoError(t, err)
-	authSvc := authorization.NewService(authStore, tenantSvc)
-
+	taskStore := kv.New(storagetest.New())
+	require.NoError(t, taskStore.Open())
 	var (
-		svc = kv.NewService(logger, store, tenantSvc, kv.ServiceConfig{
-			FluxLanguageService: fluxlang.DefaultService,
-		})
-
-		tcs         = &taskControlService{TaskControlService: svc}
-		ex, metrics = NewExecutor(zaptest.NewLogger(t), qs, ps, svc, tcs)
+		tcs         = &taskControlService{TaskControlService: taskStore}
+		ex, metrics = NewExecutor(zaptest.NewLogger(t), qs, taskStore, tcs)
 	)
 	return tes{
-		svc:     aqs,
+		svc:     qs,
 		ex:      ex,
 		metrics: metrics,
-		i:       svc,
+		i:       taskStore,
 		tcs:     tcs,
-		tc:      createCreds(t, tenantSvc, tenantSvc, authSvc),
 	}
+}
+
+func (t *tes) Close() error {
+	return t.i.Close()
 }
 
 func TestTaskExecutor(t *testing.T) {
@@ -115,15 +85,16 @@ func testQuerySuccess(t *testing.T) {
 	t.Parallel()
 
 	tes := taskExecutorSystem(t)
+	defer tes.Close()
 
 	var (
 		script = fmt.Sprintf(fmtTestScript, t.Name())
-		ctx    = icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
+		ctx    = context.Background()
 		span   = opentracing.GlobalTracer().StartSpan("test-span")
 	)
 	ctx = opentracing.ContextWithSpan(ctx, span)
 
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,9 +154,10 @@ func testQueryFailure(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
+	ctx := context.Background()
+
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,8 +192,8 @@ func testManualRun(t *testing.T) {
 	tes := taskExecutorSystem(t)
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,8 +239,8 @@ func testResumingRun(t *testing.T) {
 	tes := taskExecutorSystem(t)
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,8 +282,8 @@ func testWorkerLimit(t *testing.T) {
 	tes := taskExecutorSystem(t)
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,8 +312,8 @@ func testLimitFunc(t *testing.T) {
 	tes := taskExecutorSystem(t)
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,8 +358,8 @@ func testMetrics(t *testing.T) {
 	assert.EqualValues(t, 0, *m.Gauge.Value, "unexpected number of active runs")
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	assert.NoError(t, err)
 
 	promise, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
@@ -425,7 +397,7 @@ func testMetrics(t *testing.T) {
 	assert.NoError(t, promise.Error())
 
 	// manual runs metrics
-	mt, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	mt, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	assert.NoError(t, err)
 
 	scheduledFor := int64(123)
@@ -462,8 +434,8 @@ func testIteratorFailure(t *testing.T) {
 	}}
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,8 +474,8 @@ func testErrorHandling(t *testing.T) {
 	reg.MustRegister(metrics.PrometheusCollectors()...)
 
 	script := fmt.Sprintf(fmtTestScript, t.Name())
-	ctx := icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script, Status: "active"})
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script, Status: "active"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -525,18 +497,6 @@ func testErrorHandling(t *testing.T) {
 	if got := *m.Counter.Value; got != 1 {
 		t.Fatalf("expected 1 unrecoverable error, got %v", got)
 	}
-
-	// TODO (al): once user notification system is put in place, this code should be uncommented
-	// encountering a bucket not found error should deactivate the task
-	/*
-		inactive, err := tes.i.FindTaskByID(context.Background(), task.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if inactive.Status != "inactive" {
-			t.Fatal("expected task to be deactivated after permanent error")
-		}
-	*/
 }
 
 func TestPromiseFailure(t *testing.T) {
@@ -546,12 +506,12 @@ func TestPromiseFailure(t *testing.T) {
 
 	var (
 		script = fmt.Sprintf(fmtTestScript, t.Name())
-		ctx    = icontext.SetAuthorizer(context.Background(), tes.tc.Auth)
+		ctx    = context.Background()
 		span   = opentracing.GlobalTracer().StartSpan("test-span")
 	)
 	ctx = opentracing.ContextWithSpan(ctx, span)
 
-	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OrganizationID: tes.tc.OrgID, OwnerID: tes.tc.Auth.GetUserID(), Flux: script})
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -586,17 +546,11 @@ func TestPromiseFailure(t *testing.T) {
 
 type taskControlService struct {
 	backend.TaskControlService
-
 	run *taskmodel.Run
 }
 
 func (t *taskControlService) FinishRun(ctx context.Context, taskID platform.ID, runID platform.ID) (*taskmodel.Run, error) {
-	// ensure auth set on context
-	_, err := icontext.GetAuthorizer(ctx)
-	if err != nil {
-		panic(err)
-	}
-
+	var err error
 	t.run, err = t.TaskControlService.FinishRun(ctx, taskID, runID)
 	return t.run, err
 }

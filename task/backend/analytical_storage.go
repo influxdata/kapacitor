@@ -4,19 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"time"
-
 	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/influxdb/v2"
-	"github.com/influxdata/influxdb/v2/kit/errors"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	errors2 "github.com/influxdata/influxdb/v2/kit/platform/errors"
-	"github.com/influxdata/influxdb/v2/query"
-	"github.com/influxdata/influxdb/v2/storage"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
+	"time"
 )
 
 const (
@@ -34,48 +31,53 @@ const (
 // RunRecorder is a type which records runs into an influxdb
 // backed storage mechanism
 type RunRecorder interface {
-	Record(ctx context.Context, orgID platform.ID, org string, bucketID platform.ID, bucket string, run *taskmodel.Run) error
+	Record(ctx context.Context, bucket string, run *taskmodel.Run) error
+}
+
+type PointsWriter interface {
+	WritePoints(ctx context.Context, bucket string, points models.Points) error
+}
+
+type NoOpPointsWriter struct{}
+
+func (*NoOpPointsWriter) WritePoints(ctx context.Context, bucket string, points models.Points) error {
+       return nil
 }
 
 // NewAnalyticalStorage creates a new analytical store with access to the necessary systems for storing data and to act as a middleware (deprecated)
-func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, bs influxdb.BucketService, tcs TaskControlService, pw storage.PointsWriter, qs query.QueryService) *AnalyticalStorage {
+func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskControlService, cli influxdb.Client, dest DataDestination) *AnalyticalStorage {
 	return &AnalyticalStorage{
 		log:                log,
 		TaskService:        ts,
-		BucketService:      bs,
 		TaskControlService: tcs,
-		rr:                 NewStoragePointsWriterRecorder(log, pw),
-		qs:                 qs,
+		destination: dest,
+		rr:                 NewStoragePointsWriterRecorder(log, cli, dest),
+		cli:                cli,
 	}
+}
+
+type DataDestination struct {
+	Bucket string
+	Org string
+	OrgID string
 }
 
 type AnalyticalStorage struct {
 	taskmodel.TaskService
-	influxdb.BucketService
 	TaskControlService
 
-	rr  RunRecorder
-	qs  query.QueryService
-	log *zap.Logger
+	destination   DataDestination
+	rr     RunRecorder
+	cli    influxdb.Client
+	log    *zap.Logger
 }
 
 func (as *AnalyticalStorage) FinishRun(ctx context.Context, taskID, runID platform.ID) (*taskmodel.Run, error) {
 	run, err := as.TaskControlService.FinishRun(ctx, taskID, runID)
-	if run != nil && run.ID.String() != "" {
-		task, err := as.TaskService.FindTaskByID(ctx, run.TaskID)
-		if err != nil {
-			return run, err
-		}
-
-		sb, err := as.BucketService.FindBucketByName(ctx, task.OrganizationID, influxdb.TasksSystemBucketName)
-		if err != nil {
-			return run, err
-		}
-
-		return run, as.rr.Record(ctx, task.OrganizationID, task.Organization, sb.ID, influxdb.TasksSystemBucketName, run)
+	if err != nil {
+		return nil, err
 	}
-
-	return run, err
+	return run, as.rr.Record(ctx, as.destination.Bucket, run)
 }
 
 // FindLogs returns logs for a run.
@@ -129,26 +131,18 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 		return runs, n, err
 	}
 
-	task, err := as.TaskService.FindTaskByID(ctx, filter.Task)
-	if err != nil {
-		return runs, n, err
-	}
-
-	sb, err := as.BucketService.FindBucketByName(ctx, task.OrganizationID, influxdb.TasksSystemBucketName)
-	if err != nil {
-		return runs, n, err
-	}
-
 	filterPart := ""
 	if filter.After != nil {
 		filterPart = fmt.Sprintf(`|> filter(fn: (r) => r.runID > %q)`, filter.After.String())
 	}
 
+	now := time.Now()
+
 	// creates flux script to filter based on time, if given
 	constructedTimeFilter := ""
 	if len(filter.AfterTime) > 0 || len(filter.BeforeTime) > 0 {
 		parsedAfterTime := time.Time{}
-		parsedBeforeTime := time.Now()
+		parsedBeforeTime := now
 		if len(filter.AfterTime) > 0 {
 			parsedAfterTime, err = time.Parse(time.RFC3339, filter.AfterTime)
 			if err != nil {
@@ -173,7 +167,7 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	}
 
 	// the data will be stored for 7 days in the system bucket so pulling 14d's is sufficient.
-	runsScript := fmt.Sprintf(`from(bucketID: %q)
+	runsScript := fmt.Sprintf(`from(bucket: %q)
 	  |> range(start: -14d)
 	  |> filter(fn: (r) => r._field != "status")
 	  |> filter(fn: (r) => r._measurement == "runs" and r.taskID == %q)
@@ -184,29 +178,14 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	  |> sort(columns:["scheduledFor"], desc: true)
 	  |> limit(n:%d)
 
-	  `, sb.ID.String(), filter.Task.String(), filterPart, constructedTimeFilter, filter.Limit-len(runs))
+	  `, as.destination.Bucket, filter.Task.String(), filterPart, constructedTimeFilter, filter.Limit-len(runs))
 
-	// At this point we are behind authorization
-	// so we are faking a read only permission to the org's system bucket
-	runSystemBucketID := sb.ID
-	runAuth := &influxdb.Authorization{
-		Status: influxdb.Active,
-		ID:     sb.ID,
-		OrgID:  task.OrganizationID,
-		Permissions: []influxdb.Permission{
-			{
-				Action: influxdb.ReadAction,
-				Resource: influxdb.Resource{
-					Type:  influxdb.BucketsResourceType,
-					OrgID: &task.OrganizationID,
-					ID:    &runSystemBucketID,
-				},
-			},
-		},
-	}
-	request := &query.Request{Authorization: runAuth, OrganizationID: task.OrganizationID, Compiler: lang.FluxCompiler{Query: runsScript}}
-
-	ittr, err := as.qs.Query(ctx, request)
+	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
+		Org: as.destination.Org,
+		OrgID: as.destination.OrgID,
+		Query: runsScript,
+		Now: now,
+	})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -226,7 +205,6 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	runs = as.combineRuns(runs, re.runs)
 
 	return runs, len(runs), err
-
 }
 
 // remove any kv runs that exist in the list of completed runs
@@ -263,47 +241,22 @@ func (as *AnalyticalStorage) FindRunByID(ctx context.Context, taskID, runID plat
 		return run, err
 	}
 
-	task, err := as.TaskService.FindTaskByID(ctx, taskID)
-	if err != nil {
-		return run, err
-	}
-
-	sb, err := as.BucketService.FindBucketByName(ctx, task.OrganizationID, influxdb.TasksSystemBucketName)
-	if err != nil {
-		return run, err
-	}
-
 	// the data will be stored for 7 days in the system bucket so pulling 14d's is sufficient.
-	findRunScript := fmt.Sprintf(`from(bucketID: %q)
+	findRunScript := fmt.Sprintf(`from(bucket: %q)
 	|> range(start: -14d)
 	|> filter(fn: (r) => r._field != "status")
 	|> filter(fn: (r) => r._measurement == "runs" and r.taskID == %q)
 	|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 	|> group(columns: ["taskID"])
 	|> filter(fn: (r) => r.runID == %q)
-	  `, sb.ID.String(), taskID.String(), runID.String())
+	  `, as.destination.Bucket, taskID.String(), runID.String())
 
-	// At this point we are behind authorization
-	// so we are faking a read only permission to the org's system bucket
-	runSystemBucketID := sb.ID
-	runAuth := &influxdb.Authorization{
-		ID:     sb.ID,
-		Status: influxdb.Active,
-		OrgID:  task.OrganizationID,
-		Permissions: []influxdb.Permission{
-			{
-				Action: influxdb.ReadAction,
-				Resource: influxdb.Resource{
-					Type:  influxdb.BucketsResourceType,
-					OrgID: &task.OrganizationID,
-					ID:    &runSystemBucketID,
-				},
-			},
-		},
-	}
-	request := &query.Request{Authorization: runAuth, OrganizationID: task.OrganizationID, Compiler: lang.FluxCompiler{Query: findRunScript}}
-
-	ittr, err := as.qs.Query(ctx, request)
+	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
+		Org: as.destination.Org,
+		OrgID: as.destination.OrgID,
+		Query: findRunScript,
+		Now: time.Now(),
+	})
 	if err != nil {
 		return nil, err
 	}

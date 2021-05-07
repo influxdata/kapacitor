@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -17,16 +16,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/influxdb/v2"
-	icontext "github.com/influxdata/influxdb/v2/context"
-	"github.com/influxdata/influxdb/v2/kit/feature"
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	influxdbmock "github.com/influxdata/influxdb/v2/mock"
-	"github.com/influxdata/influxdb/v2/task/backend"
-	"github.com/influxdata/influxdb/v2/task/options"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/backend"
+	"github.com/influxdata/kapacitor/task/options"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // BackendComponentFactory is supplied by consumers of the adaptertest package,
@@ -98,12 +92,10 @@ func TestTaskService(t *testing.T, fn BackendComponentFactory, testCategory ...s
 					t.Parallel()
 					testManualRun(t, sys)
 				})
-
 				t.Run("Task Type", func(t *testing.T) {
 					t.Parallel()
 					testTaskType(t, sys)
 				})
-
 			})
 		case "analytical":
 			t.Run("AnalyticalTaskService", func(t *testing.T) {
@@ -125,48 +117,9 @@ func TestTaskService(t *testing.T, fn BackendComponentFactory, testCategory ...s
 
 }
 
-// TestCreds encapsulates credentials needed for a system to properly work with tasks.
-type TestCreds struct {
-	OrgID, UserID, AuthorizationID platform.ID
-	Org                            string
-	Token                          string
-}
-
-// Authorizer returns an authorizer for the credentials in the struct
-func (tc TestCreds) Authorizer() influxdb.Authorizer {
-	return &influxdb.Authorization{
-		ID:     tc.AuthorizationID,
-		OrgID:  tc.OrgID,
-		UserID: tc.UserID,
-		Token:  tc.Token,
-	}
-}
-
-type OrganizationService interface {
-	CreateOrganization(ctx context.Context, b *influxdb.Organization) error
-}
-
-type UserService interface {
-	CreateUser(ctx context.Context, u *influxdb.User) error
-}
-
-type UserResourceMappingService interface {
-	CreateUserResourceMapping(ctx context.Context, m *influxdb.UserResourceMapping) error
-}
-
-type AuthorizationService interface {
-	CreateAuthorization(ctx context.Context, a *influxdb.Authorization) error
-}
-
 // System  as in "system under test" encapsulates the required parts of a influxdb.TaskAdapter
 type System struct {
 	TaskControlService backend.TaskControlService
-
-	// Used in the Creds function to create valid organizations, users, tokens, etc.
-	OrganizationService        OrganizationService
-	UserService                UserService
-	UserResourceMappingService UserResourceMappingService
-	AuthorizationService       AuthorizationService
 
 	// Set this context, to be used in tests, so that any spawned goroutines watching Ctx.Done()
 	// will clean up after themselves.
@@ -175,31 +128,20 @@ type System struct {
 	// TaskService is the task service we would like to test
 	TaskService taskmodel.TaskService
 
-	// Override for accessing credentials for an individual test.
-	// Callers can leave this nil and the test will create its own random IDs for each test.
-	// However, if the system needs to verify credentials,
-	// the caller should set this value and return valid IDs and a valid token.
-	// It is safe if this returns the same values every time it is called.
-	CredsFunc func(*testing.T) (TestCreds, error)
-
 	// Toggles behavior between KV and archive storage because FinishRun() deletes runs after completion
 	CallFinishRun bool
 }
 
 func testTaskCRUD(t *testing.T, sys *System) {
-	cr := creds(t, sys)
-
+	user := "user-" + t.Name()
 	// Create a task.
 	tc := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
-		Type:           taskmodel.TaskSystemType,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
+		Type:          taskmodel.TaskSystemType,
 	}
 
-	authorizedCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
-
-	tsk, err := sys.TaskService.CreateTask(authorizedCtx, tc)
+	tsk, err := sys.TaskService.CreateTask(sys.Ctx, tc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,27 +194,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	}
 	found["FindTaskByID"] = f
 
-	fs, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err = findTask(fs, tsk.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found["FindTasks with Organization filter"] = f
-
-	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Organization: cr.Org})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err = findTask(fs, tsk.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found["FindTasks with Organization name filter"] = f
-
-	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{User: &cr.UserID})
+	fs, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,9 +209,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 		CreatedAt:       tsk.CreatedAt,
 		LatestCompleted: tsk.LatestCompleted,
 		LatestScheduled: tsk.LatestScheduled,
-		OrganizationID:  cr.OrgID,
-		Organization:    cr.Org,
-		OwnerID:         tsk.OwnerID,
+		OwnerUsername:   user,
 		Name:            "task #0",
 		Cron:            "* * * * *",
 		Offset:          5 * time.Second,
@@ -307,19 +227,18 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Check limits
 	tc2 := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 1),
-		OwnerID:        cr.UserID,
-		Status:         string(taskmodel.TaskInactive),
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 1),
+		Status:        string(taskmodel.TaskInactive),
 	}
 
-	if _, err := sys.TaskService.CreateTask(authorizedCtx, tc2); err != nil {
+	if _, err := sys.TaskService.CreateTask(sys.Ctx, tc2); err != nil {
 		t.Fatal(err)
 	}
 	if !tsk.ID.Valid() {
 		t.Fatal("no task ID set")
 	}
-	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID, Limit: 1})
+	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Limit: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +248,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Check after
 	first := tasks[0]
-	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID, After: &first.ID})
+	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, After: &first.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +265,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Check task status filter
 	active := string(taskmodel.TaskActive)
-	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Status: &active})
+	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Status: &active})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +276,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	}
 
 	inactive := string(taskmodel.TaskInactive)
-	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Status: &inactive})
+	fs, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Status: &inactive})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +289,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	// Update task: script only.
 	newFlux := fmt.Sprintf(scriptFmt, 99)
 	origID := f.ID
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Flux: &newFlux})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Flux: &newFlux})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +307,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Update task: status only.
 	newStatus := string(taskmodel.TaskInactive)
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Status: &newStatus})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Status: &newStatus})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +321,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	// Update task: reactivate status and update script.
 	newStatus = string(taskmodel.TaskActive)
 	newFlux = fmt.Sprintf(scriptFmt, 98)
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Flux: &newFlux, Status: &newStatus})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Flux: &newFlux, Status: &newStatus})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +335,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	// Update task: just update an option.
 	newStatus = string(taskmodel.TaskActive)
 	newFlux = "option task = {\n\tname: \"task-changed #98\",\n\tcron: \"* * * * *\",\n\toffset: 5s,\n\tconcurrency: 100,\n}\n\nfrom(bucket: \"b\")\n\t|> to(bucket: \"two\", orgID: \"000000000000000\")"
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Options: options.Options{Name: "task-changed #98"}})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Options: options.Options{Name: "task-changed #98"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +350,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	// Update task: switch to every.
 	newStatus = string(taskmodel.TaskActive)
 	newFlux = "option task = {\n\tname: \"task-changed #98\",\n\tevery: 30s,\n\toffset: 5s,\n\tconcurrency: 100,\n}\n\nfrom(bucket: \"b\")\n\t|> to(bucket: \"two\", orgID: \"000000000000000\")"
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Options: options.Options{Every: *(options.MustParseDuration("30s"))}})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Options: options.Options{Every: *(options.MustParseDuration("30s"))}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +365,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 	// Update task: just cron.
 	newStatus = string(taskmodel.TaskActive)
 	newFlux = fmt.Sprintf(scriptDifferentName, 98)
-	f, err = sys.TaskService.UpdateTask(authorizedCtx, origID, taskmodel.TaskUpdate{Options: options.Options{Cron: "* * * * *"}})
+	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Options: options.Options{Cron: "* * * * *"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,15 +426,13 @@ func testTaskFindTasksPaging(t *testing.T, sys *System) {
 from(bucket: "b")
 	|> to(bucket: "two", orgID: "000000000000000")`
 
-	cr := creds(t, sys)
-
+	user := "user-" + t.Name()
 	tc := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		OwnerID:        cr.UserID,
-		Type:           taskmodel.TaskSystemType,
+		OwnerUsername: user,
+		Type:          taskmodel.TaskSystemType,
 	}
 
-	authorizedCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+	authorizedCtx := sys.Ctx
 
 	created := make([]*taskmodel.Task, 50)
 	for i := 0; i < 50; i++ {
@@ -531,7 +448,7 @@ from(bucket: "b")
 		created[i] = tsk
 	}
 
-	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Limit: 5})
+	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Limit: 5})
 	if err != nil {
 		t.Fatalf("FindTasks: %v", err)
 	}
@@ -542,7 +459,7 @@ from(bucket: "b")
 
 	// find tasks using name which are after first 10
 	name := "Task 004"
-	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Limit: 5, Name: &name})
+	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Limit: 5, Name: &name})
 	if err != nil {
 		t.Fatalf("FindTasks: %v", err)
 	}
@@ -563,14 +480,13 @@ func testTaskFindTasksAfterPaging(t *testing.T, sys *System) {
 
 from(bucket: "b")
 	|> to(bucket: "two", orgID: "000000000000000")`
-		cr = creds(t, sys)
-		tc = taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			OwnerID:        cr.UserID,
-			Type:           taskmodel.TaskSystemType,
-			Flux:           script,
+		user = "user-" + t.Name()
+		tc   = taskmodel.TaskCreate{
+			OwnerUsername: user,
+			Type:          taskmodel.TaskSystemType,
+			Flux:          script,
 		}
-		authorizedCtx = icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+		authorizedCtx = sys.Ctx
 		created       = make([]*taskmodel.Task, 10)
 		taskName      = "some-unique-task-name"
 	)
@@ -604,9 +520,10 @@ from(bucket: "b")
 	// one more than expected pages
 	for i := 0; i < 6; i++ {
 		tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{
-			Limit: 2,
-			After: after,
-			Name:  &taskName,
+			Limit:    2,
+			After:    after,
+			Name:     &taskName,
+			Username: &user,
 		})
 		if err != nil {
 			t.Fatalf("FindTasks: %v", err)
@@ -626,9 +543,7 @@ from(bucket: "b")
 		after = &tasks[len(tasks)-1].ID
 	}
 
-	if !reflect.DeepEqual(expected, found) {
-		t.Errorf("expected %#v, found %#v", expected, found)
-	}
+	assert.Equal(t, expected, found)
 }
 
 //Create a new task with a Cron and Offset option
@@ -646,14 +561,12 @@ func testTaskOptionsUpdateFull(t *testing.T, sys *System) {
 from(bucket: "b")
 	|> to(bucket: "two", orgID: "000000000000000")`
 
-	cr := creds(t, sys)
-
+	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           script,
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          script,
 	}
-	authorizedCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+	authorizedCtx := sys.Ctx
 	task, err := sys.TaskService.CreateTask(authorizedCtx, ct)
 	if err != nil {
 		t.Fatal(err)
@@ -720,17 +633,15 @@ from(bucket: "b")
 }
 
 func testUpdate(t *testing.T, sys *System) {
-	cr := creds(t, sys)
 
 	now := time.Now()
 	earliestCA := now.Add(-time.Second)
-
+	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
-	authorizedCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+	authorizedCtx := sys.Ctx
 	task, err := sys.TaskService.CreateTask(authorizedCtx, ct)
 	if err != nil {
 		t.Fatal(err)
@@ -883,19 +794,17 @@ func testUpdate(t *testing.T, sys *System) {
 }
 
 func testTaskRuns(t *testing.T, sys *System) {
-	cr := creds(t, sys)
-
 	t.Run("FindRuns and FindRunByID", func(t *testing.T) {
 		t.Parallel()
 
 		// Script is set to run every minute. The platform adapter is currently hardcoded to schedule after "now",
 		// which makes timing of runs somewhat difficult.
+		user := "user-" + t.Name()
 		ct := taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			Flux:           fmt.Sprintf(scriptFmt, 0),
-			OwnerID:        cr.UserID,
+			OwnerUsername: user,
+			Flux:          fmt.Sprintf(scriptFmt, 0),
 		}
-		task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+		task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1006,18 +915,14 @@ func testTaskRuns(t *testing.T, sys *System) {
 	t.Run("FindRunsByTime", func(t *testing.T) {
 
 		t.Parallel()
-		ctx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
-		ctx, err := feature.Annotate(ctx, influxdbmock.NewFlagger(map[feature.Flag]interface{}{
-			feature.TimeFilterFlags(): true,
-		}))
-		require.NoError(t, err)
+		ctx := sys.Ctx
 
 		// Script is set to run every minute. The platform adapter is currently hardcoded to schedule after "now",
 		// which makes timing of runs somewhat difficult.
+		user := "user-" + t.Name()
 		ct := taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			Flux:           fmt.Sprintf(scriptFmt, 0),
-			OwnerID:        cr.UserID,
+			OwnerUsername: user,
+			Flux:          fmt.Sprintf(scriptFmt, 0),
 		}
 		task, err := sys.TaskService.CreateTask(ctx, ct)
 		if err != nil {
@@ -1078,12 +983,12 @@ func testTaskRuns(t *testing.T, sys *System) {
 	t.Run("ForceRun", func(t *testing.T) {
 		t.Parallel()
 
+		user := "user-" + t.Name()
 		ct := taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			Flux:           fmt.Sprintf(scriptFmt, 0),
-			OwnerID:        cr.UserID,
+			OwnerUsername: user,
+			Flux:          fmt.Sprintf(scriptFmt, 0),
 		}
-		task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+		task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1107,12 +1012,12 @@ func testTaskRuns(t *testing.T, sys *System) {
 	t.Run("FindLogs", func(t *testing.T) {
 		t.Parallel()
 
+		user := "user-" + t.Name()
 		ct := taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			Flux:           fmt.Sprintf(scriptFmt, 0),
-			OwnerID:        cr.UserID,
+			OwnerUsername: user,
+			Flux:          fmt.Sprintf(scriptFmt, 0),
 		}
-		task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+		task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1178,10 +1083,11 @@ func testTaskRuns(t *testing.T, sys *System) {
 }
 
 func testTaskConcurrency(t *testing.T, sys *System) {
-	cr := creds(t, sys)
 
 	const numTasks = 450 // Arbitrarily chosen to get a reasonable count of concurrent creates and deletes.
 	createTaskCh := make(chan taskmodel.TaskCreate, numTasks)
+
+	user := "user-" + t.Name()
 
 	// Since this test is run in parallel with other tests,
 	// we need to keep a whitelist of IDs that are okay to delete.
@@ -1194,7 +1100,7 @@ func testTaskConcurrency(t *testing.T, sys *System) {
 		createWg.Add(1)
 		go func() {
 			defer createWg.Done()
-			aCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+			aCtx := sys.Ctx
 			for ct := range createTaskCh {
 				task, err := sys.TaskService.CreateTask(aCtx, ct)
 				if err != nil {
@@ -1234,7 +1140,7 @@ func testTaskConcurrency(t *testing.T, sys *System) {
 			}
 
 			// Get all the tasks.
-			tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID})
+			tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user})
 			if err != nil {
 				t.Errorf("error finding tasks: %v", err)
 				return
@@ -1292,7 +1198,7 @@ func testTaskConcurrency(t *testing.T, sys *System) {
 			}
 
 			// Get all the tasks.
-			tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID})
+			tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user})
 			if err != nil {
 				t.Errorf("error finding tasks: %v", err)
 				return
@@ -1344,9 +1250,8 @@ func testTaskConcurrency(t *testing.T, sys *System) {
 	// Start adding tasks.
 	for i := 0; i < numTasks; i++ {
 		createTaskCh <- taskmodel.TaskCreate{
-			OrganizationID: cr.OrgID,
-			Flux:           fmt.Sprintf(scriptFmt, i),
-			OwnerID:        cr.UserID,
+			OwnerUsername: user,
+			Flux:          fmt.Sprintf(scriptFmt, i),
 		}
 	}
 
@@ -1357,16 +1262,14 @@ func testTaskConcurrency(t *testing.T, sys *System) {
 }
 
 func testManualRun(t *testing.T, s *System) {
-	cr := creds(t, s)
-
 	// Create a task.
+	user := "user-" + t.Name()
 	tc := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
 
-	authorizedCtx := icontext.SetAuthorizer(s.Ctx, cr.Authorizer())
+	authorizedCtx := s.Ctx
 
 	tsk, err := s.TaskService.CreateTask(authorizedCtx, tc)
 	if err != nil {
@@ -1401,16 +1304,14 @@ func testManualRun(t *testing.T, s *System) {
 }
 
 func testRunStorage(t *testing.T, sys *System) {
-	cr := creds(t, sys)
-
 	// Script is set to run every minute. The platform adapter is currently hardcoded to schedule after "now",
 	// which makes timing of runs somewhat difficult.
+	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
-	task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+	task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1582,15 +1483,13 @@ func testRunStorage(t *testing.T, sys *System) {
 }
 
 func testRetryAcrossStorage(t *testing.T, sys *System) {
-	cr := creds(t, sys)
-
 	// Script is set to run every minute.
+	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
-	task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+	task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1648,16 +1547,15 @@ func testRetryAcrossStorage(t *testing.T, sys *System) {
 }
 
 func testLogsAcrossStorage(t *testing.T, sys *System) {
-	cr := creds(t, sys)
 
 	// Script is set to run every minute. The platform adapter is currently hardcoded to schedule after "now",
 	// which makes timing of runs somewhat difficult.
+	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
-	task, err := sys.TaskService.CreateTask(icontext.SetAuthorizer(sys.Ctx, cr.Authorizer()), ct)
+	task, err := sys.TaskService.CreateTask(sys.Ctx, ct)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1754,53 +1652,6 @@ func testLogsAcrossStorage(t *testing.T, sys *System) {
 	if smash(logs) != "0-00-10-2" {
 		t.Fatalf("log contents not acceptable, expected: %q, got: %q", "0-00-10-2", smash(logs))
 	}
-
-}
-
-func creds(t *testing.T, s *System) TestCreds {
-	// t.Helper()
-
-	if s.CredsFunc == nil {
-		u := &influxdb.User{Name: t.Name() + "-user"}
-		if err := s.UserService.CreateUser(s.Ctx, u); err != nil {
-			t.Fatal(err)
-		}
-		o := &influxdb.Organization{Name: t.Name() + "-org"}
-		if err := s.OrganizationService.CreateOrganization(s.Ctx, o); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := s.UserResourceMappingService.CreateUserResourceMapping(s.Ctx, &influxdb.UserResourceMapping{
-			ResourceType: influxdb.OrgsResourceType,
-			ResourceID:   o.ID,
-			UserID:       u.ID,
-			UserType:     influxdb.Owner,
-		}); err != nil {
-			t.Fatal(err)
-		}
-
-		authz := influxdb.Authorization{
-			OrgID:       o.ID,
-			UserID:      u.ID,
-			Permissions: influxdb.OperPermissions(),
-		}
-		if err := s.AuthorizationService.CreateAuthorization(context.Background(), &authz); err != nil {
-			t.Fatal(err)
-		}
-		return TestCreds{
-			OrgID:           o.ID,
-			Org:             o.Name,
-			UserID:          u.ID,
-			AuthorizationID: authz.ID,
-			Token:           authz.Token,
-		}
-	}
-
-	c, err := s.CredsFunc(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
 }
 
 const (
@@ -1826,14 +1677,13 @@ from(bucket: "b")
 )
 
 func testTaskType(t *testing.T, sys *System) {
-	cr := creds(t, sys)
-	authorizedCtx := icontext.SetAuthorizer(sys.Ctx, cr.Authorizer())
+	authorizedCtx := sys.Ctx
 
 	// Create a tasks
+	user := "user-" + t.Name()
 	ts := taskmodel.TaskCreate{
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
 
 	tsk, err := sys.TaskService.CreateTask(authorizedCtx, ts)
@@ -1845,10 +1695,9 @@ func testTaskType(t *testing.T, sys *System) {
 	}
 
 	tc := taskmodel.TaskCreate{
-		Type:           "cows",
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		Type:          "cows",
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
 
 	tskCow, err := sys.TaskService.CreateTask(authorizedCtx, tc)
@@ -1860,10 +1709,9 @@ func testTaskType(t *testing.T, sys *System) {
 	}
 
 	tp := taskmodel.TaskCreate{
-		Type:           "pigs",
-		OrganizationID: cr.OrgID,
-		Flux:           fmt.Sprintf(scriptFmt, 0),
-		OwnerID:        cr.UserID,
+		Type:          "pigs",
+		OwnerUsername: user,
+		Flux:          fmt.Sprintf(scriptFmt, 0),
 	}
 
 	tskPig, err := sys.TaskService.CreateTask(authorizedCtx, tp)
@@ -1875,7 +1723,7 @@ func testTaskType(t *testing.T, sys *System) {
 	}
 
 	// get system tasks (or task's with no type)
-	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID, Type: &taskmodel.TaskSystemType})
+	tasks, _, err := sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Type: &taskmodel.TaskSystemType})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1887,7 +1735,7 @@ func testTaskType(t *testing.T, sys *System) {
 	}
 
 	// get filtered tasks
-	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID, Type: &tc.Type})
+	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user, Type: &tc.Type})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1898,7 +1746,7 @@ func testTaskType(t *testing.T, sys *System) {
 	}
 
 	// get all tasks
-	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{OrganizationID: &cr.OrgID})
+	tasks, _, err = sys.TaskService.FindTasks(sys.Ctx, taskmodel.TaskFilter{Username: &user})
 	if err != nil {
 		t.Fatal(err)
 	}

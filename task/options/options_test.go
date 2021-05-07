@@ -9,11 +9,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/influxdata/flux/ast"
-	_ "github.com/influxdata/influxdb/v2/fluxinit/static"
-	"github.com/influxdata/influxdb/v2/pkg/pointer"
-	"github.com/influxdata/influxdb/v2/query/fluxlang"
-	"github.com/influxdata/influxdb/v2/task/options"
+	"github.com/influxdata/kapacitor/task/options"
 )
+
+func int64p(i int64) *int64 {
+	return &i
+}
 
 func scriptGenerator(opt options.Options, body string) string {
 	taskData := ""
@@ -64,19 +65,19 @@ func TestFromScriptAST(t *testing.T) {
 		exp       options.Options
 		shouldErr bool
 	}{
-		{script: scriptGenerator(options.Options{Name: "name0", Cron: "* * * * *", Concurrency: pointer.Int64(2), Retry: pointer.Int64(3), Offset: options.MustParseDuration("-1m")}, ""),
+		{script: scriptGenerator(options.Options{Name: "name0", Cron: "* * * * *", Concurrency: int64p(2), Retry: int64p(3), Offset: options.MustParseDuration("-1m")}, ""),
 			exp: options.Options{Name: "name0",
 				Cron:        "* * * * *",
-				Concurrency: pointer.Int64(2),
-				Retry:       pointer.Int64(3),
+				Concurrency: int64p(2),
+				Retry:       int64p(3),
 				Offset:      options.MustParseDuration("-1m")}},
-		{script: scriptGenerator(options.Options{Name: "name1", Every: *(options.MustParseDuration("5s"))}, ""), exp: options.Options{Name: "name1", Every: *(options.MustParseDuration("5s")), Concurrency: pointer.Int64(1), Retry: pointer.Int64(1)}},
-		{script: scriptGenerator(options.Options{Name: "name2", Cron: "* * * * *"}, ""), exp: options.Options{Name: "name2", Cron: "* * * * *", Concurrency: pointer.Int64(1), Retry: pointer.Int64(1)}},
+		{script: scriptGenerator(options.Options{Name: "name1", Every: *(options.MustParseDuration("5s"))}, ""), exp: options.Options{Name: "name1", Every: *(options.MustParseDuration("5s")), Concurrency: int64p(1), Retry: int64p(1)}},
+		{script: scriptGenerator(options.Options{Name: "name2", Cron: "* * * * *"}, ""), exp: options.Options{Name: "name2", Cron: "* * * * *", Concurrency: int64p(1), Retry: int64p(1)}},
 		{script: scriptGenerator(options.Options{Name: "name3", Every: *(options.MustParseDuration("1h")), Cron: "* * * * *"}, ""), shouldErr: true},
-		{script: scriptGenerator(options.Options{Name: "name4", Concurrency: pointer.Int64(1000), Every: *(options.MustParseDuration("1h"))}, ""), shouldErr: true},
+		{script: scriptGenerator(options.Options{Name: "name4", Concurrency: int64p(1000), Every: *(options.MustParseDuration("1h"))}, ""), shouldErr: true},
 		{script: "option task = {\n  name: \"name5\",\n  concurrency: 0,\n  every: 1m0s,\n\n}\n\nfrom(bucket: \"test\")\n    |> range(start:-1h)", shouldErr: true},
 		{script: "option task = {\n  name: \"name6\",\n  concurrency: 1,\n  every: 1,\n\n}\n\nfrom(bucket: \"test\")\n    |> range(start:-1h)", shouldErr: true},
-		{script: scriptGenerator(options.Options{Name: "name7", Retry: pointer.Int64(20), Every: *(options.MustParseDuration("1h"))}, ""), shouldErr: true},
+		{script: scriptGenerator(options.Options{Name: "name7", Retry: int64p(20), Every: *(options.MustParseDuration("1h"))}, ""), shouldErr: true},
 		{script: "option task = {\n  name: \"name8\",\n  retry: 0,\n  every: 1m0s,\n\n}\n\nfrom(bucket: \"test\")\n    |> range(start:-1h)", shouldErr: true},
 		{script: scriptGenerator(options.Options{Name: "name9"}, ""), shouldErr: true},
 		{script: scriptGenerator(options.Options{}, ""), shouldErr: true},
@@ -88,7 +89,7 @@ func TestFromScriptAST(t *testing.T) {
 			from(bucket: "metrics")
 			|> range(start: now(), stop: 8w)
 		`,
-			exp: options.Options{Name: "name10", Every: *(options.MustParseDuration("1d")), Concurrency: pointer.Int64(1), Retry: pointer.Int64(1), Offset: options.MustParseDuration("1m")},
+			exp: options.Options{Name: "name10", Every: *(options.MustParseDuration("1d")), Concurrency: int64p(1), Retry: int64p(1), Offset: options.MustParseDuration("1m")},
 		},
 		{script: `option task = {
 			name: "name11",
@@ -99,13 +100,13 @@ func TestFromScriptAST(t *testing.T) {
 			|> range(start: now(), stop: 8w)
 
 		`,
-			exp: options.Options{Name: "name11", Every: *(options.MustParseDuration("1m")), Concurrency: pointer.Int64(1), Retry: pointer.Int64(1), Offset: options.MustParseDuration("1d")},
+			exp: options.Options{Name: "name11", Every: *(options.MustParseDuration("1m")), Concurrency: int64p(1), Retry: int64p(1), Offset: options.MustParseDuration("1d")},
 		},
 		{script: "option task = {name:\"test_task_smoke_name\", every:30s} from(bucket:\"test_tasks_smoke_bucket_source\") |> range(start: -1h) |> map(fn: (r) => ({r with _time: r._time, _value:r._value, t : \"quality_rocks\"}))|> to(bucket:\"test_tasks_smoke_bucket_dest\", orgID:\"3e73e749495d37d5\")",
-			exp: options.Options{Name: "test_task_smoke_name", Every: *(options.MustParseDuration("30s")), Retry: pointer.Int64(1), Concurrency: pointer.Int64(1)}, shouldErr: false}, // TODO(docmerlin): remove this once tasks fully supports all flux duration units.
+			exp: options.Options{Name: "test_task_smoke_name", Every: *(options.MustParseDuration("30s")), Retry: int64p(1), Concurrency: int64p(1)}, shouldErr: false}, // TODO(docmerlin): remove this once tasks fully supports all flux duration units.
 
 	} {
-		o, err := options.FromScriptAST(fluxlang.DefaultService, c.script)
+		o, err := options.FromScriptAST(c.script)
 		if c.shouldErr && err == nil {
 			t.Fatalf("script %q should have errored but didn't", c.script)
 		} else if !c.shouldErr && err != nil {
@@ -125,7 +126,7 @@ func TestFromScriptAST(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	good := options.Options{Name: "x", Cron: "* * * * *", Concurrency: pointer.Int64(1), Retry: pointer.Int64(1)}
+	good := options.Options{Name: "x", Cron: "* * * * *", Concurrency: int64p(1), Retry: int64p(1)}
 	if err := good.Validate(); err != nil {
 		t.Fatal(err)
 	}
@@ -169,25 +170,25 @@ func TestValidate(t *testing.T) {
 	}
 
 	*bad = good
-	bad.Concurrency = pointer.Int64(0)
+	bad.Concurrency = int64p(0)
 	if err := bad.Validate(); err == nil {
 		t.Error("expected error for 0 concurrency")
 	}
 
 	*bad = good
-	bad.Concurrency = pointer.Int64(math.MaxInt64)
+	bad.Concurrency = int64p(math.MaxInt64)
 	if err := bad.Validate(); err == nil {
 		t.Error("expected error for concurrency too large")
 	}
 
 	*bad = good
-	bad.Retry = pointer.Int64(0)
+	bad.Retry = int64p(0)
 	if err := bad.Validate(); err == nil {
 		t.Error("expected error for 0 retry")
 	}
 
 	*bad = good
-	bad.Retry = pointer.Int64(math.MaxInt64)
+	bad.Retry = int64p(math.MaxInt64)
 	if err := bad.Validate(); err == nil {
 		t.Error("expected error for retry too large")
 	}

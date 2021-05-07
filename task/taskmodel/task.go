@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/influxdata/flux"
 	"strconv"
 	"time"
 
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/ast/edit"
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	errors2 "github.com/influxdata/influxdb/v2/kit/platform/errors"
-	"github.com/influxdata/influxdb/v2/query/fluxlang"
-	"github.com/influxdata/influxdb/v2/task/options"
+	"github.com/influxdata/kapacitor/task/options"
 )
 
 const (
@@ -33,27 +32,27 @@ var (
 
 // Task is a task. 🎊
 type Task struct {
-	ID              platform.ID            `json:"id"`
-	Type            string                 `json:"type,omitempty"`
-	OrganizationID  platform.ID            `json:"orgID"`
-	Organization    string                 `json:"org"`
-	OwnerID         platform.ID            `json:"ownerID"`
-	Name            string                 `json:"name"`
-	Description     string                 `json:"description,omitempty"`
-	Status          string                 `json:"status"`
-	Flux            string                 `json:"flux"`
-	Every           string                 `json:"every,omitempty"`
-	Cron            string                 `json:"cron,omitempty"`
-	Offset          time.Duration          `json:"offset,omitempty"`
-	LatestCompleted time.Time              `json:"latestCompleted,omitempty"`
-	LatestScheduled time.Time              `json:"latestScheduled,omitempty"`
-	LatestSuccess   time.Time              `json:"latestSuccess,omitempty"`
-	LatestFailure   time.Time              `json:"latestFailure,omitempty"`
-	LastRunStatus   string                 `json:"lastRunStatus,omitempty"`
-	LastRunError    string                 `json:"lastRunError,omitempty"`
-	CreatedAt       time.Time              `json:"createdAt,omitempty"`
-	UpdatedAt       time.Time              `json:"updatedAt,omitempty"`
-	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	ID                   platform.ID            `json:"id"`
+	Type                 string                 `json:"type,omitempty"`
+	UnusedOrganizationID platform.ID            `json:"orgID,omitempty"`
+	UnusedOrganization   string                 `json:"org,omitempty"`
+	OwnerUsername        string                 `json:"ownerID"`
+	Name                 string                 `json:"name"`
+	Description          string                 `json:"description,omitempty"`
+	Status               string                 `json:"status"`
+	Flux                 string                 `json:"flux"`
+	Every                string                 `json:"every,omitempty"`
+	Cron                 string                 `json:"cron,omitempty"`
+	Offset               time.Duration          `json:"offset,omitempty"`
+	LatestCompleted      time.Time              `json:"latestCompleted,omitempty"`
+	LatestScheduled      time.Time              `json:"latestScheduled,omitempty"`
+	LatestSuccess        time.Time              `json:"latestSuccess,omitempty"`
+	LatestFailure        time.Time              `json:"latestFailure,omitempty"`
+	LastRunStatus        string                 `json:"lastRunStatus,omitempty"`
+	LastRunError         string                 `json:"lastRunError,omitempty"`
+	CreatedAt            time.Time              `json:"createdAt,omitempty"`
+	UpdatedAt            time.Time              `json:"updatedAt,omitempty"`
+	Metadata             map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // EffectiveCron returns the effective cron string of the options.
@@ -136,22 +135,20 @@ type TaskService interface {
 
 // TaskCreate is the set of values to create a task.
 type TaskCreate struct {
-	Type           string                 `json:"type,omitempty"`
-	Flux           string                 `json:"flux"`
-	Description    string                 `json:"description,omitempty"`
-	Status         string                 `json:"status,omitempty"`
-	OrganizationID platform.ID            `json:"orgID,omitempty"`
-	Organization   string                 `json:"org,omitempty"`
-	OwnerID        platform.ID            `json:"-"`
-	Metadata       map[string]interface{} `json:"-"` // not to be set through a web request but rather used by a http service using tasks backend.
+	Type                 string                 `json:"type,omitempty"`
+	Flux                 string                 `json:"flux"`
+	Description          string                 `json:"description,omitempty"`
+	Status               string                 `json:"status,omitempty"`
+	UnusedOrganizationID platform.ID            `json:"orgID,omitempty"`
+	UnusedOrganization   string                 `json:"org,omitempty"`
+	OwnerUsername        string                 `json:"-"`
+	Metadata             map[string]interface{} `json:"-"` // not to be set through a web request but rather used by a http service using tasks backend.
 }
 
 func (t TaskCreate) Validate() error {
 	switch {
 	case t.Flux == "":
 		return errors.New("missing flux")
-	case !t.OrganizationID.Valid() && t.Organization == "":
-		return errors.New("missing orgID and org")
 	case t.Status != "" && t.Status != TaskStatusActive && t.Status != TaskStatusInactive:
 		return fmt.Errorf("invalid task status: %q", t.Status)
 	}
@@ -276,38 +273,29 @@ func (t *TaskUpdate) Validate() error {
 
 // safeParseSource calls the Flux parser.ParseSource function
 // and is guaranteed not to panic.
-func safeParseSource(parser fluxlang.FluxLanguageService, f string) (pkg *ast.Package, err error) {
-	if parser == nil {
-		return nil, &errors2.Error{
-			Code: errors2.EInternal,
-			Msg:  "flux parser is not configured; updating a task requires the flux parser to be set",
-		}
-	}
+func safeParseSource(f string) (pkg *ast.Package, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = &errors2.Error{
-				Code: errors2.EInternal,
-				Msg:  "internal error in flux engine; unable to parse",
-			}
+			err = fmt.Errorf("internal error in flux engine; unable to parse")
 		}
 	}()
 
-	return parser.Parse(f)
+	return options.Parse(f)
 }
 
 // UpdateFlux updates the TaskUpdate to go from updating options to updating a
 // flux string, that now has those updated options in it. It zeros the options
 // in the TaskUpdate.
-func (t *TaskUpdate) UpdateFlux(parser fluxlang.FluxLanguageService, oldFlux string) error {
-	return t.updateFlux(parser, oldFlux)
+func (t *TaskUpdate) UpdateFlux(oldFlux string) error {
+	return t.updateFlux(oldFlux)
 }
 
-func (t *TaskUpdate) updateFlux(parser fluxlang.FluxLanguageService, oldFlux string) error {
+func (t *TaskUpdate) updateFlux(oldFlux string) error {
 	if t.Flux != nil && *t.Flux != "" {
 		oldFlux = *t.Flux
 	}
 	toDelete := map[string]struct{}{}
-	parsedPKG, err := safeParseSource(parser, oldFlux)
+	parsedPKG, err := safeParseSource(oldFlux)
 	if err != nil {
 		return err
 	}
@@ -409,14 +397,12 @@ func (t *TaskUpdate) updateFlux(parser fluxlang.FluxLanguageService, oldFlux str
 
 // TaskFilter represents a set of filters that restrict the returned results
 type TaskFilter struct {
-	Type           *string
-	Name           *string
-	After          *platform.ID
-	OrganizationID *platform.ID
-	Organization   string
-	User           *platform.ID
-	Limit          int
-	Status         *string
+	Type     *string
+	Name     *string
+	After    *platform.ID
+	Username *string
+	Limit    int
+	Status   *string
 }
 
 // QueryParams Converts TaskFilter fields to url query params.
@@ -426,16 +412,8 @@ func (f TaskFilter) QueryParams() map[string][]string {
 		qp["after"] = []string{f.After.String()}
 	}
 
-	if f.OrganizationID != nil {
-		qp["orgID"] = []string{f.OrganizationID.String()}
-	}
-
-	if f.Organization != "" {
-		qp["org"] = []string{f.Organization}
-	}
-
-	if f.User != nil {
-		qp["user"] = []string{f.User.String()}
+	if f.Username != nil {
+		qp["username"] = []string{*f.Username}
 	}
 
 	if f.Limit > 0 {
@@ -536,3 +514,8 @@ func ParseRequestStillQueuedError(msg string) *RequestStillQueuedError {
 
 	return &RequestStillQueuedError{Start: start.Unix(), End: end.Unix()}
 }
+
+type QueryService interface {
+	Query(ctx context.Context, compiler flux.Compiler) (flux.ResultIterator, error)
+}
+

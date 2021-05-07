@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	"github.com/influxdata/influxdb/v2/task/backend/executor"
-	"github.com/influxdata/influxdb/v2/task/backend/scheduler"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/backend/executor"
+	"github.com/influxdata/kapacitor/task/backend/scheduler"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 )
 
 var _ Executor = (*executorE)(nil)

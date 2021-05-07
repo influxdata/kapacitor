@@ -9,8 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	"github.com/influxdata/influxdb/v2/task/backend/scheduler"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/backend/scheduler"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap/zaptest"
 )
 

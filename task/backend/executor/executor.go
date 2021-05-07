@@ -11,15 +11,11 @@ import (
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/lang"
 	"github.com/influxdata/flux/runtime"
-	"github.com/influxdata/influxdb/v2"
-	icontext "github.com/influxdata/influxdb/v2/context"
-	"github.com/influxdata/influxdb/v2/kit/feature"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/influxdb/v2/kit/tracing"
-	"github.com/influxdata/influxdb/v2/query"
-	"github.com/influxdata/influxdb/v2/task/backend"
-	"github.com/influxdata/influxdb/v2/task/backend/scheduler"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/backend"
+	"github.com/influxdata/kapacitor/task/backend/scheduler"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
 )
 
@@ -31,10 +27,6 @@ const (
 )
 
 var _ scheduler.Executor = (*Executor)(nil)
-
-type PermissionService interface {
-	FindPermissionForUser(ctx context.Context, UserID platform.ID) (influxdb.PermissionSet, error)
-}
 
 type Promise interface {
 	ID() platform.ID
@@ -62,7 +54,6 @@ type executorConfig struct {
 	maxWorkers             int
 	systemBuildCompiler    CompilerBuilderFunc
 	nonSystemBuildCompiler CompilerBuilderFunc
-	flagger                feature.Flagger
 }
 
 type executorOption func(*executorConfig)
@@ -119,15 +110,8 @@ func WithNonSystemCompilerBuilder(builder CompilerBuilderFunc) executorOption {
 	}
 }
 
-// WithFlagger is an Executor option that allows us to use a feature flagger in the executor
-func WithFlagger(flagger feature.Flagger) executorOption {
-	return func(o *executorConfig) {
-		o.flagger = flagger
-	}
-}
-
 // NewExecutor creates a new task executor
-func NewExecutor(log *zap.Logger, qs query.QueryService, us PermissionService, ts taskmodel.TaskService, tcs backend.TaskControlService, opts ...executorOption) (*Executor, *ExecutorMetrics) {
+func NewExecutor(log *zap.Logger, qs taskmodel.QueryService, ts taskmodel.TaskService, tcs backend.TaskControlService, opts ...executorOption) (*Executor, *ExecutorMetrics) {
 	cfg := &executorConfig{
 		maxWorkers:             defaultMaxWorkers,
 		systemBuildCompiler:    NewASTCompiler,
@@ -142,7 +126,6 @@ func NewExecutor(log *zap.Logger, qs query.QueryService, us PermissionService, t
 		ts:  ts,
 		tcs: tcs,
 		qs:  qs,
-		ps:  us,
 
 		currentPromises:        sync.Map{},
 		promiseQueue:           make(chan *promise, maxPromises),
@@ -150,7 +133,6 @@ func NewExecutor(log *zap.Logger, qs query.QueryService, us PermissionService, t
 		limitFunc:              func(*taskmodel.Task, *taskmodel.Run) error { return nil }, // noop
 		systemBuildCompiler:    cfg.systemBuildCompiler,
 		nonSystemBuildCompiler: cfg.nonSystemBuildCompiler,
-		flagger:                cfg.flagger,
 	}
 
 	e.metrics = NewExecutorMetrics(e)
@@ -169,8 +151,7 @@ type Executor struct {
 	ts  taskmodel.TaskService
 	tcs backend.TaskControlService
 
-	qs query.QueryService
-	ps PermissionService
+	qs taskmodel.QueryService
 
 	metrics *ExecutorMetrics
 
@@ -188,7 +169,6 @@ type Executor struct {
 
 	nonSystemBuildCompiler CompilerBuilderFunc
 	systemBuildCompiler    CompilerBuilderFunc
-	flagger                feature.Flagger
 }
 
 // SetLimitFunc sets the limit func for this task executor
@@ -322,23 +302,11 @@ func (e *Executor) createPromise(ctx context.Context, run *taskmodel.Run) (*prom
 		return nil, err
 	}
 
-	perm, err := e.ps.FindPermissionForUser(ctx, t.OwnerID)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	// create promise
 	p := &promise{
-		run:  run,
-		task: t,
-		auth: &influxdb.Authorization{
-			Status:      influxdb.Active,
-			UserID:      t.OwnerID,
-			ID:          platform.ID(1),
-			OrgID:       t.OrganizationID,
-			Permissions: perm,
-		},
+		run:        run,
+		task:       t,
 		createdAt:  time.Now().UTC(),
 		done:       make(chan struct{}),
 		ctx:        ctx,
@@ -436,7 +404,7 @@ func (w *worker) start(p *promise) {
 	defer span.Finish()
 
 	// add to run log
-	w.e.tcs.AddRunLog(p.ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Started task from script: %q", p.task.Flux))
+	w.e.tcs.AddRunLog(ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Started task from script: %q", p.task.Flux))
 	// update run status
 	w.e.tcs.UpdateRunState(ctx, p.task.ID, p.run.ID, time.Now().UTC(), taskmodel.RunStarted)
 
@@ -450,7 +418,7 @@ func (w *worker) finish(p *promise, rs taskmodel.RunStatus, err error) {
 	defer span.Finish()
 
 	// add to run log
-	w.e.tcs.AddRunLog(p.ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Completed(%s)", rs.String()))
+	w.e.tcs.AddRunLog(ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Completed(%s)", rs.String()))
 	// update run status
 	w.e.tcs.UpdateRunState(ctx, p.task.ID, p.run.ID, time.Now().UTC(), rs)
 
@@ -460,7 +428,7 @@ func (w *worker) finish(p *promise, rs taskmodel.RunStatus, err error) {
 
 	// log error
 	if err != nil {
-		w.e.tcs.AddRunLog(p.ctx, p.task.ID, p.run.ID, time.Now().UTC(), err.Error())
+		w.e.tcs.AddRunLog(ctx, p.task.ID, p.run.ID, time.Now().UTC(), err.Error())
 		w.e.log.Debug("Execution failed", zap.Error(err), zap.String("taskID", p.task.ID.String()))
 		w.e.metrics.LogError(p.task.Type, err)
 
@@ -471,7 +439,7 @@ func (w *worker) finish(p *promise, rs taskmodel.RunStatus, err error) {
 			// w.te.ts.UpdateTask(p.ctx, p.task.ID, influxdb.TaskUpdate{Status: &inactive})
 
 			// and add to run logs
-			w.e.tcs.AddRunLog(p.ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Task encountered unrecoverable error, requires admin action: %v", err.Error()))
+			w.e.tcs.AddRunLog(ctx, p.task.ID, p.run.ID, time.Now().UTC(), fmt.Sprintf("Task encountered unrecoverable error, requires admin action: %v", err.Error()))
 			// add to metrics
 			w.e.metrics.LogUnrecoverableError(p.task.ID, err)
 		}
@@ -481,7 +449,7 @@ func (w *worker) finish(p *promise, rs taskmodel.RunStatus, err error) {
 		w.e.log.Debug("Completed successfully", zap.String("taskID", p.task.ID.String()))
 	}
 
-	if _, err := w.e.tcs.FinishRun(p.ctx, p.task.ID, p.run.ID); err != nil {
+	if _, err := w.e.tcs.FinishRun(ctx, p.task.ID, p.run.ID); err != nil {
 		w.e.log.Error("Failed to finish run", zap.String("taskID", p.task.ID.String()), zap.String("runID", p.run.ID.String()), zap.Error(err))
 	}
 }
@@ -492,8 +460,6 @@ func (w *worker) executeQuery(p *promise) {
 
 	// start
 	w.start(p)
-
-	ctx = icontext.SetAuthorizer(ctx, p.auth)
 
 	buildCompiler := w.systemBuildCompiler
 	if p.task.Type != taskmodel.TaskSystemType {
@@ -508,13 +474,7 @@ func (w *worker) executeQuery(p *promise) {
 		return
 	}
 
-	req := &query.Request{
-		Authorization:  p.auth,
-		OrganizationID: p.task.OrganizationID,
-		Compiler:       compiler,
-	}
-	req.WithReturnNoContent(true)
-	it, err := w.e.qs.Query(ctx, req)
+	it, err := w.e.qs.Query(ctx, compiler)
 	if err != nil {
 		// Assume the error should not be part of the runResult.
 		w.finish(p, taskmodel.RunFail, taskmodel.ErrQueryError(err))
@@ -536,7 +496,7 @@ func (w *worker) executeQuery(p *promise) {
 	// log the trace id and whether or not it was sampled into the run log
 	if traceID, isSampled, ok := tracing.InfoFromSpan(span); ok {
 		msg := fmt.Sprintf("trace_id=%s is_sampled=%t", traceID, isSampled)
-		w.e.tcs.AddRunLog(p.ctx, p.task.ID, p.run.ID, time.Now().UTC(), msg)
+		w.e.tcs.AddRunLog(ctx, p.task.ID, p.run.ID, time.Now().UTC(), msg)
 	}
 
 	if runErr != nil {
@@ -572,7 +532,6 @@ func (e *Executor) PromiseQueueUsage() float64 {
 type promise struct {
 	run  *taskmodel.Run
 	task *taskmodel.Task
-	auth *influxdb.Authorization
 
 	done chan struct{}
 	err  error
@@ -629,57 +588,17 @@ func NewASTCompiler(ctx context.Context, query string, ts CompilerBuilderTimesta
 		return nil, err
 	}
 	var externBytes []byte
-	if feature.InjectLatestSuccessTime().Enabled(ctx) {
-		extern := ts.Extern()
-		if len(extern.Body) > 0 {
-			var err error
-			externBytes, err = json.Marshal(extern)
-			if err != nil {
-				return nil, err
-			}
+	extern := ts.Extern()
+	if len(extern.Body) > 0 {
+		var err error
+		externBytes, err = json.Marshal(extern)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return lang.ASTCompiler{
 		AST:    pkg,
 		Now:    ts.Now,
 		Extern: externBytes,
-	}, nil
-}
-
-// NewFluxCompiler wraps a Flux query string in a raw-query representation.
-func NewFluxCompiler(ctx context.Context, query string, ts CompilerBuilderTimestamps) (flux.Compiler, error) {
-	var externBytes []byte
-	if feature.InjectLatestSuccessTime().Enabled(ctx) {
-		extern := ts.Extern()
-		if len(extern.Body) > 0 {
-			var err error
-			externBytes, err = json.Marshal(extern)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return lang.FluxCompiler{
-		Query:  query,
-		Extern: externBytes,
-		// TODO(brett): This mitigates an immediate problem where
-		// Checks/Notifications breaks when sending Now, and system Tasks do not
-		// break when sending Now. We are currently sending C+N through using
-		// Flux Compiler and Tasks as AST Compiler until we come to the root
-		// cause.
-		//
-		// Removing Now here will keep the system humming along normally until
-		// we are able to locate the root cause and use Flux Compiler for all
-		// Task types.
-		//
-		// It turns out this is due to the exclusive nature of the stop time in
-		// Flux "from" and that we weren't including the left-hand boundary of
-		// the range check for notifications. We're shipping a fix soon in
-		//
-		// https://github.com/influxdata/influxdb/pull/19392
-		//
-		// Once this has merged, we can send Now again.
-		//
-		// Now: now,
 	}, nil
 }

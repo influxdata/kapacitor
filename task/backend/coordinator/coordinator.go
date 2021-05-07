@@ -6,14 +6,12 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	"github.com/influxdata/influxdb/v2/task/backend/executor"
-	"github.com/influxdata/influxdb/v2/task/backend/middleware"
-	"github.com/influxdata/influxdb/v2/task/backend/scheduler"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/backend/executor"
+	"github.com/influxdata/kapacitor/task/backend/scheduler"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
 )
 
-var _ middleware.Coordinator = (*Coordinator)(nil)
 var _ Executor = (*executor.Executor)(nil)
 
 // DefaultLimit is the maximum number of tasks that a given taskd server can own
@@ -36,7 +34,7 @@ type Coordinator struct {
 
 type CoordinatorOption func(*Coordinator)
 
-// SchedulableTask is a wrapper around the Task struct, giving it methods to make it compatible with the Scheduler
+// SchedulableTask is a wrapper around the Task struct, giving it methods to make it compatible with the scheduler
 type SchedulableTask struct {
 	*taskmodel.Task
 	sch scheduler.Schedule
@@ -106,7 +104,7 @@ func NewCoordinator(log *zap.Logger, scheduler scheduler.Scheduler, executor Exe
 	return c
 }
 
-// TaskCreated asks the Scheduler to schedule the newly created task
+// TaskCreated asks the scheduler to schedule the newly created task
 func (c *Coordinator) TaskCreated(ctx context.Context, task *taskmodel.Task) error {
 	t, err := NewSchedulableTask(task)
 
@@ -144,7 +142,7 @@ func (c *Coordinator) TaskUpdated(ctx context.Context, from, to *taskmodel.Task)
 	return nil
 }
 
-//TaskDeleted asks the Scheduler to release the deleted task
+//TaskDeleted asks the scheduler to release the deleted task
 func (c *Coordinator) TaskDeleted(ctx context.Context, id platform.ID) error {
 	tid := scheduler.ID(id)
 	if err := c.sch.Release(tid); err != nil && err != taskmodel.ErrTaskNotClaimed {

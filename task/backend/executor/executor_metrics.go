@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/v2/kit/platform"
-	"github.com/influxdata/influxdb/v2/kit/platform/errors"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	errors2 "github.com/influxdata/influxdb/v2/kit/platform/errors"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -155,7 +155,7 @@ func (em *ExecutorMetrics) FinishRun(task *taskmodel.Task, status taskmodel.RunS
 // LogError increments the count of errors by error code.
 func (em *ExecutorMetrics) LogError(taskType string, err error) {
 	switch e := err.(type) {
-	case *errors.Error:
+	case *errors2.Error:
 		em.errorsCounter.WithLabelValues(taskType, e.Code).Inc()
 	default:
 		em.errorsCounter.WithLabelValues(taskType, "unknown").Inc()
@@ -167,7 +167,7 @@ func (em *ExecutorMetrics) LogError(taskType string, err error) {
 // and so that unrecoverable errors can be quickly identified for deactivation
 func (em *ExecutorMetrics) LogUnrecoverableError(taskID platform.ID, err error) {
 	switch e := err.(type) {
-	case *errors.Error:
+	case *errors2.Error:
 		em.unrecoverableCounter.WithLabelValues(taskID.String(), e.Code).Inc()
 	default:
 		em.unrecoverableCounter.WithLabelValues(taskID.String(), "unknown").Inc()

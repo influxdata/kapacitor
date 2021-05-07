@@ -3,7 +3,6 @@ package options
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,8 +11,8 @@ import (
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/ast/edit"
 	"github.com/influxdata/flux/interpreter"
+	"github.com/influxdata/flux/parser"
 	"github.com/influxdata/flux/values"
-	"github.com/influxdata/influxdb/v2/pkg/pointer"
 )
 
 const maxConcurrency = 100
@@ -150,17 +149,21 @@ type FluxLanguageService interface {
 	EvalAST(ctx context.Context, astPkg *ast.Package) ([]interpreter.SideEffect, values.Scope, error)
 }
 
+func int64p(i int64) *int64 {
+	return &i
+}
+
 // FromScriptAST extracts Task options from a Flux script using only the AST (no
 // evaluation of the script). Using AST here allows us to avoid having to
 // contend with functions that aren't available in some parsing contexts (within
 // Gateway for example).
-func FromScriptAST(lang FluxLanguageService, script string) (Options, error) {
+func FromScriptAST(script string) (Options, error) {
 	opts := Options{
-		Retry:       pointer.Int64(1),
-		Concurrency: pointer.Int64(1),
+		Retry:       int64p(1),
+		Concurrency: int64p(1),
 	}
 
-	fluxAST, err := parse(lang, script)
+	fluxAST, err := Parse(script)
 	if err != nil {
 		return opts, err
 	}
@@ -409,9 +412,12 @@ func (o *Options) EffectiveCronString() string {
 // but it may be null if parsing didn't even occur.
 //
 // This will return an error if the FluxLanguageService is nil.
-func parse(lang FluxLanguageService, source string) (*ast.Package, error) {
-	if lang == nil {
-		return nil, errors.New("flux is not configured; cannot parse")
+func Parse(source string) (*ast.Package, error) {
+	pkg := parser.ParseSource(source)
+	var err error
+	if ast.Check(pkg) > 0 {
+		err = ast.GetError(pkg)
+
 	}
-	return lang.Parse(source)
+	return pkg, err
 }

@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb/v2/query/fluxlang"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 )
 
 var (
@@ -35,7 +34,7 @@ func TestTaskConcurrency(t *testing.T) {
 		ScheduledFor: time.Now(),
 	}
 
-	clFunc := ConcurrencyLimit(te, fluxlang.DefaultService)
+	clFunc := ConcurrencyLimit(te)
 	if err := clFunc(taskWith1Concurrency, r1); err != nil {
 		t.Fatal(err)
 	}

@@ -8,17 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb/v2/kit/platform"
-
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/execute"
 	"github.com/influxdata/flux/lang"
 	"github.com/influxdata/flux/memory"
 	"github.com/influxdata/flux/runtime"
 	"github.com/influxdata/flux/values"
-	"github.com/influxdata/influxdb/v2"
-	_ "github.com/influxdata/influxdb/v2/fluxinit/static"
-	"github.com/influxdata/influxdb/v2/query"
 )
 
 type fakeQueryService struct {
@@ -29,8 +24,6 @@ type fakeQueryService struct {
 	// Used to validate that the executor applied the correct authorizer.
 	mostRecentCtx context.Context
 }
-
-var _ query.AsyncQueryService = (*fakeQueryService)(nil)
 
 func makeAST(q string) lang.ASTCompiler {
 	pkg, err := runtime.ParseToJSON(q)
@@ -55,11 +48,7 @@ func newFakeQueryService() *fakeQueryService {
 	return &fakeQueryService{queries: make(map[string]*fakeQuery)}
 }
 
-func (s *fakeQueryService) Query(ctx context.Context, req *query.Request) (flux.Query, error) {
-	if req.Authorization == nil {
-		panic("authorization required")
-	}
-
+func (s *fakeQueryService) Query(ctx context.Context, compiler flux.Compiler) (flux.ResultIterator, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.mostRecentCtx = ctx
@@ -69,9 +58,9 @@ func (s *fakeQueryService) Query(ctx context.Context, req *query.Request) (flux.
 		return nil, err
 	}
 
-	astc, ok := req.Compiler.(lang.ASTCompiler)
+	astc, ok := compiler.(lang.ASTCompiler)
 	if !ok {
-		return nil, fmt.Errorf("fakeQueryService only supports the ASTCompiler, got %T", req.Compiler)
+		return nil, fmt.Errorf("fakeQueryService only supports the ASTCompiler, got %T", compiler)
 	}
 
 	fq := &fakeQuery{
@@ -82,7 +71,7 @@ func (s *fakeQueryService) Query(ctx context.Context, req *query.Request) (flux.
 
 	go fq.run(ctx)
 
-	return fq, nil
+	return flux.NewResultIteratorFromQuery(fq), nil
 }
 
 // SucceedQuery allows the running query matching the given script to return on its Ready channel.
@@ -250,45 +239,6 @@ func (ts tables) Do(f func(flux.Table) error) error {
 }
 
 func (ts tables) Statistics() flux.Statistics { return flux.Statistics{} }
-
-type testCreds struct {
-	OrgID, UserID platform.ID
-	Auth          *influxdb.Authorization
-}
-
-func createCreds(t *testing.T, orgSvc influxdb.OrganizationService, userSvc influxdb.UserService, authSvc influxdb.AuthorizationService) testCreds {
-	t.Helper()
-
-	org := &influxdb.Organization{Name: t.Name() + "-org"}
-	if err := orgSvc.CreateOrganization(context.Background(), org); err != nil {
-		t.Fatal(err)
-	}
-
-	user := &influxdb.User{Name: t.Name() + "-user"}
-	if err := userSvc.CreateUser(context.Background(), user); err != nil {
-		t.Fatal(err)
-	}
-
-	readPerm, err := influxdb.NewGlobalPermission(influxdb.ReadAction, influxdb.BucketsResourceType)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writePerm, err := influxdb.NewGlobalPermission(influxdb.WriteAction, influxdb.BucketsResourceType)
-	if err != nil {
-		t.Fatal(err)
-	}
-	auth := &influxdb.Authorization{
-		OrgID:       org.ID,
-		UserID:      user.ID,
-		Token:       "hifriend!",
-		Permissions: []influxdb.Permission{*readPerm, *writePerm},
-	}
-	if err := authSvc.CreateAuthorization(context.Background(), auth); err != nil {
-		t.Fatal(err)
-	}
-
-	return testCreds{OrgID: org.ID, Auth: auth}
-}
 
 // Some tests use t.Parallel, and the fake query service depends on unique scripts,
 // so format a new script with the test name in each test.

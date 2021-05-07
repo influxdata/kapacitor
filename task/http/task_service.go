@@ -8,134 +8,117 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"runtime/debug"
 	"strconv"
 	"time"
 
 	"github.com/influxdata/httprouter"
 	"github.com/influxdata/influxdb/v2"
-	pcontext "github.com/influxdata/influxdb/v2/context"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	errors2 "github.com/influxdata/influxdb/v2/kit/platform/errors"
 	"github.com/influxdata/influxdb/v2/kit/tracing"
-	"github.com/influxdata/influxdb/v2/kv"
+	http2 "github.com/influxdata/influxdb/v2/kit/transport/http"
 	"github.com/influxdata/influxdb/v2/pkg/httpc"
-	"github.com/influxdata/influxdb/v2/task/options"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/auth"
+	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/task/options"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
-
-// TaskBackend is all services and associated parameters required to construct
-// the TaskHandler.
-type TaskBackend struct {
-	errors2.HTTPErrorHandler
-	log *zap.Logger
-
-	AlgoWProxy                 FeatureProxyHandler
-	TaskService                taskmodel.TaskService
-	AuthorizationService       influxdb.AuthorizationService
-	OrganizationService        influxdb.OrganizationService
-	UserResourceMappingService influxdb.UserResourceMappingService
-	LabelService               influxdb.LabelService
-	UserService                influxdb.UserService
-	BucketService              influxdb.BucketService
-}
-
-// NewTaskBackend returns a new instance of TaskBackend.
-func NewTaskBackend(log *zap.Logger, b *APIBackend) *TaskBackend {
-	return &TaskBackend{
-		HTTPErrorHandler:           b.HTTPErrorHandler,
-		log:                        log,
-		AlgoWProxy:                 b.AlgoWProxy,
-		TaskService:                b.TaskService,
-		AuthorizationService:       b.AuthorizationService,
-		OrganizationService:        b.OrganizationService,
-		UserResourceMappingService: b.UserResourceMappingService,
-		LabelService:               b.LabelService,
-		UserService:                b.UserService,
-		BucketService:              b.BucketService,
-	}
-}
 
 // TaskHandler represents an HTTP API handler for tasks.
 type TaskHandler struct {
-	*httprouter.Router
+	log         *zap.Logger
+	TaskService taskmodel.TaskService
 	errors2.HTTPErrorHandler
-	log *zap.Logger
-
-	TaskService                taskmodel.TaskService
-	AuthorizationService       influxdb.AuthorizationService
-	OrganizationService        influxdb.OrganizationService
-	UserResourceMappingService influxdb.UserResourceMappingService
-	LabelService               influxdb.LabelService
-	UserService                influxdb.UserService
-	BucketService              influxdb.BucketService
+	router *httprouter.Router
 }
 
 const (
-	prefixTasks            = "/api/v2/tasks"
-	tasksIDPath            = "/api/v2/tasks/:id"
-	tasksIDLogsPath        = "/api/v2/tasks/:id/logs"
-	tasksIDMembersPath     = "/api/v2/tasks/:id/members"
-	tasksIDMembersIDPath   = "/api/v2/tasks/:id/members/:userID"
-	tasksIDOwnersPath      = "/api/v2/tasks/:id/owners"
-	tasksIDOwnersIDPath    = "/api/v2/tasks/:id/owners/:userID"
-	tasksIDRunsPath        = "/api/v2/tasks/:id/runs"
-	tasksIDRunsIDPath      = "/api/v2/tasks/:id/runs/:rid"
-	tasksIDRunsIDLogsPath  = "/api/v2/tasks/:id/runs/:rid/logs"
-	tasksIDRunsIDRetryPath = "/api/v2/tasks/:id/runs/:rid/retry"
-	tasksIDLabelsPath      = "/api/v2/tasks/:id/labels"
-	tasksIDLabelsIDPath    = "/api/v2/tasks/:id/labels/:lid"
+	prefixKapacitor        = "/kapacitor/v1"
+	prefixTasks            = "/fluxtasks"
+	tasksIDPath            = "/fluxtasks/:id"
+	tasksIDLogsPath        = "/fluxtasks/:id/logs"
+	tasksIDRunsPath        = "/fluxtasks/:id/runs"
+	tasksIDRunsIDPath      = "/fluxtasks/:id/runs/:rid"
+	tasksIDRunsIDLogsPath  = "/fluxtasks/:id/runs/:rid/logs"
+	tasksIDRunsIDRetryPath = "/fluxtasks/:id/runs/:rid/retry"
 )
 
-// NewTaskHandler returns a new instance of TaskHandler.
-func NewTaskHandler(log *zap.Logger, b *TaskBackend) *TaskHandler {
-	h := &TaskHandler{
-		Router:           NewRouter(b.HTTPErrorHandler),
-		HTTPErrorHandler: b.HTTPErrorHandler,
-		log:              log,
+func (h *TaskHandler) Handle(w http.ResponseWriter, r *http.Request, user auth.User) {
+	req := r.WithContext(WithKapacitorUser(r.Context(), user))
+	h.router.ServeHTTP(w, req)
+}
 
-		TaskService:                b.TaskService,
-		AuthorizationService:       b.AuthorizationService,
-		OrganizationService:        b.OrganizationService,
-		UserResourceMappingService: b.UserResourceMappingService,
-		LabelService:               b.LabelService,
-		UserService:                b.UserService,
-		BucketService:              b.BucketService,
+// panic handles panics recovered from http handlers.
+// It returns a json response with http status code 500 and the recovered error message.
+func (h *TaskHandler) panicHandler(w http.ResponseWriter, r *http.Request, rcv interface{}) {
+	ctx := r.Context()
+	pe := &errors2.Error{
+		Code: errors2.EInternal,
+		Msg:  "a panic has occurred",
+		Err:  fmt.Errorf("%s: %v", r.URL.String(), rcv),
 	}
+
+	if entry := h.log.Check(zapcore.ErrorLevel, pe.Msg); entry != nil {
+		entry.Stack = string(debug.Stack())
+		entry.Write(zap.Error(pe.Err))
+	}
+
+	h.HandleHTTPError(ctx, pe, w)
+}
+
+// panic handles panics recovered from http handlers.
+// It returns a json response with http status code 500 and the recovered error message.
+func (h *TaskHandler) notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	pe := &errors2.Error{
+		Code: errors2.ENotFound,
+		Msg:  "url not found",
+		Err:  fmt.Errorf("%s: not found", r.URL.String()),
+	}
+	h.HandleHTTPError(ctx, pe, w)
+}
+
+type contextKey string
+
+var userContextKey contextKey = "user"
+
+func WithKapacitorUser(ctx context.Context, user auth.User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
+}
+
+func KapacitorUserFromContext(ctx context.Context) *auth.User {
+	user, ok := ctx.Value(userContextKey).(auth.User)
+	if !ok {
+		return nil
+	}
+	return &user
+}
+
+func (h *TaskHandler) HandlerFunc(method string, pattern string, handler func(w http.ResponseWriter, r *http.Request)) {
+	h.router.HandlerFunc(method, prefixKapacitor+pattern, handler)
+}
+
+func AddTaskServiceRoutes(handler *httpd.Handler, log *zap.Logger, svc taskmodel.TaskService) error {
+	h := &TaskHandler{
+		log:              log,
+		TaskService:      svc,
+		HTTPErrorHandler: http2.ErrorHandler(0),
+		router:           httprouter.New(),
+	}
+	h.router.AddMatchedRouteToContext = true
+	h.router.PanicHandler = h.panicHandler
+	h.router.NotFound = http.HandlerFunc(h.notFoundHandler)
 
 	h.HandlerFunc("GET", prefixTasks, h.handleGetTasks)
-	h.Handler("POST", prefixTasks, withFeatureProxy(b.AlgoWProxy, http.HandlerFunc(h.handlePostTask)))
-
+	h.HandlerFunc("POST", prefixTasks, h.handlePostTask)
 	h.HandlerFunc("GET", tasksIDPath, h.handleGetTask)
-	h.Handler("PATCH", tasksIDPath, withFeatureProxy(b.AlgoWProxy, http.HandlerFunc(h.handleUpdateTask)))
+	h.HandlerFunc("PATCH", tasksIDPath, h.handleUpdateTask)
 	h.HandlerFunc("DELETE", tasksIDPath, h.handleDeleteTask)
-
 	h.HandlerFunc("GET", tasksIDLogsPath, h.handleGetLogs)
 	h.HandlerFunc("GET", tasksIDRunsIDLogsPath, h.handleGetLogs)
-
-	memberBackend := MemberBackend{
-		HTTPErrorHandler:           b.HTTPErrorHandler,
-		log:                        b.log.With(zap.String("handler", "member")),
-		ResourceType:               influxdb.TasksResourceType,
-		UserType:                   influxdb.Member,
-		UserResourceMappingService: b.UserResourceMappingService,
-		UserService:                b.UserService,
-	}
-	h.HandlerFunc("POST", tasksIDMembersPath, newPostMemberHandler(memberBackend))
-	h.HandlerFunc("GET", tasksIDMembersPath, newGetMembersHandler(memberBackend))
-	h.HandlerFunc("DELETE", tasksIDMembersIDPath, newDeleteMemberHandler(memberBackend))
-
-	ownerBackend := MemberBackend{
-		HTTPErrorHandler:           b.HTTPErrorHandler,
-		log:                        b.log.With(zap.String("handler", "member")),
-		ResourceType:               influxdb.TasksResourceType,
-		UserType:                   influxdb.Owner,
-		UserResourceMappingService: b.UserResourceMappingService,
-		UserService:                b.UserService,
-	}
-	h.HandlerFunc("POST", tasksIDOwnersPath, newPostMemberHandler(ownerBackend))
-	h.HandlerFunc("GET", tasksIDOwnersPath, newGetMembersHandler(ownerBackend))
-	h.HandlerFunc("DELETE", tasksIDOwnersIDPath, newDeleteMemberHandler(ownerBackend))
 
 	h.HandlerFunc("GET", tasksIDRunsPath, h.handleGetRuns)
 	h.HandlerFunc("POST", tasksIDRunsPath, h.handleForceRun)
@@ -143,26 +126,38 @@ func NewTaskHandler(log *zap.Logger, b *TaskBackend) *TaskHandler {
 	h.HandlerFunc("POST", tasksIDRunsIDRetryPath, h.handleRetryRun)
 	h.HandlerFunc("DELETE", tasksIDRunsIDPath, h.handleCancelRun)
 
-	labelBackend := &LabelBackend{
-		HTTPErrorHandler: b.HTTPErrorHandler,
-		log:              b.log.With(zap.String("handler", "label")),
-		LabelService:     b.LabelService,
-		ResourceType:     influxdb.TasksResourceType,
+	routes := make([]httpd.Route, 0, 10)
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		for _, prefix := range []string{prefixTasks, prefixTasks + "/"} {
+			routes = append(routes, httpd.Route{
+				Method:      method,
+				Pattern:     prefix,
+				HandlerFunc: h.Handle,
+			})
+		}
 	}
-	h.HandlerFunc("GET", tasksIDLabelsPath, newGetLabelsHandler(labelBackend))
-	h.HandlerFunc("POST", tasksIDLabelsPath, newPostLabelHandler(labelBackend))
-	h.HandlerFunc("DELETE", tasksIDLabelsIDPath, newDeleteLabelHandler(labelBackend))
+	return handler.AddRoutes(routes)
+}
 
-	return h
+func RemoveTaskServiceRoutes(handler *httpd.Handler) error {
+	routes := make([]httpd.Route, 0, 10)
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		for _, prefix := range []string{prefixTasks, prefixTasks + "/"} {
+			routes = append(routes, httpd.Route{
+				Method:      method,
+				Pattern:     prefix,
+			})
+		}
+	}
+	handler.DelRoutes(routes)
+	return nil
 }
 
 // Task is a package-specific Task format that preserves the expected format for the API,
 // where time values are represented as strings
 type Task struct {
 	ID              platform.ID            `json:"id"`
-	OrganizationID  platform.ID            `json:"orgID"`
-	Organization    string                 `json:"org"`
-	OwnerID         platform.ID            `json:"ownerID"`
+	OwnerUsername   string                 `json:"ownerUsername"`
 	Name            string                 `json:"name"`
 	Description     string                 `json:"description,omitempty"`
 	Status          string                 `json:"status"`
@@ -182,6 +177,23 @@ type taskResponse struct {
 	Links  map[string]string `json:"links"`
 	Labels []influxdb.Label  `json:"labels"`
 	Task
+}
+
+func encodeResponse(ctx context.Context, w http.ResponseWriter, code int, res interface{}) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+
+	return json.NewEncoder(w).Encode(res)
+}
+
+func logEncodingError(log *zap.Logger, r *http.Request, err error) {
+	// If we encounter an error while encoding the response to an http request
+	// the best thing we can do is log that error, as we may have already written
+	// the headers for the http request in question.
+	log.Error("Error encoding response",
+		zap.String("path", r.URL.Path),
+		zap.String("method", r.Method),
+		zap.Error(err))
 }
 
 // NewFrontEndTask converts a internal task type to a task that we want to display to users
@@ -205,9 +217,7 @@ func NewFrontEndTask(t taskmodel.Task) Task {
 
 	return Task{
 		ID:              t.ID,
-		OrganizationID:  t.OrganizationID,
-		Organization:    t.Organization,
-		OwnerID:         t.OwnerID,
+		OwnerUsername:   t.OwnerUsername,
 		Name:            t.Name,
 		Description:     t.Description,
 		Status:          t.Status,
@@ -253,9 +263,7 @@ func convertTask(t Task) *taskmodel.Task {
 
 	return &taskmodel.Task{
 		ID:              t.ID,
-		OrganizationID:  t.OrganizationID,
-		Organization:    t.Organization,
-		OwnerID:         t.OwnerID,
+		OwnerUsername:   t.OwnerUsername,
 		Name:            t.Name,
 		Description:     t.Description,
 		Status:          t.Status,
@@ -308,22 +316,14 @@ func customParseDuration(d time.Duration) string {
 	return str
 }
 
-func newTaskResponse(t taskmodel.Task, labels []*influxdb.Label) taskResponse {
+func newTaskResponse(t taskmodel.Task) taskResponse {
 	response := taskResponse{
 		Links: map[string]string{
-			"self":    fmt.Sprintf("/api/v2/tasks/%s", t.ID),
-			"members": fmt.Sprintf("/api/v2/tasks/%s/members", t.ID),
-			"owners":  fmt.Sprintf("/api/v2/tasks/%s/owners", t.ID),
-			"labels":  fmt.Sprintf("/api/v2/tasks/%s/labels", t.ID),
-			"runs":    fmt.Sprintf("/api/v2/tasks/%s/runs", t.ID),
-			"logs":    fmt.Sprintf("/api/v2/tasks/%s/logs", t.ID),
+			"self": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s", t.ID),
+			"runs": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s/runs", t.ID),
+			"logs": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s/logs", t.ID),
 		},
-		Task:   NewFrontEndTask(t),
-		Labels: []influxdb.Label{},
-	}
-
-	for _, l := range labels {
-		response.Labels = append(response.Labels, *l)
+		Task: NewFrontEndTask(t),
 	}
 
 	return response
@@ -366,15 +366,13 @@ type tasksResponse struct {
 	Tasks []taskResponse        `json:"tasks"`
 }
 
-func newTasksResponse(ctx context.Context, ts []*taskmodel.Task, f taskmodel.TaskFilter, labelService influxdb.LabelService) tasksResponse {
+func newTasksResponse(ctx context.Context, ts []*taskmodel.Task, f taskmodel.TaskFilter) tasksResponse {
 	rs := tasksResponse{
 		Links: newTasksPagingLinks(prefixTasks, ts, f),
 		Tasks: make([]taskResponse, len(ts)),
 	}
-
 	for i := range ts {
-		labels, _ := labelService.FindResourceLabels(ctx, influxdb.LabelMappingFilter{ResourceID: ts[i].ID, ResourceType: influxdb.TasksResourceType})
-		rs.Tasks[i] = newTaskResponse(*ts[i], labels)
+		rs.Tasks[i] = newTaskResponse(*ts[i])
 	}
 	return rs
 }
@@ -478,7 +476,7 @@ func newRunsResponse(rs []*taskmodel.Run, taskID platform.ID) runsResponse {
 
 func (h *TaskHandler) handleGetTasks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	req, err := decodeGetTasksRequest(ctx, r, h.OrganizationService)
+	req, err := decodeGetTasksRequest(ctx, r)
 	if err != nil {
 		err = &errors2.Error{
 			Err:  err,
@@ -495,7 +493,7 @@ func (h *TaskHandler) handleGetTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.log.Debug("Tasks retrieved", zap.String("tasks", fmt.Sprint(tasks)))
-	if err := encodeResponse(ctx, w, http.StatusOK, newTasksResponse(ctx, tasks, req.filter, h.LabelService)); err != nil {
+	if err := encodeResponse(ctx, w, http.StatusOK, newTasksResponse(ctx, tasks, req.filter)); err != nil {
 		logEncodingError(h.log, r, err)
 		return
 	}
@@ -505,7 +503,7 @@ type getTasksRequest struct {
 	filter taskmodel.TaskFilter
 }
 
-func decodeGetTasksRequest(ctx context.Context, r *http.Request, orgs influxdb.OrganizationService) (*getTasksRequest, error) {
+func decodeGetTasksRequest(ctx context.Context, r *http.Request) (*getTasksRequest, error) {
 	qp := r.URL.Query()
 	req := &getTasksRequest{}
 
@@ -517,36 +515,8 @@ func decodeGetTasksRequest(ctx context.Context, r *http.Request, orgs influxdb.O
 		req.filter.After = id
 	}
 
-	if orgName := qp.Get("org"); orgName != "" {
-		o, err := orgs.FindOrganization(ctx, influxdb.OrganizationFilter{Name: &orgName})
-		if err != nil {
-			if pErr, ok := err.(*errors2.Error); ok && pErr != nil {
-				if kv.IsNotFound(err) || pErr.Code == errors2.EUnauthorized {
-					return nil, &errors2.Error{
-						Err: errors.New("org not found or unauthorized"),
-						Msg: "org " + orgName + " not found or unauthorized",
-					}
-				}
-			}
-			return nil, err
-		}
-		req.filter.Organization = o.Name
-		req.filter.OrganizationID = &o.ID
-	}
-	if oid := qp.Get("orgID"); oid != "" {
-		orgID, err := platform.IDFromString(oid)
-		if err != nil {
-			return nil, err
-		}
-		req.filter.OrganizationID = orgID
-	}
-
-	if userID := qp.Get("user"); userID != "" {
-		id, err := platform.IDFromString(userID)
-		if err != nil {
-			return nil, err
-		}
-		req.filter.User = id
+	if userName := qp.Get("user"); userName != "" {
+		req.filter.Username = &userName
 	}
 
 	if limit := qp.Get("limit"); limit != "" {
@@ -594,24 +564,6 @@ func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.populateTaskCreateOrg(ctx, &req.TaskCreate); err != nil {
-		err = &errors2.Error{
-			Err: err,
-			Msg: "could not identify organization",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
-	if !req.TaskCreate.OrganizationID.Valid() {
-		err := &errors2.Error{
-			Code: errors2.EInvalid,
-			Msg:  "invalid organization id",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
 	if err != nil {
 		h.HandleHTTPError(ctx, err, w)
 		return
@@ -619,11 +571,7 @@ func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.TaskService.CreateTask(ctx, req.TaskCreate)
 	if err != nil {
-		if e, ok := err.(AuthzError); ok {
-			h.log.Error("Failed authentication", zap.Errors("error messages", []error{err, e.AuthzError()}))
-		}
-
-		// if the error is not already a influxdb.error then make it into one
+		// if the error is not already a errors2.Error then make it into one
 		if _, ok := err.(*errors2.Error); !ok {
 			err = &errors2.Error{
 				Err:  err,
@@ -636,7 +584,7 @@ func (h *TaskHandler) handlePostTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := encodeResponse(ctx, w, http.StatusCreated, newTaskResponse(*task, []*influxdb.Label{})); err != nil {
+	if err := encodeResponse(ctx, w, http.StatusCreated, newTaskResponse(*task)); err != nil {
 		logEncodingError(h.log, r, err)
 		return
 	}
@@ -652,13 +600,9 @@ func decodePostTaskRequest(ctx context.Context, r *http.Request) (*postTaskReque
 		return nil, err
 	}
 
-	// pull auth from ctx, populate OwnerID
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		return nil, err
+	if user := KapacitorUserFromContext(r.Context()); user != nil && user.Name() != "" {
+		tc.OwnerUsername = user.Name()
 	}
-	tc.OwnerID = auth.GetUserID()
-	// when creating a task we set the type so we can filter later.
 	tc.Type = taskmodel.TaskSystemType
 
 	if err := tc.Validate(); err != nil {
@@ -694,7 +638,6 @@ func (h *TaskHandler) handleGetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	labels, err := h.LabelService.FindResourceLabels(ctx, influxdb.LabelMappingFilter{ResourceID: task.ID, ResourceType: influxdb.TasksResourceType})
 	if err != nil {
 		err = &errors2.Error{
 			Err: err,
@@ -704,7 +647,7 @@ func (h *TaskHandler) handleGetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.log.Debug("Task retrieved", zap.String("tasks", fmt.Sprint(task)))
-	if err := encodeResponse(ctx, w, http.StatusOK, newTaskResponse(*task, labels)); err != nil {
+	if err := encodeResponse(ctx, w, http.StatusOK, newTaskResponse(*task)); err != nil {
 		logEncodingError(h.log, r, err)
 		return
 	}
@@ -761,7 +704,6 @@ func (h *TaskHandler) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	labels, err := h.LabelService.FindResourceLabels(ctx, influxdb.LabelMappingFilter{ResourceID: task.ID, ResourceType: influxdb.TasksResourceType})
 	if err != nil {
 		err = &errors2.Error{
 			Err: err,
@@ -771,7 +713,7 @@ func (h *TaskHandler) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.log.Debug("Tasks updated", zap.String("task", fmt.Sprint(task)))
-	if err := encodeResponse(ctx, w, http.StatusOK, newTaskResponse(*task, labels)); err != nil {
+	if err := encodeResponse(ctx, w, http.StatusOK, newTaskResponse(*task)); err != nil {
 		logEncodingError(h.log, r, err)
 		return
 	}
@@ -878,29 +820,6 @@ func (h *TaskHandler) handleGetLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		err = &errors2.Error{
-			Err:  err,
-			Code: errors2.EUnauthorized,
-			Msg:  "failed to get authorizer",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
-	if k := auth.Kind(); k != influxdb.AuthorizationKind {
-		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, auth, req.filter.Task)
-		if err != nil {
-			h.HandleHTTPError(ctx, err, w)
-			return
-		}
-
-		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
-		ctx = pcontext.SetAuthorizer(ctx, authz)
-	}
-
 	logs, _, err := h.TaskService.FindLogs(ctx, req.filter)
 	if err != nil {
 		err := &errors2.Error{
@@ -968,29 +887,6 @@ func (h *TaskHandler) handleGetRuns(w http.ResponseWriter, r *http.Request) {
 		}
 		h.HandleHTTPError(ctx, err, w)
 		return
-	}
-
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		err = &errors2.Error{
-			Err:  err,
-			Code: errors2.EUnauthorized,
-			Msg:  "failed to get authorizer",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
-	if k := auth.Kind(); k != influxdb.AuthorizationKind {
-		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, auth, req.filter.Task)
-		if err != nil {
-			h.HandleHTTPError(ctx, err, w)
-			return
-		}
-
-		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
-		ctx = pcontext.SetAuthorizer(ctx, authz)
 	}
 
 	runs, _, err := h.TaskService.FindRuns(ctx, req.filter)
@@ -1176,29 +1072,6 @@ func (h *TaskHandler) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		err = &errors2.Error{
-			Err:  err,
-			Code: errors2.EUnauthorized,
-			Msg:  "failed to get authorizer",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
-	if k := auth.Kind(); k != influxdb.AuthorizationKind {
-		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, auth, req.TaskID)
-		if err != nil {
-			h.HandleHTTPError(ctx, err, w)
-			return
-		}
-
-		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
-		ctx = pcontext.SetAuthorizer(ctx, authz)
-	}
-
 	run, err := h.TaskService.FindRunByID(ctx, req.TaskID, req.RunID)
 	if err != nil {
 		err := &errors2.Error{
@@ -1333,29 +1206,6 @@ func (h *TaskHandler) handleRetryRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	auth, err := pcontext.GetAuthorizer(ctx)
-	if err != nil {
-		err = &errors2.Error{
-			Err:  err,
-			Code: errors2.EUnauthorized,
-			Msg:  "failed to get authorizer",
-		}
-		h.HandleHTTPError(ctx, err, w)
-		return
-	}
-
-	if k := auth.Kind(); k != influxdb.AuthorizationKind {
-		// Get the authorization for the task, if allowed.
-		authz, err := h.getAuthorizationForTask(ctx, auth, req.TaskID)
-		if err != nil {
-			h.HandleHTTPError(ctx, err, w)
-			return
-		}
-
-		// We were able to access the authorizer for the task, so reassign that on the context for the rest of this call.
-		ctx = pcontext.SetAuthorizer(ctx, authz)
-	}
-
 	run, err := h.TaskService.RetryRun(ctx, req.TaskID, req.RunID)
 	if err != nil {
 		err := &errors2.Error{
@@ -1409,57 +1259,6 @@ func decodeRetryRunRequest(ctx context.Context, r *http.Request) (*retryRunReque
 	}, nil
 }
 
-func (h *TaskHandler) populateTaskCreateOrg(ctx context.Context, tc *taskmodel.TaskCreate) error {
-	if tc.OrganizationID.Valid() && tc.Organization != "" {
-		return nil
-	}
-
-	if !tc.OrganizationID.Valid() && tc.Organization == "" {
-		return errors.New("missing orgID and organization name")
-	}
-
-	if tc.OrganizationID.Valid() {
-		o, err := h.OrganizationService.FindOrganizationByID(ctx, tc.OrganizationID)
-		if err != nil {
-			return err
-		}
-		tc.Organization = o.Name
-	} else {
-		o, err := h.OrganizationService.FindOrganization(ctx, influxdb.OrganizationFilter{Name: &tc.Organization})
-		if err != nil {
-			return err
-		}
-		tc.OrganizationID = o.ID
-	}
-	return nil
-}
-
-// getAuthorizationForTask looks up the authorization associated with taskID,
-// ensuring that the authorizer on ctx is allowed to view the task and the authorization.
-//
-// This method returns a *influxdb.Error, suitable for directly passing to h.HandleHTTPError.
-func (h *TaskHandler) getAuthorizationForTask(ctx context.Context, auth influxdb.Authorizer, taskID platform.ID) (*influxdb.Authorization, *errors2.Error) {
-	sess, ok := auth.(*influxdb.Session)
-	if !ok {
-		return nil, &errors2.Error{
-			Code: errors2.EUnauthorized,
-			Msg:  "unable to authorize session",
-		}
-	}
-	// First look up the task, if we're allowed.
-	// This assumes h.TaskService validates access.
-	t, err := h.TaskService.FindTaskByID(ctx, taskID)
-	if err != nil {
-		return nil, &errors2.Error{
-			Err:  err,
-			Code: errors2.EUnauthorized,
-			Msg:  "task ID unknown or unauthorized",
-		}
-	}
-
-	return sess.EphemeralAuth(t.OrganizationID), nil
-}
-
 // TaskService connects to Influx via HTTP using tokens to manage tasks.
 type TaskService struct {
 	Client *httpc.Client
@@ -1491,14 +1290,8 @@ func (t TaskService) FindTasks(ctx context.Context, filter taskmodel.TaskFilter)
 	if filter.After != nil {
 		params = append(params, [2]string{"after", filter.After.String()})
 	}
-	if filter.OrganizationID != nil {
-		params = append(params, [2]string{"orgID", filter.OrganizationID.String()})
-	}
-	if filter.Organization != "" {
-		params = append(params, [2]string{"org", filter.Organization})
-	}
-	if filter.User != nil {
-		params = append(params, [2]string{"user", filter.User.String()})
+	if filter.Username != nil {
+		params = append(params, [2]string{"user", *filter.Username})
 	}
 	if filter.Limit != 0 {
 		params = append(params, [2]string{"limit", strconv.Itoa(filter.Limit)})

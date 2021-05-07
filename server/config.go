@@ -3,6 +3,7 @@ package server
 import (
 	"encoding"
 	"fmt"
+	"github.com/influxdata/kapacitor/task"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -79,6 +80,7 @@ type Config struct {
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
+	FluxTask task.Config `toml:"fluxtask"`
 	Load           load.Config       `toml:"load"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        diagnostic.Config `toml:"logging"`
@@ -159,6 +161,7 @@ func NewConfig() *Config {
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
+	c.FluxTask = task.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = diagnostic.NewConfig()
 	c.ConfigOverride = config.NewConfig()
@@ -245,6 +248,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Task.Validate(); err != nil {
 		return errors.Wrap(err, "task")
+	}
+	if err := c.FluxTask.Validate(); err != nil {
+		return errors.Wrap(err, "fluxtask")
 	}
 	if err := c.TLS.Validate(); err != nil {
 		return errors.Wrap(err, "tls")

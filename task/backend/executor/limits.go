@@ -4,16 +4,15 @@ import (
 	"context"
 	"sort"
 
-	"github.com/influxdata/influxdb/v2/query/fluxlang"
-	"github.com/influxdata/influxdb/v2/task/options"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/options"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 )
 
 // ConcurrencyLimit creates a concurrency limit func that uses the executor to determine
 // if the task has exceeded the concurrency limit.
-func ConcurrencyLimit(exec *Executor, lang fluxlang.FluxLanguageService) LimitFunc {
+func ConcurrencyLimit(exec *Executor) LimitFunc {
 	return func(t *taskmodel.Task, r *taskmodel.Run) error {
-		o, err := options.FromScriptAST(lang, t.Flux)
+		o, err := options.FromScriptAST(t.Flux)
 		if err != nil {
 			return err
 		}

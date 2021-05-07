@@ -4,31 +4,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/kapacitor/influxdb"
 	"time"
 
-	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/influxdb/v2/models"
-	"github.com/influxdata/influxdb/v2/storage"
-	"github.com/influxdata/influxdb/v2/task/taskmodel"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
 )
+
 
 // StoragePointsWriterRecorder is an implementation of RunRecorder which
 // writes runs via an implementation of storage PointsWriter
 type StoragePointsWriterRecorder struct {
-	pw storage.PointsWriter
-
-	log *zap.Logger
+	cli         influxdb.Client
+	log         *zap.Logger
+	destination DataDestination
 }
 
 // NewStoragePointsWriterRecorder configures and returns a new *StoragePointsWriterRecorder
-func NewStoragePointsWriterRecorder(log *zap.Logger, pw storage.PointsWriter) *StoragePointsWriterRecorder {
-	return &StoragePointsWriterRecorder{pw, log}
+func NewStoragePointsWriterRecorder(log *zap.Logger, cli influxdb.Client, dest DataDestination) *StoragePointsWriterRecorder {
+	return &StoragePointsWriterRecorder{cli, log, dest}
 }
 
 // Record formats the provided run as a models.Point and writes the resulting
 // point to an underlying storage.PointsWriter
-func (s *StoragePointsWriterRecorder) Record(ctx context.Context, orgID platform.ID, org string, bucketID platform.ID, bucket string, run *taskmodel.Run) error {
+func (s *StoragePointsWriterRecorder) Record(ctx context.Context, bucket string, run *taskmodel.Run) error {
 	tags := models.NewTags(map[string]string{
 		statusTag: run.Status,
 		taskIDTag: run.TaskID.String(),
@@ -66,6 +66,10 @@ func (s *StoragePointsWriterRecorder) Record(ctx context.Context, orgID platform
 		return err
 	}
 
-	// TODO - fix
-	return s.pw.WritePoints(ctx, orgID, bucketID, models.Points{point})
+	return s.cli.WriteV2(influxdb.FluxWrite{
+		Bucket: bucket,
+		Org:    s.destination.Org,
+		OrgID:  s.destination.OrgID,
+		Points: models.Points{point},
+	})
 }

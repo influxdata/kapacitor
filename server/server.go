@@ -4,6 +4,8 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/fluxtask"
+	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -76,6 +78,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
@@ -117,6 +120,8 @@ type Server struct {
 
 	TaskMaster       *kapacitor.TaskMaster
 	TaskMasterLookup *kapacitor.TaskMasterLookup
+
+	FluxTaskService taskmodel.TaskService
 
 	LoadService           *load.Service
 	SideloadService       *sideload.Service
@@ -248,6 +253,10 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "influxdb service")
 	}
 
+	if err := s.appendFluxTaskService(); err != nil {
+		return nil, errors.Wrap(err, "fluxtask service")
+	}
+
 	if err := s.appendLoadService(); err != nil {
 		return nil, errors.Wrap(err, "load service")
 	}
@@ -293,6 +302,8 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendTaskStoreService()
 	s.appendReplayService()
 	s.appendSessionService()
+
+
 
 	// Append third-party integrations
 	// Append extra input services
@@ -399,6 +410,17 @@ func (s *Server) initAlertService() {
 
 func (s *Server) appendAlertService() {
 	s.AppendService("alert", s.AlertService)
+}
+
+func (s *Server) appendFluxTaskService() error {
+	// TODO: hook into correct logging level instead of assuming info
+	logger := s.DiagService.NewZapLogger(zapcore.InfoLevel)
+	srv := fluxtask.New(s.config.FluxTask, logger)
+	srv.HTTPDService = s.HTTPDService
+	srv.InfluxDBService = s.InfluxDBService
+	srv.StorageService = s.StorageService
+	s.AppendService("fluxtask", srv)
+	return nil
 }
 
 func (s *Server) appendTesterService() {

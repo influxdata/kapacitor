@@ -6,6 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/flux"
+	"github.com/influxdata/flux/csv"
+	"github.com/influxdata/influxdb/v2/models"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -30,6 +33,9 @@ type Client interface {
 	// Write takes a BatchPoints object and writes all Points to InfluxDB.
 	Write(bp BatchPoints) error
 
+	// Write takes a BatchPoints object and writes all Points to InfluxDB using the V2 interface.
+	WriteV2(w FluxWrite) error
+
 	// Query makes an InfluxDB Query on the database.
 	// The response is checked for an error and the is returned
 	// if it exists
@@ -38,7 +44,7 @@ type Client interface {
 	// QueryFlux is for querying Influxdb with the Flux language
 	// The response is checked for an error and the is returned
 	// if it exists
-	QueryFlux(q FluxQuery) (*Response, error)
+	QueryFlux(q FluxQuery) (flux.ResultIterator, error)
 }
 
 type ClientUpdater interface {
@@ -323,7 +329,18 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 	return resp, nil
 }
 
-func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (*Response, error) {
+type readClose struct {
+	io.Reader
+	close func() error
+}
+
+func (r readClose) Close() error {
+	return r.close()
+}
+
+var _ io.ReadCloser = readClose{}
+
+func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (io.ReadCloser, error) {
 	// Get current config
 	config := c.loadConfig()
 	// Set auth credentials
@@ -349,7 +366,15 @@ func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (*Response, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer func() { resp.Body.Close() }()
+	closer := func() error {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		return resp.Body.Close()
+	}
+	defer func() {
+		if closer != nil {
+			closer()
+		}
+	}()
 
 	valid := false
 	for _, code := range codes {
@@ -384,16 +409,16 @@ func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (*Response, error) 
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		body, err = gzip.NewReader(resp.Body)
 		if err != nil {
+			closer()
 			return nil, err
 		}
-		defer body.Close() // close the gzip reader
 	}
-	// cleanup
-	defer func() {
-		_, _ = io.Copy(ioutil.Discard, resp.Body)
-		defer resp.Body.Close()
-	}()
-	panic("NOT IMPLEMENTED")
+	reader := readClose{
+		Reader: body,
+		close:  closer,
+	}
+	closer = nil // so that we don't close the reader when we return
+	return reader, nil
 }
 
 // Ping will check to see if the server is up with an optional timeout on waiting for leader.
@@ -470,6 +495,42 @@ func (c *HTTPClient) Write(bp BatchPoints) error {
 	return err
 }
 
+type FluxWrite struct {
+	Bucket string
+	Org string
+	OrgID string
+	Points models.Points
+}
+
+func (c *HTTPClient) WriteV2(w FluxWrite) error {
+	// TODO: make this more efficient and enable gzip
+	b := make([]byte, 0)
+
+	u := c.url()
+	u.Path = "api/v2/write"
+	v := url.Values{}
+	if w.Org != "" {
+		v.Set("org", w.Org)
+	}
+	if w.OrgID != "" {
+		v.Set("orgID", w.OrgID)
+	}
+	v.Set("bucket", w.Bucket)
+	u.RawQuery = v.Encode()
+
+	for _, p := range w.Points {
+		b = p.AppendString(b)
+	}
+	reader := bytes.NewReader(b)
+	req, err := http.NewRequest("POST", u.String(), reader)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	_, err = c.do(req, nil, http.StatusNoContent, http.StatusOK)
+	return err
+}
+
 // Response represents a list of statement results.
 type Response struct {
 	Results []Result
@@ -503,7 +564,7 @@ type Result struct {
 	Err      string `json:"error,omitempty"`
 }
 
-func (c *HTTPClient) QueryFlux(q FluxQuery) (*Response, error) {
+func (c *HTTPClient) buildFluxRequest(q FluxQuery) (*http.Request, error) {
 	u := c.url()
 	if c.url().Path == "" || c.url().Path == "/" {
 		u.Path = "/api/v2/query"
@@ -523,6 +584,10 @@ func (c *HTTPClient) QueryFlux(q FluxQuery) (*Response, error) {
 		Delimiter   string   `json:"delimiter,omitempty"`
 		Header      bool     `json:"header"`
 	}
+	nowString := ""
+	if !q.Now.IsZero() {
+		nowString = q.Now.Format(time.RFC3339Nano)
+	}
 
 	body, err := json.Marshal(&struct {
 		Type    string  `json:"type"`
@@ -531,10 +596,10 @@ func (c *HTTPClient) QueryFlux(q FluxQuery) (*Response, error) {
 		Dialect dialect `json:"dialect"`
 	}{
 		Type:  "flux",
-		Now:   q.Now.Format(time.RFC3339Nano),
+		Now:   nowString,
 		Query: q.Query,
 		Dialect: dialect{
-			Annotations: []string{"datatype", "group"},
+			Annotations: []string{"datatype", "default", "group"},
 			Delimiter:   ",",
 			Header:      true,
 		},
@@ -545,7 +610,36 @@ func (c *HTTPClient) QueryFlux(q FluxQuery) (*Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Encoding", "gzip")
-	return c.doFlux(req, http.StatusOK)
+	return req, nil
+}
+
+func (c *HTTPClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
+	req, err := c.buildFluxRequest(q)
+	if err != nil {
+		return nil, err
+	}
+	_, err = c.doFlux(req, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	panic("flux kapacitor response parsing not implemented")
+}
+
+func (c *HTTPClient) QueryFlux(q FluxQuery) (flux.ResultIterator, error) {
+	req, err := c.buildFluxRequest(q)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := c.doFlux(req, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	decoder := csv.NewMultiResultDecoder(csv.ResultDecoderConfig{})
+	itr, err := decoder.Decode(reader)
+	if err != nil {
+		return nil, err
+	}
+	return itr, nil
 }
 
 // Query sends a command to the server and returns the Response
