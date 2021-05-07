@@ -22,3 +22,6 @@ kapacitor*.zip
 /kapacitord
 /tickfmt
 /tickdoc
+
+# Ignore go vendor directory
+/vendor
