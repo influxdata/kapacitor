@@ -15,6 +15,47 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestClient_Flux(t *testing.T) {
+	t.Skip("Not Implemented")
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,double,string,string
+#group,false,false,true,true,false,false,true,true
+,result,table,_start,_stop,_time,_value,_field,_measurement
+,_result,0,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:14.5346632Z,45,counter,boltdb_reads_total
+,_result,0,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:24.536408365Z,47,counter,boltdb_reads_total
+,_result,0,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:34.536392986Z,49,counter,boltdb_reads_total
+,_result,1,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:14.5346632Z,24,counter,boltdb_writes_total
+,_result,1,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:24.536408365Z,24,counter,boltdb_writes_total
+,_result,1,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:34.536392986Z,24,counter,boltdb_writes_total
+
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,double,string,string,string
+#group,false,false,true,true,false,false,true,true,true
+,result,table,_start,_stop,_time,_value,_field,_measurement,version
+,_result,10,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:14.5346632Z,1,gauge,go_info,go1.15.2
+,_result,10,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:24.536408365Z,1,gauge,go_info,go1.15.2
+,_result,10,2021-04-22T16:11:09.536898692Z,2021-04-22T16:13:09.536898692Z,2021-04-22T16:11:34.536392986Z,1,gauge,go_info,go1.15.2`))
+	}))
+	defer ts.Close()
+
+	config := Config{
+		URLs: []string{ts.URL},
+		Credentials: Credentials{
+			Token:  "faketoken",
+			Method: TokenAuthentication,
+		},
+	}
+	c, err := NewHTTPClient(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := FluxQuery{Query: `from(bucket:"testbucket")|>range(start:-2m )`, Org: "testorg"}
+	_, err = c.QueryFlux(q)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
 func TestClient_Query(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data Response

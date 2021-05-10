@@ -1237,11 +1237,12 @@ func (c *clientCreator) Create(config influxcli.Config) (influxcli.ClientUpdater
 }
 
 type influxDBClient struct {
-	clusterName string
-	PingFunc    func(ctx context.Context) (time.Duration, string, error)
-	WriteFunc   func(bp influxcli.BatchPoints) error
-	QueryFunc   func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
-	UpdateFunc  func(influxcli.Config) error
+	clusterName   string
+	PingFunc      func(ctx context.Context) (time.Duration, string, error)
+	WriteFunc     func(bp influxcli.BatchPoints) error
+	QueryFunc     func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
+	FluxQueryFunc func(clusterName string, q influxcli.FluxQuery) (*influxcli.Response, error)
+	UpdateFunc    func(influxcli.Config) error
 }
 
 func (c influxDBClient) Close() error {
@@ -1266,6 +1267,14 @@ func (c influxDBClient) Query(q influxcli.Query) (*influxcli.Response, error) {
 	}
 	return &influxcli.Response{}, nil
 }
+
+func (c influxDBClient) QueryFlux(q influxcli.FluxQuery) (*influxcli.Response, error) {
+	if c.FluxQueryFunc != nil {
+		return c.FluxQueryFunc(c.clusterName, q)
+	}
+	return &influxcli.Response{}, nil
+}
+
 func (c influxDBClient) Update(config influxcli.Config) error {
 	if c.UpdateFunc != nil {
 		return c.UpdateFunc(config)
