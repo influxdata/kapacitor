@@ -70,7 +70,7 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	ChannelURL string      `json:"channel_url"`
+	ChannelURL string      `json:"channel-url"`
 	AlertTopic string      `json:"alert_topic"`
 	AlertID    string      `json:"alert_id"`
 	Message    string      `json:"message"`
