@@ -506,7 +506,12 @@ func httpConfig(c Config) (influxdb.Config, error) {
 	}
 	tr := khttp.NewDefaultTransportWithTLS(tlsConfig)
 	var credentials influxdb.Credentials
-	if c.Username != "" {
+	if c.Token != "" {
+		credentials = influxdb.Credentials{
+			Method: influxdb.TokenAuthentication,
+			Token:  c.Token,
+		}
+	} else if c.Username != "" {
 		credentials = influxdb.Credentials{
 			Method:   influxdb.UserAuthentication,
 			Username: c.Username,

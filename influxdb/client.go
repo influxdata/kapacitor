@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -33,6 +34,11 @@ type Client interface {
 	// The response is checked for an error and the is returned
 	// if it exists
 	Query(q Query) (*Response, error)
+
+	// QueryFlux is for querying Influxdb with the Flux language
+	// The response is checked for an error and the is returned
+	// if it exists
+	QueryFlux(q FluxQuery) (*Response, error)
 }
 
 type ClientUpdater interface {
@@ -61,6 +67,13 @@ type Query struct {
 	Command   string
 	Database  string
 	Precision string
+}
+
+type FluxQuery struct {
+	Org   string
+	OrgID string
+	Query string
+	Now   time.Time
 }
 
 // HTTPConfig is the config data needed to create an HTTP Client
@@ -93,6 +106,7 @@ const (
 	NoAuthentication AuthenticationMethod = iota
 	UserAuthentication
 	BearerAuthentication
+	TokenAuthentication // like bearer authentication but with the word Token
 )
 
 // Set of credentials depending on the authentication method
@@ -243,6 +257,8 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 		req.SetBasicAuth(cred.Username, cred.Password)
 	case BearerAuthentication:
 		req.Header.Set("Authorization", "Bearer "+cred.Token)
+	case TokenAuthentication:
+		req.Header.Set("Authorization", "Token "+cred.Token)
 	default:
 		return nil, errors.New("unknown authentication method set")
 	}
@@ -257,7 +273,83 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer func() {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	valid := false
+	for _, code := range codes {
+		if resp.StatusCode == code {
+			valid = true
+			break
+		}
+	}
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		body, err = gzip.NewReader(body)
+		if err != nil {
+			return nil, err
+		}
+		defer body.Close()
+	}
+
+	if !valid {
+		body, err := ioutil.ReadAll(body)
+		if err != nil {
+			return nil, err
+		}
+		d := json.NewDecoder(bytes.NewReader(body))
+		rp := struct {
+			Error string `json:"error"`
+		}{}
+		if err := d.Decode(&rp); err != nil {
+			return nil, err
+		}
+		if rp.Error != "" {
+			return nil, errors.New(rp.Error)
+		}
+		return nil, fmt.Errorf("invalid response: code %d", resp.StatusCode)
+	}
+
+	if result != nil {
+		d := json.NewDecoder(body)
+		d.UseNumber()
+		err = d.Decode(result)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode JSON")
+		}
+	}
+	return resp, nil
+}
+
+func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (*Response, error) {
+	// Get current config
+	config := c.loadConfig()
+	// Set auth credentials
+	cred := config.Credentials
+	switch cred.Method {
+	case NoAuthentication:
+	case UserAuthentication:
+		req.SetBasicAuth(cred.Username, cred.Password)
+	case BearerAuthentication:
+		req.Header.Set("Authorization", "Bearer "+cred.Token)
+	case TokenAuthentication:
+		req.Header.Set("Authorization", "Token "+cred.Token)
+	default:
+		return nil, errors.New("unknown authentication method set")
+	}
+	// Set user agent
+	req.Header.Set("User-Agent", config.UserAgent)
+
+	// Get client
+	client := c.loadHTTPClient()
+	// Do request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resp.Body.Close() }()
 
 	valid := false
 	for _, code := range codes {
@@ -273,7 +365,9 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 		}
 		d := json.NewDecoder(bytes.NewReader(body))
 		rp := struct {
-			Error string `json:"error"`
+			Message string `json:"message"`
+			Code    string `json:"code"`
+			Error   string `json:"error"`
 		}{}
 		if err := d.Decode(&rp); err != nil {
 			return nil, err
@@ -281,17 +375,25 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 		if rp.Error != "" {
 			return nil, errors.New(rp.Error)
 		}
+		if rp.Message != "" {
+			return nil, errors.New(rp.Message)
+		}
 		return nil, fmt.Errorf("invalid response: code %d: body: %s", resp.StatusCode, string(body))
 	}
-	if result != nil {
-		d := json.NewDecoder(resp.Body)
-		d.UseNumber()
-		err := d.Decode(result)
+	body := resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		body, err = gzip.NewReader(resp.Body)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode JSON")
+			return nil, err
 		}
+		defer body.Close() // close the gzip reader
 	}
-	return resp, nil
+	// cleanup
+	defer func() {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		defer resp.Body.Close()
+	}()
+	panic("NOT IMPLEMENTED")
 }
 
 // Ping will check to see if the server is up with an optional timeout on waiting for leader.
@@ -399,6 +501,51 @@ type Result struct {
 	Series   []imodels.Row
 	Messages []*Message
 	Err      string `json:"error,omitempty"`
+}
+
+func (c *HTTPClient) QueryFlux(q FluxQuery) (*Response, error) {
+	u := c.url()
+	if c.url().Path == "" || c.url().Path == "/" {
+		u.Path = "/api/v2/query"
+	}
+
+	v := url.Values{}
+	if q.Org != "" {
+		v.Set("org", q.Org)
+	}
+	if q.OrgID != "" {
+		v.Set("orgID", q.OrgID)
+	}
+	u.RawQuery = v.Encode()
+
+	type dialect struct {
+		Annotations []string `json:"annotations,omitempty"`
+		Delimiter   string   `json:"delimiter,omitempty"`
+		Header      bool     `json:"header"`
+	}
+
+	body, err := json.Marshal(&struct {
+		Type    string  `json:"type"`
+		Now     string  `json:"now,omitempty"`
+		Query   string  `json:"query"`
+		Dialect dialect `json:"dialect"`
+	}{
+		Type:  "flux",
+		Now:   q.Now.Format(time.RFC3339Nano),
+		Query: q.Query,
+		Dialect: dialect{
+			Annotations: []string{"datatype", "group"},
+			Delimiter:   ",",
+			Header:      true,
+		},
+	})
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Encoding", "gzip")
+	return c.doFlux(req, http.StatusOK)
 }
 
 // Query sends a command to the server and returns the Response
