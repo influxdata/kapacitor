@@ -144,8 +144,8 @@ func RemoveTaskServiceRoutes(handler *httpd.Handler) error {
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
 		for _, prefix := range []string{prefixTasks, prefixTasks + "/"} {
 			routes = append(routes, httpd.Route{
-				Method:      method,
-				Pattern:     prefix,
+				Method:  method,
+				Pattern: prefix,
 			})
 		}
 	}

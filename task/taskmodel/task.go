@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/influxdata/flux"
 	"strconv"
 	"time"
 
+	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/ast"
 	"github.com/influxdata/flux/ast/edit"
 	"github.com/influxdata/influxdb/v2/kit/platform"
@@ -518,4 +518,3 @@ func ParseRequestStillQueuedError(msg string) *RequestStillQueuedError {
 type QueryService interface {
 	Query(ctx context.Context, compiler flux.Compiler) (flux.ResultIterator, error)
 }
-

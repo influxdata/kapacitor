@@ -3,13 +3,14 @@ package diagnostic
 import (
 	"bytes"
 	"errors"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"os"
 	"path"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type nopCloser struct {

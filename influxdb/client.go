@@ -6,9 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/csv"
-	"github.com/influxdata/influxdb/v2/models"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -19,7 +16,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/influxdata/flux"
+	"github.com/influxdata/flux/csv"
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/v2/models"
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
@@ -497,8 +497,8 @@ func (c *HTTPClient) Write(bp BatchPoints) error {
 
 type FluxWrite struct {
 	Bucket string
-	Org string
-	OrgID string
+	Org    string
+	OrgID  string
 	Points models.Points
 }
 

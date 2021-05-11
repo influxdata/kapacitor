@@ -4,8 +4,6 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/fluxtask"
-	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -37,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
+	"github.com/influxdata/kapacitor/services/fluxtask"
 	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -82,6 +81,7 @@ import (
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
+	"go.uber.org/zap/zapcore"
 )
 
 const clusterIDFilename = "cluster.id"
@@ -302,8 +302,6 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendTaskStoreService()
 	s.appendReplayService()
 	s.appendSessionService()
-
-
 
 	// Append third-party integrations
 	// Append extra input services

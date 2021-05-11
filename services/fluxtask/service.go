@@ -3,6 +3,8 @@ package fluxtask
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/influxdata/flux"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -18,7 +20,6 @@ import (
 	"github.com/influxdata/kapacitor/task/kv"
 	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Service struct {

@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/influxdata/kapacitor/influxdb"
 	"time"
 
 	"github.com/influxdata/influxdb/v2/models"
+	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
 )
-
 
 // StoragePointsWriterRecorder is an implementation of RunRecorder which
 // writes runs via an implementation of storage PointsWriter

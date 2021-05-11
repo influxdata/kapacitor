@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/influxdata/flux"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/v2/kit/platform"
@@ -13,7 +15,6 @@ import (
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/task/taskmodel"
 	"go.uber.org/zap"
-	"time"
 )
 
 const (
@@ -41,7 +42,7 @@ type PointsWriter interface {
 type NoOpPointsWriter struct{}
 
 func (*NoOpPointsWriter) WritePoints(ctx context.Context, bucket string, points models.Points) error {
-       return nil
+	return nil
 }
 
 // NewAnalyticalStorage creates a new analytical store with access to the necessary systems for storing data and to act as a middleware (deprecated)
@@ -50,7 +51,7 @@ func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskCon
 		log:                log,
 		TaskService:        ts,
 		TaskControlService: tcs,
-		destination: dest,
+		destination:        dest,
 		rr:                 NewStoragePointsWriterRecorder(log, cli, dest),
 		cli:                cli,
 	}
@@ -58,18 +59,18 @@ func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskCon
 
 type DataDestination struct {
 	Bucket string
-	Org string
-	OrgID string
+	Org    string
+	OrgID  string
 }
 
 type AnalyticalStorage struct {
 	taskmodel.TaskService
 	TaskControlService
 
-	destination   DataDestination
-	rr     RunRecorder
-	cli    influxdb.Client
-	log    *zap.Logger
+	destination DataDestination
+	rr          RunRecorder
+	cli         influxdb.Client
+	log         *zap.Logger
 }
 
 func (as *AnalyticalStorage) FinishRun(ctx context.Context, taskID, runID platform.ID) (*taskmodel.Run, error) {
@@ -181,10 +182,10 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	  `, as.destination.Bucket, filter.Task.String(), filterPart, constructedTimeFilter, filter.Limit-len(runs))
 
 	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
-		Org: as.destination.Org,
+		Org:   as.destination.Org,
 		OrgID: as.destination.OrgID,
 		Query: runsScript,
-		Now: now,
+		Now:   now,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -252,10 +253,10 @@ func (as *AnalyticalStorage) FindRunByID(ctx context.Context, taskID, runID plat
 	  `, as.destination.Bucket, taskID.String(), runID.String())
 
 	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
-		Org: as.destination.Org,
+		Org:   as.destination.Org,
 		OrgID: as.destination.OrgID,
 		Query: findRunScript,
-		Now: time.Now(),
+		Now:   time.Now(),
 	})
 	if err != nil {
 		return nil, err

@@ -9,7 +9,7 @@ type Config struct {
 	// TaskRunInfluxDB is the name of the influxdb instance finished
 	// task runs and logs are written to.
 	// Leaving it blank will write to Kapacitor's default influxdb instance.
-	TaskRunInfluxDB string `toml:"task-run-influxdb""`
+	TaskRunInfluxDB string `toml:"task-run-influxdb"`
 
 	// TaskRunBucket is the bucket (or influxdb 1.x database) to use for saving
 	// task runs and logs

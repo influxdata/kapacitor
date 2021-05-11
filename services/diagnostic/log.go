@@ -3,11 +3,12 @@ package diagnostic
 import (
 	"bufio"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"io"
 	"strconv"
 	"sync"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 )
 
 const RFC3339Milli = "2006-01-02T15:04:05.000Z07:00"

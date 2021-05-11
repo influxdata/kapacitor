@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/flux"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	influxcli "github.com/influxdata/kapacitor/influxdb"
@@ -1237,12 +1238,19 @@ func (c *clientCreator) Create(config influxcli.Config) (influxcli.ClientUpdater
 }
 
 type influxDBClient struct {
-	clusterName   string
-	PingFunc      func(ctx context.Context) (time.Duration, string, error)
-	WriteFunc     func(bp influxcli.BatchPoints) error
-	QueryFunc     func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
-	FluxQueryFunc func(clusterName string, q influxcli.FluxQuery) (*influxcli.Response, error)
-	UpdateFunc    func(influxcli.Config) error
+	clusterName string
+	PingFunc    func(ctx context.Context) (time.Duration, string, error)
+	WriteFunc   func(bp influxcli.BatchPoints) error
+	QueryFunc   func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
+	UpdateFunc  func(influxcli.Config) error
+}
+
+func (c influxDBClient) WriteV2(w influxcli.FluxWrite) error {
+	panic("not implemented")
+}
+
+func (c influxDBClient) QueryFlux(q influxcli.FluxQuery) (flux.ResultIterator, error) {
+	panic("not implemented")
 }
 
 func (c influxDBClient) Close() error {
@@ -1264,13 +1272,6 @@ func (c influxDBClient) Write(bp influxcli.BatchPoints) error {
 func (c influxDBClient) Query(q influxcli.Query) (*influxcli.Response, error) {
 	if c.QueryFunc != nil {
 		return c.QueryFunc(c.clusterName, q)
-	}
-	return &influxcli.Response{}, nil
-}
-
-func (c influxDBClient) QueryFlux(q influxcli.FluxQuery) (*influxcli.Response, error) {
-	if c.FluxQueryFunc != nil {
-		return c.FluxQueryFunc(c.clusterName, q)
 	}
 	return &influxcli.Response{}, nil
 }
