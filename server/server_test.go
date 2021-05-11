@@ -6504,6 +6504,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		"subscriptions":               nil,
 		"subscriptions-sync-interval": "1m0s",
 		"timeout":                     "0s",
+		"token":                       false,
 		"udp-bind":                    "",
 		"udp-buffer":                  float64(1e3),
 		"udp-read-buffer":             float64(0),
@@ -6584,6 +6585,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					Options: deepCopyMapWithReplace(defMap)(),
 					Redacted: []string{
 						"password",
+						"token",
 					},
 				}},
 			},
@@ -6592,6 +6594,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Options: deepCopyMapWithReplace(defMap)(),
 				Redacted: []string{
 					"password",
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -6611,6 +6614,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6619,6 +6623,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6645,6 +6650,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6659,6 +6665,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6680,6 +6687,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6693,6 +6701,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6718,6 +6727,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									}),
 								Redacted: []string{
 									"password",
+									"token",
 								},
 							},
 							{
@@ -6732,6 +6742,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									}),
 								Redacted: []string{
 									"password",
+									"token",
 								},
 							},
 						},
@@ -6748,6 +6759,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
