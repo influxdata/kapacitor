@@ -32,7 +32,7 @@ const (
 // RunRecorder is a type which records runs into an influxdb
 // backed storage mechanism
 type RunRecorder interface {
-	Record(ctx context.Context, bucket string, run *taskmodel.Run) error
+	Record(ctx context.Context, run *taskmodel.Run) error
 }
 
 type PointsWriter interface {
@@ -58,9 +58,10 @@ func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskCon
 }
 
 type DataDestination struct {
-	Bucket string
-	Org    string
-	OrgID  string
+	Bucket      string
+	Org         string
+	OrgID       string
+	Measurement string
 }
 
 type AnalyticalStorage struct {
@@ -78,7 +79,7 @@ func (as *AnalyticalStorage) FinishRun(ctx context.Context, taskID, runID platfo
 	if err != nil {
 		return nil, err
 	}
-	return run, as.rr.Record(ctx, as.destination.Bucket, run)
+	return run, as.rr.Record(ctx, run)
 }
 
 // FindLogs returns logs for a run.
@@ -171,7 +172,7 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	runsScript := fmt.Sprintf(`from(bucket: %q)
 	  |> range(start: -14d)
 	  |> filter(fn: (r) => r._field != "status")
-	  |> filter(fn: (r) => r._measurement == "runs" and r.taskID == %q)
+	  |> filter(fn: (r) => r._measurement == %q and r.taskID == %q)
 	  %s
 	  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 	  %s
@@ -179,7 +180,7 @@ func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunF
 	  |> sort(columns:["scheduledFor"], desc: true)
 	  |> limit(n:%d)
 
-	  `, as.destination.Bucket, filter.Task.String(), filterPart, constructedTimeFilter, filter.Limit-len(runs))
+	  `, as.destination.Bucket, as.destination.Measurement, filter.Task.String(), filterPart, constructedTimeFilter, filter.Limit-len(runs))
 
 	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
 		Org:   as.destination.Org,
@@ -246,11 +247,11 @@ func (as *AnalyticalStorage) FindRunByID(ctx context.Context, taskID, runID plat
 	findRunScript := fmt.Sprintf(`from(bucket: %q)
 	|> range(start: -14d)
 	|> filter(fn: (r) => r._field != "status")
-	|> filter(fn: (r) => r._measurement == "runs" and r.taskID == %q)
+	|> filter(fn: (r) => r._measurement == %q and r.taskID == %q)
 	|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 	|> group(columns: ["taskID"])
 	|> filter(fn: (r) => r.runID == %q)
-	  `, as.destination.Bucket, taskID.String(), runID.String())
+	  `, as.destination.Bucket, as.destination.Measurement, taskID.String(), runID.String())
 
 	ittr, err := as.cli.QueryFlux(influxdb.FluxQuery{
 		Org:   as.destination.Org,

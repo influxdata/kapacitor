@@ -45,9 +45,10 @@ func (s *Service) Open() error {
 		s.kvService = kv.New(s.StorageService)
 		s.kvService.Open()
 		dataDestination := backend.DataDestination{
-			Bucket: s.config.TaskRunBucket,
-			Org:    s.config.TaskRunOrg,
-			OrgID:  s.config.TaskRunOrgID,
+			Bucket:      s.config.TaskRunBucket,
+			Org:         s.config.TaskRunOrg,
+			OrgID:       s.config.TaskRunOrgID,
+			Measurement: s.config.TaskRunMeasurement,
 		}
 		cli, err := s.InfluxDBService.NewNamedClient(s.config.TaskRunInfluxDB)
 		if err != nil {

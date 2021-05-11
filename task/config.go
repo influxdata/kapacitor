@@ -26,12 +26,16 @@ type Config struct {
 	// This is ignored if TaskRunInfluxDB is a 1.x database
 	// Only one of TaskRunOrg and TaskRunOrgID should be set
 	TaskRunOrgID string `toml:"task-run-orgid"`
+
+	// TaskRunMeasurement is the measurement used for saving task runs
+	// and logs.
+	// The defaults is "runs"
+	TaskRunMeasurement string `toml:"task-run-measurement"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Enabled:         false,
-		TaskRunInfluxDB: "",
+		TaskRunMeasurement: "runs",
 	}
 }
 

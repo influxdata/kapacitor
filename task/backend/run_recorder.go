@@ -27,7 +27,7 @@ func NewStoragePointsWriterRecorder(log *zap.Logger, cli influxdb.Client, dest D
 
 // Record formats the provided run as a models.Point and writes the resulting
 // point to an underlying storage.PointsWriter
-func (s *StoragePointsWriterRecorder) Record(ctx context.Context, bucket string, run *taskmodel.Run) error {
+func (s *StoragePointsWriterRecorder) Record(ctx context.Context, run *taskmodel.Run) error {
 	tags := models.NewTags(map[string]string{
 		statusTag: run.Status,
 		taskIDTag: run.TaskID.String(),
@@ -60,13 +60,13 @@ func (s *StoragePointsWriterRecorder) Record(ctx context.Context, bucket string,
 	}
 	fields[logField] = string(logBytes)
 
-	point, err := models.NewPoint("runs", tags, fields, startedAt)
+	point, err := models.NewPoint(s.destination.Measurement, tags, fields, startedAt)
 	if err != nil {
 		return err
 	}
 
 	return s.cli.WriteV2(influxdb.FluxWrite{
-		Bucket: bucket,
+		Bucket: s.destination.Bucket,
 		Org:    s.destination.Org,
 		OrgID:  s.destination.OrgID,
 		Points: models.Points{point},
