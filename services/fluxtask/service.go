@@ -110,11 +110,20 @@ func (s *Service) Open() error {
 }
 
 func (s *Service) Close() error {
-	if err := s.kvService.Close(); err != nil {
+	if s.kvService != nil {
+		if err := s.kvService.Close(); err != nil {
+			return err
+		}
+		s.kvService = nil
+	}
+	if s.scheduler != nil {
+		s.scheduler.Stop()
+		s.scheduler = nil
+	}
+	if err := http.RemoveTaskServiceRoutes(s.HTTPDService.Handler); err != nil {
 		return err
 	}
-	s.scheduler.Stop()
-	return http.RemoveTaskServiceRoutes(s.HTTPDService.Handler)
+	return nil
 }
 
 // TODO: remove

@@ -17,6 +17,7 @@ commands:
             steps:
                   - run:
                         name: Running Kapacitor Tests
+                        no_output_timeout: 30m
                         command:  |
                               ./circle-test.sh
       deploy_nightly:

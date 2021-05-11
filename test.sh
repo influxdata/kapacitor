@@ -29,7 +29,7 @@ DOCKER_SAVE_DIR=${DOCKER_SAVE_DIR-$HOME/docker}
 # Set default parallelism
 PARALLELISM=${PARALLELISM-1}
 # Set default timeout
-TIMEOUT=${TIMEOUT-480s}
+TIMEOUT=${TIMEOUT-1000s}
 # No uncommitted changes
 NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 # Home dir of the docker user
