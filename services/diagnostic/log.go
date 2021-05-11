@@ -2,6 +2,8 @@ package diagnostic
 
 import (
 	"bufio"
+	"fmt"
+	"go.uber.org/zap/zapcore"
 	"io"
 	"strconv"
 	"sync"
@@ -268,3 +270,64 @@ func writeJSONMessage(w Writer, msg string) {
 	w.Write([]byte("\"msg\":"))
 	w.WriteString(strconv.Quote(msg))
 }
+
+// zapAdapter is a wrapper for zap logging to target kapacitor-style logging.
+// It is not performance-optimized as we only use it for a few features imported
+// from influxdb 2.x
+type zapAdapter struct {
+	zapcore.LevelEnabler
+	out Logger
+}
+
+func (c *zapAdapter) WithConcrete(fields []zapcore.Field) *zapAdapter {
+	if len(fields) == 0 {
+		return c
+	}
+	clone := *c
+	m := zapcore.NewMapObjectEncoder()
+	for i := range fields {
+		fields[i].AddTo(m)
+	}
+	for k, v := range m.Fields {
+		str := ""
+		switch val := v.(type) {
+		case string:
+			str = val
+		case fmt.Stringer:
+			str = val.String()
+		default:
+			str = fmt.Sprintf("%v", v)
+		}
+		clone.out = clone.out.With(String(k, str))
+	}
+	return &clone
+}
+
+func (c *zapAdapter) With(fields []zapcore.Field) zapcore.Core {
+	return c.WithConcrete(fields)
+}
+
+func (c *zapAdapter) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(ent.Level) {
+		return ce.AddCore(ent, c)
+	}
+	return ce
+}
+
+func (c *zapAdapter) Write(ent zapcore.Entry, fields []zapcore.Field) error {
+	clone := c.WithConcrete(fields)
+	if ent.Level >= zapcore.ErrorLevel {
+		clone.out.Error(ent.Message)
+	} else if ent.Level >= zapcore.InfoLevel {
+		clone.out.Info(ent.Message)
+	} else if ent.Level >= zapcore.DebugLevel {
+		clone.out.Debug(ent.Message)
+	}
+	return nil
+}
+
+func (c *zapAdapter) Sync() error {
+	return nil
+}
+
+var _ zapcore.Core = &zapAdapter{}

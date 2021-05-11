@@ -3,14 +3,13 @@ package diagnostic
 import (
 	"bytes"
 	"errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"io"
 	"os"
 	"path"
 	"strings"
 	"sync"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type nopCloser struct {
@@ -506,63 +505,11 @@ func (s *Service) NewZenossHandler() *ZenossHandler {
 	}
 }
 
-type zapAdapter struct {
-	zapcore.LevelEnabler
-	enc zapcore.Encoder
-	out Logger
-}
-
-func (c *zapAdapter) With(fields []zapcore.Field) zapcore.Core {
-	clone := c.clone()
-	for i := range fields {
-		fields[i].AddTo(clone.enc)
-	}
-	return clone
-}
-
-func (c *zapAdapter) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
-	if c.Enabled(ent.Level) {
-		return ce.AddCore(ent, c)
-	}
-	return ce
-}
-
-func (c *zapAdapter) Write(ent zapcore.Entry, fields []zapcore.Field) error {
-	buf, err := c.enc.EncodeEntry(ent, fields)
-	if err != nil {
-		return err
-	}
-	if ent.Level >= zapcore.ErrorLevel {
-		c.out.Error(buf.String())
-	} else if ent.Level >= zapcore.InfoLevel {
-		c.out.Info(buf.String())
-	} else if ent.Level >= zapcore.DebugLevel {
-		c.out.Debug(buf.String())
-	}
-	buf.Free()
-	return nil
-}
-
-func (c *zapAdapter) Sync() error {
-	return nil
-}
-
-func (c *zapAdapter) clone() *zapAdapter {
-	return &zapAdapter{
-		LevelEnabler: c.LevelEnabler,
-		enc:          c.enc.Clone(),
-		out:          c.out,
-	}
-}
-
-var _ zapcore.Core = &zapAdapter{}
-
 func (s *Service) NewZapLogger(level zapcore.Level) *zap.Logger {
 	return zap.New(&zapAdapter{
 		LevelEnabler: zap.LevelEnablerFunc(func(l zapcore.Level) bool {
 			return l >= level
 		}),
-		enc: zapcore.NewConsoleEncoder(zap.NewProductionEncoderConfig()),
 		out: s.Logger,
 	})
 }
