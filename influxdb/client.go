@@ -33,7 +33,7 @@ type Client interface {
 	// Write takes a BatchPoints object and writes all Points to InfluxDB.
 	Write(bp BatchPoints) error
 
-	// Write takes a BatchPoints object and writes all Points to InfluxDB using the V2 interface.
+	// WriteV2 takes a FluxWrite object and writes all Points to InfluxDB using the V2 interface.
 	WriteV2(w FluxWrite) error
 
 	// Query makes an InfluxDB Query on the database.
