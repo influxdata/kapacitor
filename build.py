@@ -218,6 +218,7 @@ def run_tests(race, parallel, timeout, no_vet):
         test_command += " -timeout {}".format(timeout)
     test_command += " ./..."
     logging.info("Running tests...")
+    logging.info("Test command: " + test_command)
     output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
 

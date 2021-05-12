@@ -121,10 +121,11 @@ go build ./cmd/kapacitord
 ```
 Kapacitor builds two binares is named `kapacitor`, and `kapacitord`.
 
-To run the tests, execute the following command:
+To run the tests, execute the following commands:
 
-```bash
-go test $(go list ./... | grep -v /vendor/)
+```
+export CIRCLE_BUILD_NUM=0 CIRCLE_NODE_INDEX=0 CIRCLE_NODE_TOTAL=1
+./circle-test.sh
 ```
 
 Dependencies

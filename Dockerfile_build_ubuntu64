@@ -16,6 +16,7 @@ RUN apt-get -qq update && apt-get -qq install -y \
     ruby-dev \
     rpm \
     zip \
+    pkg-config \
     python \
     python-setuptools \
     python3 \
@@ -45,6 +46,11 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
     && python3 setup.py install \
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
+# Install rust
+ENV PATH "/root/.cargo/bin:$PATH"
+RUN curl --proto '=https' --tlsv1.2 --tls-max 1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y && \
+    cargo --help
+
 # Install go
 ENV GOPATH /root/go
 ENV GO_VERSION 1.15.5
@@ -53,8 +59,8 @@ RUN wget -q https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARC
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
    rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
 ENV PATH /usr/local/go/bin:$PATH
-
 ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
+ENV PKG_CONFIG  $PROJECT_DIR/pkg-config.sh
 ENV PATH $GOPATH/bin:$PATH
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR

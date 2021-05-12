@@ -8,6 +8,9 @@ import (
 	"path"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type nopCloser struct {
@@ -501,4 +504,13 @@ func (s *Service) NewZenossHandler() *ZenossHandler {
 	return &ZenossHandler{
 		l: s.Logger.With(String("service", "zenoss")),
 	}
+}
+
+func (s *Service) NewZapLogger(level zapcore.Level) *zap.Logger {
+	return zap.New(&zapAdapter{
+		LevelEnabler: zap.LevelEnablerFunc(func(l zapcore.Level) bool {
+			return l >= level
+		}),
+		out: s.Logger,
+	})
 }

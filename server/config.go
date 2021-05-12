@@ -18,7 +18,6 @@ import (
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/auth"
-	authservice "github.com/influxdata/kapacitor/services/auth"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/config"
@@ -67,6 +66,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/influxdata/kapacitor/task"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 )
@@ -79,6 +79,7 @@ type Config struct {
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
+	FluxTask       task.Config       `toml:"fluxtask"`
 	Load           load.Config       `toml:"load"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        diagnostic.Config `toml:"logging"`
@@ -154,11 +155,12 @@ func NewConfig() *Config {
 	}
 
 	c.Alert = alert.NewConfig()
-	c.Auth = authservice.NewDisabledConfig()
+	c.Auth = auth.NewDisabledConfig()
 	c.HTTP = httpd.NewConfig()
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
+	c.FluxTask = task.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = diagnostic.NewConfig()
 	c.ConfigOverride = config.NewConfig()
@@ -245,6 +247,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Task.Validate(); err != nil {
 		return errors.Wrap(err, "task")
+	}
+	if err := c.FluxTask.Validate(); err != nil {
+		return errors.Wrap(err, "fluxtask")
 	}
 	if err := c.TLS.Validate(); err != nil {
 		return errors.Wrap(err, "tls")
