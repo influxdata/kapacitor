@@ -581,7 +581,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, s := range n.ZenossHandlers {
 		c := zenoss.HandlerConfig{
-			URL:           s.URL,
 			Action:        s.Action,
 			Method:        s.Method,
 			Type:          s.Type,

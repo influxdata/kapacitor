@@ -110,7 +110,6 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	c := s.config()
 	hc := &HandlerConfig{
 		Action:        o.Action,
 		Method:        o.Method,
@@ -134,11 +133,11 @@ func (s *Service) Test(options interface{}) error {
 		Message: o.Message,
 	}
 
-	return s.Alert(c.URL, state, data, hc)
+	return s.Alert(state, data, hc)
 }
 
-func (s *Service) Alert(url string, state *alert.EventState, data *alert.EventData, hc *HandlerConfig) error {
-	postUrl, postBody, err := s.preparePost(url, state, data, hc)
+func (s *Service) Alert(state *alert.EventState, data *alert.EventData, hc *HandlerConfig) error {
+	postUrl, postBody, err := s.preparePost(state, data, hc)
 	if err != nil {
 		return err
 	}
@@ -201,16 +200,13 @@ type Event struct {
 	TID    int64                    `json:"tid"`
 }
 
-func (s *Service) preparePost(url string, state *alert.EventState, data *alert.EventData, hc *HandlerConfig) (string, io.Reader, error) {
+func (s *Service) preparePost(state *alert.EventState, data *alert.EventData, hc *HandlerConfig) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
 	}
 
-	if url == "" {
-		url = c.URL
-	}
-	u, err := neturl.Parse(url)
+	u, err := neturl.Parse(c.URL)
 	if err != nil {
 		return "", nil, err
 	}
@@ -401,18 +397,6 @@ func (s *Service) toMap(data *EventData) (map[string]interface{}, error) {
 }
 
 type HandlerConfig struct {
-	// web service URL used to post messages.
-	// If empty uses the service URL from the configuration.
-	URL string `mapstructure:"url"`
-
-	// Username for BASIC authentication.
-	// If empty uses username from the configuration.
-	Username string `mapstructure:"username"`
-
-	// Password for BASIC authentication.
-	// If empty uses password from the configuration.
-	Password string `mapstructure:"password"`
-
 	// Action (router name).
 	// If empty uses action from the configuration.
 	Action string `mapstructure:"action"`
@@ -470,7 +454,6 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
-		h.c.URL,
 		&event.State,
 		&event.Data,
 		&h.c,
