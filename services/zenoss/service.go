@@ -91,14 +91,15 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
+	c := s.config()
 	return &testOptions{
 		AlertID:      "1001",
 		Level:        alert.Critical,
 		Message:      "test zenoss message",
-		Action:       "EventsRouter",
-		Method:       "add_event",
-		Type:         "rpc",
-		TID:          1,
+		Action:       c.Action,
+		Method:       c.Method,
+		Type:         c.Type,
+		TID:          c.TID,
 		CustomFields: map[string]interface{}{},
 	}
 }
