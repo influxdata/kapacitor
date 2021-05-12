@@ -8850,6 +8850,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"method":             "add_event",
 						"type":               "rpc",
 						"tid":                float64(1),
+						"collector":          "",
 						"severity-map": map[string]interface{}{
 							"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 						},
@@ -8872,6 +8873,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"method":             "add_event",
 					"type":               "rpc",
 					"tid":                float64(1),
+					"collector":          "",
 					"severity-map": map[string]interface{}{
 						"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 					},
@@ -8910,6 +8912,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"method":             "kapa_handler",
 								"type":               "rpc",
 								"tid":                float64(1),
+								"collector":          "",
 								"severity-map": map[string]interface{}{
 									"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 								},
@@ -8932,6 +8935,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"method":             "kapa_handler",
 							"type":               "rpc",
 							"tid":                float64(1),
+							"collector":          "",
 							"severity-map": map[string]interface{}{
 								"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 							},

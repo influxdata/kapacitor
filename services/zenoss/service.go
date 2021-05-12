@@ -100,6 +100,7 @@ func (s *Service) TestOptions() interface{} {
 		Method:       c.Method,
 		Type:         c.Type,
 		TID:          c.TID,
+		Collector:    c.Collector,
 		CustomFields: map[string]interface{}{},
 	}
 }
@@ -308,6 +309,9 @@ func (s *Service) preparePost(url string, state *alert.EventState, data *alert.E
 
 	if summary == "" { // fallback to default (ie. alert message)
 		summary = state.Message
+	}
+	if collector == "" {
+		collector = c.Collector
 	}
 
 	eventData := &EventData{

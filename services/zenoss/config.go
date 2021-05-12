@@ -71,6 +71,8 @@ type Config struct {
 	Type string `toml:"type" override:"type"`
 	// Event TID.
 	TID int64 `toml:"tid" override:"tid"`
+	// Collector name.
+	Collector string `toml:"collector" override:"collector"`
 	// Level to severity map.
 	SeverityMap SeverityMap `toml:"severity-map" override:"severity-map"`
 	// Whether all alerts should automatically post to ServiceNow.
