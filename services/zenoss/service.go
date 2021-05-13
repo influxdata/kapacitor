@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
-	neturl "net/url"
 	"strings"
 	"sync/atomic"
 	text "text/template"
@@ -206,11 +205,6 @@ func (s *Service) preparePost(state *alert.EventState, data *alert.EventData, hc
 		return "", nil, errors.New("service is not enabled")
 	}
 
-	u, err := neturl.Parse(c.URL)
-	if err != nil {
-		return "", nil, err
-	}
-
 	// fallback to config values for handler options not set
 	action := hc.Action
 	if action == "" {
@@ -358,7 +352,7 @@ func (s *Service) preparePost(state *alert.EventState, data *alert.EventData, hc
 		return "", nil, errors.Wrap(err, "error marshaling event struct")
 	}
 
-	return u.String(), bytes.NewBuffer(postBytes), nil
+	return c.URL, bytes.NewBuffer(postBytes), nil
 }
 
 func (s *Service) addCustomData(basicData, customData map[string]interface{}) {
