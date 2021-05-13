@@ -59,9 +59,9 @@ type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// Zenoss events API URL.
 	URL string `toml:"url" override:"url"`
-	// ServiceNow authentication username.
+	// Zenoss authentication username.
 	Username string `toml:"username" override:"username"`
-	// ServiceNow authentication password.
+	// Zenoss authentication password.
 	Password string `toml:"password" override:"password,redact"`
 	// Action (router name).
 	Action string `toml:"action" override:"action"`
@@ -75,7 +75,7 @@ type Config struct {
 	Collector string `toml:"collector" override:"collector"`
 	// Level to severity map.
 	SeverityMap SeverityMap `toml:"severity-map" override:"severity-map"`
-	// Whether all alerts should automatically post to ServiceNow.
+	// Whether all alerts should automatically post to Zenoss.
 	Global bool `toml:"global" override:"global"`
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.
