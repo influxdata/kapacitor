@@ -89,6 +89,7 @@ func NewConfig() Config {
 		Method:      "add_event",
 		Type:        "rpc",
 		TID:         1,
+		Collector:   "Kapacitor",
 		SeverityMap: SeverityMap{OK: "Clear", Info: "Info", Warning: "Warning", Critical: "Critical"},
 	}
 }
