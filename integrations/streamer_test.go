@@ -11239,6 +11239,7 @@ stream
 		c := zenoss.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL + "/zport/dmd/evconsole_router"
+		c.Collector = ""
 		svc := zenoss.NewService(c, diagService.NewZenossHandler())
 		tm.ZenossService = svc
 	}

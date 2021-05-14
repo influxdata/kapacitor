@@ -8834,6 +8834,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 			section: "zenoss",
 			setDefaults: func(c *server.Config) {
 				c.Zenoss.URL = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+				c.Zenoss.Collector = "Kapacitor"
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss"},
@@ -8850,7 +8851,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"method":             "add_event",
 						"type":               "rpc",
 						"tid":                float64(1),
-						"collector":          "",
+						"collector":          "Kapacitor",
 						"severity-map": map[string]interface{}{
 							"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 						},
@@ -8873,7 +8874,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"method":             "add_event",
 					"type":               "rpc",
 					"tid":                float64(1),
-					"collector":          "",
+					"collector":          "Kapacitor",
 					"severity-map": map[string]interface{}{
 						"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 					},
@@ -8912,7 +8913,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"method":             "kapa_handler",
 								"type":               "rpc",
 								"tid":                float64(1),
-								"collector":          "",
+								"collector":          "Kapacitor",
 								"severity-map": map[string]interface{}{
 									"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 								},
@@ -8935,7 +8936,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"method":             "kapa_handler",
 							"type":               "rpc",
 							"tid":                float64(1),
-							"collector":          "",
+							"collector":          "Kapacitor",
 							"severity-map": map[string]interface{}{
 								"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 							},
@@ -9467,7 +9468,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"component":       "",
 					"event_class_key": "",
 					"event_class":     "",
-					"collector":       "",
+					"collector":       "Kapacitor",
 					"custom_fields":   map[string]interface{}{},
 				},
 			},
@@ -11178,6 +11179,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				c.Zenoss.Enabled = true
 				c.Zenoss.URL = ts.URL + "/zport/dmd/evconsole_router"
+				c.Zenoss.Collector = ""
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
