@@ -97,7 +97,7 @@ func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
 		return errors.New("must specify events URL")
 	}
-	if _, err := url.Parse(c.URL); err != nil {
+	if _, err := url.ParseRequestURI(c.URL); err != nil {
 		return errors.Wrapf(err, "invalid url %q", c.URL)
 	}
 	if c.SeverityMap.OK == nil || c.SeverityMap.Info == nil || c.SeverityMap.Warning == nil || c.SeverityMap.Critical == nil {
