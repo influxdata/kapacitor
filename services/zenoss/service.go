@@ -83,8 +83,8 @@ type testOptions struct {
 	Summary       string                 `json:"summary"`
 	Device        string                 `json:"device"`
 	Component     string                 `json:"component"`
-	EventClassKey string                 `json:"event_class_key"`
-	EventClass    string                 `json:"event_class"`
+	EventClassKey string                 `json:"eventclasskey"`
+	EventClass    string                 `json:"eventclass"`
 	Collector     string                 `json:"collector"`
 	CustomFields  map[string]interface{} `json:"custom_fields"`
 }
