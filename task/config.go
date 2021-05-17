@@ -9,6 +9,7 @@ type Config struct {
 	// TaskRunInfluxDB is the name of the influxdb instance finished
 	// task runs and logs are written to.
 	// Leaving it blank will write to Kapacitor's default influxdb instance.
+	// Setting it to 'none' will disable task logging.
 	TaskRunInfluxDB string `toml:"task-run-influxdb"`
 
 	// TaskRunBucket is the bucket (or influxdb 1.x database) to use for saving
@@ -31,6 +32,10 @@ type Config struct {
 	// and logs.
 	// The defaults is "runs"
 	TaskRunMeasurement string `toml:"task-run-measurement"`
+
+	// Secrets is the kapacitor provider for secrets as described at
+	// https://docs.influxdata.com/influxdb/v2.0/security/secrets/
+	Secrets map[string]string `toml:"secrets"`
 }
 
 func NewConfig() Config {
@@ -41,6 +46,9 @@ func NewConfig() Config {
 
 func (c Config) Validate() error {
 	if !c.Enabled {
+		return nil
+	}
+	if c.TaskRunInfluxDB == "none" {
 		return nil
 	}
 	if len(c.TaskRunOrgID) > 0 && len(c.TaskRunOrg) > 0 {

@@ -37,13 +37,14 @@ type TaskHandler struct {
 
 const (
 	prefixKapacitor        = "/kapacitor/v1"
-	prefixTasks            = "/fluxtasks"
-	tasksIDPath            = "/fluxtasks/:id"
-	tasksIDLogsPath        = "/fluxtasks/:id/logs"
-	tasksIDRunsPath        = "/fluxtasks/:id/runs"
-	tasksIDRunsIDPath      = "/fluxtasks/:id/runs/:rid"
-	tasksIDRunsIDLogsPath  = "/fluxtasks/:id/runs/:rid/logs"
-	tasksIDRunsIDRetryPath = "/fluxtasks/:id/runs/:rid/retry"
+	prefixTasks            = "/api/v2/tasks"
+	prefixKapacitorTasks   = prefixKapacitor + prefixTasks
+	tasksIDPath            = prefixTasks + "/:id"
+	tasksIDLogsPath        = prefixTasks + "/:id/logs"
+	tasksIDRunsPath        = prefixTasks + "/:id/runs"
+	tasksIDRunsIDPath      = prefixTasks + "/:id/runs/:rid"
+	tasksIDRunsIDLogsPath  = prefixTasks + "/:id/runs/:rid/logs"
+	tasksIDRunsIDRetryPath = prefixTasks + "/:id/runs/:rid/retry"
 )
 
 func (h *TaskHandler) Handle(w http.ResponseWriter, r *http.Request, user auth.User) {
@@ -157,7 +158,8 @@ func RemoveTaskServiceRoutes(handler *httpd.Handler) error {
 // where time values are represented as strings
 type Task struct {
 	ID              platform.ID            `json:"id"`
-	OwnerUsername   string                 `json:"ownerUsername"`
+	OwnerUsername   string                 `json:"ownerID"`
+	UnusedOrgId     string                 `json:"orgID"`
 	Name            string                 `json:"name"`
 	Description     string                 `json:"description,omitempty"`
 	Status          string                 `json:"status"`
@@ -319,9 +321,9 @@ func customParseDuration(d time.Duration) string {
 func newTaskResponse(t taskmodel.Task) taskResponse {
 	response := taskResponse{
 		Links: map[string]string{
-			"self": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s", t.ID),
-			"runs": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s/runs", t.ID),
-			"logs": fmt.Sprintf("/kapacitor/v1/fluxtasks/%s/logs", t.ID),
+			"self": fmt.Sprintf(prefixKapacitorTasks+"/%s", t.ID),
+			"runs": fmt.Sprintf(prefixKapacitorTasks+"/%s/runs", t.ID),
+			"logs": fmt.Sprintf(prefixKapacitorTasks+"/%s/logs", t.ID),
 		},
 		Task: NewFrontEndTask(t),
 	}
@@ -368,7 +370,7 @@ type tasksResponse struct {
 
 func newTasksResponse(ctx context.Context, ts []*taskmodel.Task, f taskmodel.TaskFilter) tasksResponse {
 	rs := tasksResponse{
-		Links: newTasksPagingLinks(prefixTasks, ts, f),
+		Links: newTasksPagingLinks(prefixKapacitorTasks, ts, f),
 		Tasks: make([]taskResponse, len(ts)),
 	}
 	for i := range ts {
@@ -417,10 +419,10 @@ func newRunResponse(r taskmodel.Run) runResponse {
 
 	return runResponse{
 		Links: map[string]string{
-			"self":  fmt.Sprintf("/api/v2/tasks/%s/runs/%s", r.TaskID, r.ID),
-			"task":  fmt.Sprintf("/api/v2/tasks/%s", r.TaskID),
-			"logs":  fmt.Sprintf("/api/v2/tasks/%s/runs/%s/logs", r.TaskID, r.ID),
-			"retry": fmt.Sprintf("/api/v2/tasks/%s/runs/%s/retry", r.TaskID, r.ID),
+			"self":  fmt.Sprintf(prefixKapacitorTasks+"/%s/runs/%s", r.TaskID, r.ID),
+			"task":  fmt.Sprintf(prefixKapacitorTasks+"/%s", r.TaskID),
+			"logs":  fmt.Sprintf(prefixKapacitorTasks+"/%s/runs/%s/logs", r.TaskID, r.ID),
+			"retry": fmt.Sprintf(prefixKapacitorTasks+"/%s/runs/%s/retry", r.TaskID, r.ID),
 		},
 		httpRun: run,
 	}
@@ -461,8 +463,8 @@ type runsResponse struct {
 func newRunsResponse(rs []*taskmodel.Run, taskID platform.ID) runsResponse {
 	r := runsResponse{
 		Links: map[string]string{
-			"self": fmt.Sprintf("/api/v2/tasks/%s/runs", taskID),
-			"task": fmt.Sprintf("/api/v2/tasks/%s", taskID),
+			"self": fmt.Sprintf(prefixKapacitorTasks+"/%s/runs", taskID),
+			"task": fmt.Sprintf(prefixKapacitorTasks+"/%s", taskID),
 		},
 		Runs: make([]*runResponse, len(rs)),
 	}

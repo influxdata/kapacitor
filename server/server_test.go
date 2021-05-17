@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -28,6 +29,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
+	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
@@ -80,6 +82,8 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -88,6 +92,7 @@ var udfDir string
 func init() {
 	dir, _ := os.Getwd()
 	udfDir = filepath.Clean(filepath.Join(dir, "../udf"))
+	fluxinit.FluxInit()
 }
 
 func mustHash(hash []byte, err error) string {
@@ -13335,6 +13340,104 @@ func TestLogSessions_HeaderGzip(t *testing.T) {
 		t.Fatalf("expected: %v, got: %v\n", exp, got)
 		return
 	}
+}
+
+func TestFluxTasks_Basic(t *testing.T) {
+	conf := NewConfig()
+	conf.FluxTask.Enabled = true
+	conf.FluxTask.TaskRunInfluxDB = "none"
+	s := OpenServer(conf)
+	cli := Client(s)
+	defer s.Close()
+
+	// Check we can query empty tasks
+	u := cli.BaseURL()
+	basePath := "kapacitor/v1/api/v2/tasks"
+	query := func(method string, path string, body string) string {
+		u.Path = path
+		t.Log("Querying: ", method, u.String())
+		req, err := http.NewRequest(method, u.String(), bytes.NewBufferString(body))
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		buf := bytes.Buffer{}
+		_, err = io.Copy(&buf, resp.Body)
+		require.NoError(t, err)
+		return strings.Trim(buf.String(), "\n")
+	}
+
+	assert.Equal(t, `{"links":{"self":"/kapacitor/v1/api/v2/tasks?limit=100"},"tasks":[]}`, query("GET", basePath, ""))
+
+	// Start a simple server. It listens on port and closes requestDone when finished.
+	// This lets us create a task that uses the flux-native http.Post and assert that
+	// flux is configured properly
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	server := &http.Server{}
+	requestStarted := make(chan struct{})
+	requestStopped := make(chan struct{})
+	go func() {
+		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			<-requestStarted
+			<-requestStopped
+		})
+		server.Serve(listener)
+	}()
+	defer server.Close()
+
+	// create a task, assert on the important parts of it
+	fluxScript := fmt.Sprintf(`import "http"
+option task = {concurrency: 1, name:"poster", every:1s}
+http.post(url: "http://localhost:%d")
+`, port)
+	task := fmt.Sprintf(`{"status": "active", "description": "simple post", "flux": %q}`, fluxScript)
+	createResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("POST", basePath, task)), &createResp))
+	id := createResp["id"].(string)
+	assert.Equal(t, 16, len(id))
+	assert.Contains(t, createResp, "orgID")
+	assert.Equal(t, "", createResp["orgID"])
+	assert.Equal(t, "poster", createResp["name"])
+	logPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s/logs", id)
+	runPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s/runs", id)
+	selfPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s", id)
+	assert.Equal(t, map[string]interface{}{
+		"logs": logPath,
+		"runs": runPath,
+		"self": selfPath,
+	}, createResp["links"])
+
+	t.Log("waiting for request")
+	requestStarted <- struct{}{}
+
+	// Request is now started (it hit our test server with a post) but can't finish - time to assert that we have runs and logs
+	logResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", logPath, task)), &logResp))
+	expectMessage := "Started task from script:"
+	assert.Equal(t, expectMessage, logResp["events"].([]interface{})[0].(map[string]interface{})["message"].(string)[:len(expectMessage)])
+
+	runResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", runPath, task)), &runResp))
+	assert.Equal(t, map[string]interface{}{
+		"task": selfPath,
+		"self": runPath,
+	}, runResp["links"])
+
+	// stop blocking the server
+	close(requestStarted)
+	close(requestStopped)
+
+	// Assert that we can really update a task
+	query("PATCH", selfPath, `{"every": "10m"}`)
+	getResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", selfPath, task)), &getResp))
+	assert.Equal(t, getResp["every"], "10m")
+
+	// Assert that when we delete a task it goes away
+	query("DELETE", selfPath, "")
+	assert.Equal(t, `{"links":{"self":"/kapacitor/v1/api/v2/tasks?limit=100"},"tasks":[]}`, query("GET", basePath, ""))
 
 }
 
