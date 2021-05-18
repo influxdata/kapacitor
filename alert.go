@@ -584,7 +584,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			Action:        s.Action,
 			Method:        s.Method,
 			Type:          s.Type,
-			TID:           s.TID,
+			TID:           s.Tid,
 			Summary:       s.Summary,
 			Device:        s.Device,
 			Component:     s.Component,
