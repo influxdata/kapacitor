@@ -2423,6 +2423,10 @@ type ZenossHandler struct {
 	// If empty uses value from the configuration.
 	TID int64 `json:"tid"`
 
+	// Collector name.
+	// If empty uses value from the configuration.
+	Collector string `json:"collector"`
+
 	// Summary of the event.
 	Summary string `json:"summary"`
 
@@ -2440,9 +2444,6 @@ type ZenossHandler struct {
 
 	// Message related to the event.
 	Message string `json:"message"`
-
-	// Collector.
-	Collector string `json:"collector"`
 
 	// Custom fields.
 	// tick:ignore

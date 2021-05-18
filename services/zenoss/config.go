@@ -59,9 +59,9 @@ type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// Zenoss events API URL.
 	URL string `toml:"url" override:"url"`
-	// ServiceNow authentication username.
+	// Zenoss authentication username.
 	Username string `toml:"username" override:"username"`
-	// ServiceNow authentication password.
+	// Zenoss authentication password.
 	Password string `toml:"password" override:"password,redact"`
 	// Action (router name).
 	Action string `toml:"action" override:"action"`
@@ -71,9 +71,11 @@ type Config struct {
 	Type string `toml:"type" override:"type"`
 	// Event TID.
 	TID int64 `toml:"tid" override:"tid"`
+	// Collector name.
+	Collector string `toml:"collector" override:"collector"`
 	// Level to severity map.
 	SeverityMap SeverityMap `toml:"severity-map" override:"severity-map"`
-	// Whether all alerts should automatically post to ServiceNow.
+	// Whether all alerts should automatically post to Zenoss.
 	Global bool `toml:"global" override:"global"`
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.
@@ -87,6 +89,7 @@ func NewConfig() Config {
 		Method:      "add_event",
 		Type:        "rpc",
 		TID:         1,
+		Collector:   "Kapacitor",
 		SeverityMap: SeverityMap{OK: "Clear", Info: "Info", Warning: "Warning", Critical: "Critical"},
 	}
 }
@@ -95,7 +98,7 @@ func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
 		return errors.New("must specify events URL")
 	}
-	if _, err := url.Parse(c.URL); err != nil {
+	if _, err := url.ParseRequestURI(c.URL); err != nil {
 		return errors.Wrapf(err, "invalid url %q", c.URL)
 	}
 	if c.SeverityMap.OK == nil || c.SeverityMap.Info == nil || c.SeverityMap.Warning == nil || c.SeverityMap.Critical == nil {

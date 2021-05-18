@@ -263,7 +263,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("action", h.Action).
 			Dot("method", h.Method).
 			Dot("type", h.Type).
-			Dot("TID", h.TID).
+			Dot("tid", h.TID).
 			// standard event data element fields
 			Dot("summary", h.Summary).
 			Dot("device", h.Device).
