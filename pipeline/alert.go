@@ -2421,7 +2421,7 @@ type ZenossHandler struct {
 
 	// Temporary transaction ID.
 	// If empty uses value from the configuration.
-	TID int64 `json:"tid"`
+	Tid int64 `json:"tid"`
 
 	// Collector name.
 	// If empty uses value from the configuration.
