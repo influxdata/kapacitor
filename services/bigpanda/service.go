@@ -93,7 +93,7 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:01Z")
+	t := time.Now()
 
 	return &testOptions{
 		AppKey:  "my-app-key-123456",
