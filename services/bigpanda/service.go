@@ -93,11 +93,8 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	t := time.Now()
-	c := s.config()
-
 	return &testOptions{
-		AppKey:  c.AppKey,
+		AppKey:  s.config().AppKey,
 		Message: "test bigpanda message",
 		Level:   alert.Critical,
 		Data: alert.EventData{
@@ -106,9 +103,8 @@ func (s *Service) TestOptions() interface{} {
 			Fields: make(map[string]interface{}),
 			Result: models.Result{},
 		},
-		Timestamp: t,
+		Timestamp: time.Now(),
 	}
-
 }
 
 func (s *Service) Test(options interface{}) error {
