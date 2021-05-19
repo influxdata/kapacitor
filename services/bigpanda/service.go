@@ -94,9 +94,10 @@ type testOptions struct {
 
 func (s *Service) TestOptions() interface{} {
 	t := time.Now()
+	c := s.config()
 
 	return &testOptions{
-		AppKey:  "my-app-key-123456",
+		AppKey:  c.AppKey,
 		Message: "test bigpanda message",
 		Level:   alert.Critical,
 		Data: alert.EventData{
