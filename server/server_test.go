@@ -9100,7 +9100,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
 				Name: "bigpanda",
 				Options: client.ServiceTestOptions{
-					"app_key":            "my-app-key-123456",
+					"app_key":            "",
 					"level":              "CRITICAL",
 					"message":            "test bigpanda message",
 					"timestamp":          "1970-01-01T00:00:01Z",
@@ -9483,6 +9483,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 	for i := range expServiceTests.Services {
 		exp := expServiceTests.Services[i]
 		got := serviceTests.Services[i]
+		if _, expHasTimestamp := exp.Options["timestamp"]; expHasTimestamp {
+			if _, gotHasTimestamp := got.Options["timestamp"]; !gotHasTimestamp {
+				t.Errorf("timestamp not found in server test %s:\n%s", exp.Name, cmp.Diff(exp, got))
+			}
+			exp.Options["timestamp"] = ""
+			got.Options["timestamp"] = ""
+		}
 		if !reflect.DeepEqual(got, exp) {
 			t.Errorf("unexpected server test %s:\n%s", exp.Name, cmp.Diff(exp, got))
 		}
