@@ -38,6 +38,7 @@ require (
 	github.com/influxdata/httprouter v1.3.1-0.20191122104820-ee83e2772f69
 	github.com/influxdata/influxdb v1.8.4
 	github.com/influxdata/influxdb/v2 v2.0.1-alpha.10.0.20210507184756-dc72dc3f0c07
+	github.com/influxdata/pkg-config v0.2.7
 	github.com/influxdata/usage-client v0.0.0-20160829180054-6d3895376368
 	github.com/influxdata/wlog v0.0.0-20160411224016-7c63b0a71ef8
 	github.com/k-sone/snmpgo v3.2.0+incompatible

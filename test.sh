@@ -34,6 +34,10 @@ TIMEOUT=${TIMEOUT-1000s}
 NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 # Home dir of the docker user
 HOME_DIR=/root
+# Go version
+GO_VERSION=1.15.10
+# GOPATH
+GOPATH=/go
 
 no_uncomitted_arg="$no_uncommitted_arg"
 if [ ! $NO_UNCOMMITTED ]
@@ -66,16 +70,16 @@ function run_test_docker {
     dataname="kapacitor-data-$BUILD_NUM"
 
     echo "Building docker image $imagename"
-    docker build -f "$dockerfile" -t "$imagename" .
+    docker build -f "$dockerfile" --build-arg GO_VERSION=$GO_VERSION -t "$imagename" .
 
     echo "Running test in docker $name with args $@"
 
     # Create data volume with code
     docker create \
         --name $dataname \
-        -v "$HOME_DIR/go/src/github.com/influxdata/kapacitor" \
+        -v "$GOPATH/src/github.com/influxdata/kapacitor" \
         $imagename /bin/true
-    docker cp "$DIR/" "$dataname:$HOME_DIR/go/src/github.com/influxdata/"
+    docker cp "$DIR/" "$dataname:$GOPATH/src/github.com/influxdata/"
 
     # Run tests in docker
     docker run \
@@ -92,7 +96,7 @@ function run_test_docker {
 
     # Copy results back out
     docker cp \
-        "$dataname:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
+        "$dataname:$GOPATH/src/github.com/influxdata/kapacitor/build" \
         ./
 
     # Remove the data and builder containers
