@@ -34,7 +34,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/influxdata/cron v0.0.0-20201006132531-4bb0a200dcbe
-	github.com/influxdata/flux v0.114.1
+	github.com/influxdata/flux v0.116.1-0.20210519190248-4347b978c91a
 	github.com/influxdata/httprouter v1.3.1-0.20191122104820-ee83e2772f69
 	github.com/influxdata/influxdb v1.8.4
 	github.com/influxdata/influxdb/v2 v2.0.1-alpha.10.0.20210507184756-dc72dc3f0c07
@@ -61,7 +61,7 @@ require (
 	github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 // indirect
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/stretchr/testify v1.7.0
-	github.com/uber/jaeger-client-go v2.25.0+incompatible
+	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	go.etcd.io/bbolt v1.3.5
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
