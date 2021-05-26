@@ -8,6 +8,7 @@
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
 - [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
 - [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
+- [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
 
 ## v1.5.9 [2021-04-01]
 
