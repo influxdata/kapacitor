@@ -134,6 +134,8 @@ func AddTaskServiceRoutes(handler *httpd.Handler, log *zap.Logger, svc taskmodel
 				Method:      method,
 				Pattern:     prefix,
 				HandlerFunc: h.Handle,
+				NoJSON:      true, // don't default to json headers (e.g. for DELETE which is 204)
+				NoGzip:      true, // don't default to gzip, it has problems with openapi codegen and empty responses
 			})
 		}
 	}
