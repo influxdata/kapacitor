@@ -16,8 +16,15 @@ type Config struct {
 	Default bool `toml:"default" override:"default"`
 	// ID assigned if multiple slack configs are given
 	Workspace string `toml:"workspace"  override:"workspace"`
-	// The Slack webhook URL, can be obtained by adding Incoming Webhook integration.
+	// The Slack webhook URL.
+	// For new-style slack apps, use "https://slack.com/api/chat.postMessage".
+	// For legacy webhooks (e.g. created at https://slack.com/services/new/incoming-webhook), use the webhook link.
 	URL string `toml:"url" override:"url,redact"`
+	// The Slack OAuth token.
+	// For new-style slack apps, go to https://api.slack.com/apps -> your app -> 'OAuth & Permissions' to find
+	// the token. Ensure your app has 'chat:write' and 'chat:write.public' permissions.
+	// For legacy webhooks this can be left blank.
+	Token string `toml:"token" override:"token,redact"`
 	// The default channel, can be overridden per alert.
 	Channel string `toml:"channel" override:"channel"`
 	// The username of the Slack bot.

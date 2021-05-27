@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
@@ -196,7 +195,7 @@ func (s *Service) Global() bool {
 }
 
 func (s *Service) StateChangesOnly() bool {
-	return s.defaultConfig().Global
+	return s.defaultConfig().StateChangesOnly
 }
 
 // slack attachment info
@@ -235,7 +234,7 @@ func (s *Service) Test(options interface{}) error {
 }
 
 func (s *Service) Alert(workspace, channel, message, username, iconEmoji string, level alert.Level) error {
-	url, post, err := s.preparePost(workspace, channel, message, username, iconEmoji, level)
+	url, token, post, err := s.preparePost(workspace, channel, message, username, iconEmoji, level)
 	if err != nil {
 		return err
 	}
@@ -245,11 +244,20 @@ func (s *Service) Alert(workspace, channel, message, username, iconEmoji string,
 		return err
 	}
 
-	resp, err := client.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -267,13 +275,13 @@ func (s *Service) Alert(workspace, channel, message, username, iconEmoji string,
 	return nil
 }
 
-func (s *Service) preparePost(workspace, channel, message, username, iconEmoji string, level alert.Level) (string, io.Reader, error) {
+func (s *Service) preparePost(workspace, channel, message, username, iconEmoji string, level alert.Level) (string, string, io.Reader, error) {
 	c, err := s.config(workspace)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 	if !c.Enabled {
-		return "", nil, errors.New("service is not enabled")
+		return "", "", nil, errors.New("service is not enabled")
 	}
 	if channel == "" {
 		channel = c.Channel
@@ -294,7 +302,6 @@ func (s *Service) preparePost(workspace, channel, message, username, iconEmoji s
 		Mrkdwn_in: []string{"text"},
 	}
 	postData := make(map[string]interface{})
-	postData["as_user"] = false
 	postData["channel"] = channel
 	postData["text"] = ""
 	postData["attachments"] = []attachment{a}
@@ -313,10 +320,10 @@ func (s *Service) preparePost(workspace, channel, message, username, iconEmoji s
 	enc := json.NewEncoder(&post)
 	err = enc.Encode(postData)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 
-	return c.URL, &post, nil
+	return c.URL, c.Token, &post, nil
 }
 
 type HandlerConfig struct {
