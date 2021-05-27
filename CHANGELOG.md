@@ -9,6 +9,7 @@
 - [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
 - [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
+- [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
 
 ## v1.5.9 [2021-04-01]
 

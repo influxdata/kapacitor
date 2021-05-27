@@ -7982,6 +7982,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"global":               true,
 						"icon-emoji":           "",
 						"state-changes-only":   false,
+						"token":                false,
 						"url":                  false,
 						"username":             "kapacitor",
 						"ssl-ca":               "",
@@ -7991,6 +7992,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					Redacted: []string{
 						"url",
+						"token",
 					},
 				}},
 			},
@@ -8005,6 +8007,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"icon-emoji":           "",
 					"state-changes-only":   false,
 					"url":                  false,
+					"token":                false,
 					"username":             "kapacitor",
 					"ssl-ca":               "",
 					"ssl-cert":             "",
@@ -8013,6 +8016,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 				},
 				Redacted: []string{
 					"url",
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -8025,6 +8029,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"channel":   "#general",
 							"username":  slack.DefaultUsername,
 							"url":       "http://slack.example.com/secret-token",
+							"token":     "my_other_secret",
 						},
 					},
 					element: "company_private",
@@ -8041,6 +8046,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"icon-emoji":           "",
 								"state-changes-only":   false,
 								"url":                  false,
+								"token":                false,
 								"username":             "kapacitor",
 								"ssl-ca":               "",
 								"ssl-cert":             "",
@@ -8049,6 +8055,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							},
 							Redacted: []string{
 								"url",
+								"token",
 							},
 						},
 							{
@@ -8062,6 +8069,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8070,6 +8078,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							}},
 					},
@@ -8084,6 +8093,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                true,
 							"username":             "kapacitor",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8092,6 +8102,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8121,6 +8132,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8129,6 +8141,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8142,6 +8155,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8150,6 +8164,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8163,6 +8178,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8171,6 +8187,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8186,6 +8203,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "kapacitor",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8194,6 +8212,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8219,6 +8238,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8227,6 +8247,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8240,6 +8261,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8248,6 +8270,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8261,6 +8284,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "testbot",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8269,6 +8293,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8284,6 +8309,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "testbot",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8292,6 +8318,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8314,6 +8341,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8322,6 +8350,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8335,6 +8364,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8343,6 +8373,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8356,6 +8387,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8364,6 +8396,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8379,6 +8412,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8387,6 +8421,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
