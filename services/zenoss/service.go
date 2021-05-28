@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
-	neturl "net/url"
 	"strings"
 	"sync/atomic"
 	text "text/template"
@@ -84,21 +83,23 @@ type testOptions struct {
 	Summary       string                 `json:"summary"`
 	Device        string                 `json:"device"`
 	Component     string                 `json:"component"`
-	EventClassKey string                 `json:"event_class_key"`
-	EventClass    string                 `json:"event_class"`
+	EventClassKey string                 `json:"eventclasskey"`
+	EventClass    string                 `json:"eventclass"`
 	Collector     string                 `json:"collector"`
 	CustomFields  map[string]interface{} `json:"custom_fields"`
 }
 
 func (s *Service) TestOptions() interface{} {
+	c := s.config()
 	return &testOptions{
 		AlertID:      "1001",
 		Level:        alert.Critical,
 		Message:      "test zenoss message",
-		Action:       "EventsRouter",
-		Method:       "add_event",
-		Type:         "rpc",
-		TID:          1,
+		Action:       c.Action,
+		Method:       c.Method,
+		Type:         c.Type,
+		TID:          c.TID,
+		Collector:    c.Collector,
 		CustomFields: map[string]interface{}{},
 	}
 }
@@ -108,7 +109,6 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	c := s.config()
 	hc := &HandlerConfig{
 		Action:        o.Action,
 		Method:        o.Method,
@@ -132,11 +132,11 @@ func (s *Service) Test(options interface{}) error {
 		Message: o.Message,
 	}
 
-	return s.Alert(c.URL, state, data, hc)
+	return s.Alert(state, data, hc)
 }
 
-func (s *Service) Alert(url string, state *alert.EventState, data *alert.EventData, hc *HandlerConfig) error {
-	postUrl, postBody, err := s.preparePost(url, state, data, hc)
+func (s *Service) Alert(state *alert.EventState, data *alert.EventData, hc *HandlerConfig) error {
+	postUrl, postBody, err := s.preparePost(state, data, hc)
 	if err != nil {
 		return err
 	}
@@ -199,18 +199,10 @@ type Event struct {
 	TID    int64                    `json:"tid"`
 }
 
-func (s *Service) preparePost(url string, state *alert.EventState, data *alert.EventData, hc *HandlerConfig) (string, io.Reader, error) {
+func (s *Service) preparePost(state *alert.EventState, data *alert.EventData, hc *HandlerConfig) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
-	}
-
-	if url == "" {
-		url = c.URL
-	}
-	u, err := neturl.Parse(url)
-	if err != nil {
-		return "", nil, err
 	}
 
 	// fallback to config values for handler options not set
@@ -308,6 +300,9 @@ func (s *Service) preparePost(url string, state *alert.EventState, data *alert.E
 	if summary == "" { // fallback to default (ie. alert message)
 		summary = state.Message
 	}
+	if collector == "" {
+		collector = c.Collector
+	}
 
 	eventData := &EventData{
 		Summary:    cutoff(summary, 256),
@@ -357,7 +352,7 @@ func (s *Service) preparePost(url string, state *alert.EventState, data *alert.E
 		return "", nil, errors.Wrap(err, "error marshaling event struct")
 	}
 
-	return u.String(), bytes.NewBuffer(postBytes), nil
+	return c.URL, bytes.NewBuffer(postBytes), nil
 }
 
 func (s *Service) addCustomData(basicData, customData map[string]interface{}) {
@@ -396,18 +391,6 @@ func (s *Service) toMap(data *EventData) (map[string]interface{}, error) {
 }
 
 type HandlerConfig struct {
-	// web service URL used to post messages.
-	// If empty uses the service URL from the configuration.
-	URL string `mapstructure:"url"`
-
-	// Username for BASIC authentication.
-	// If empty uses username from the configuration.
-	Username string `mapstructure:"username"`
-
-	// Password for BASIC authentication.
-	// If empty uses password from the configuration.
-	Password string `mapstructure:"password"`
-
 	// Action (router name).
 	// If empty uses action from the configuration.
 	Action string `mapstructure:"action"`
@@ -465,7 +448,6 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
-		h.c.URL,
 		&event.State,
 		&event.Data,
 		&h.c,

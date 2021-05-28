@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
 // Config is a Serverset service discovery configuration
@@ -39,14 +40,12 @@ func (s Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (s Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.ServersetSDConfigs = []*config.ServersetSDConfig{
-		s.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, s.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (s Config) PromConfig() *config.ServersetSDConfig {
-	return &config.ServersetSDConfig{
+func (s Config) PromConfig() *zookeeper.ServersetSDConfig {
+	return &zookeeper.ServersetSDConfig{
 		Servers: s.Servers,
 		Paths:   s.Paths,
 		Timeout: model.Duration(s.Timeout),

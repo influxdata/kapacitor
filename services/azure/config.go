@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/azure"
 )
 
 // Config is a Azure service discovery configuration
@@ -37,19 +39,17 @@ func (a Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (a Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.AzureSDConfigs = []*config.AzureSDConfig{
-		a.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, a.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (a Config) PromConfig() *config.AzureSDConfig {
-	return &config.AzureSDConfig{
+func (a Config) PromConfig() *azure.SDConfig {
+	return &azure.SDConfig{
 		Port:            a.Port,
 		SubscriptionID:  a.SubscriptionID,
 		TenantID:        a.TenantID,
 		ClientID:        a.ClientID,
-		ClientSecret:    a.ClientSecret,
+		ClientSecret:    config2.Secret(a.ClientSecret),
 		RefreshInterval: model.Duration(a.RefreshInterval),
 	}
 }

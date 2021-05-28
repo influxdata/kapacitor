@@ -168,6 +168,24 @@ func TestAlertServiceNow(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertTeams(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Teams()
+	handler.ChannelURL = "https://..."
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .teams()
+        .channelURL('https://...')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertHTTPPostMultipleHeaders(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Post("")

@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/BurntSushi/toml"
+	"github.com/influxdata/flux/fluxinit"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 )
@@ -121,6 +122,9 @@ func (cmd *Command) Run(args ...string) error {
 		return fmt.Errorf("write pid file: %s", err)
 	}
 	cmd.pidfile = options.PIDFile
+
+	// run flux initialization
+	fluxinit.FluxInit()
 
 	// Create server from config and start it.
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch, Platform: cmd.Platform}

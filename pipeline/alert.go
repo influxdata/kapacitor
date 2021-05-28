@@ -2248,7 +2248,7 @@ type TeamsHandler struct {
 
 	// Teams channel webhook URL to post messages.
 	// If empty uses the URL from the configuration.
-	ChannelURL string `json:"channel_url"`
+	ChannelURL string `json:"channel-url"`
 }
 
 // Send the alert to ServiceNow.
@@ -2421,7 +2421,11 @@ type ZenossHandler struct {
 
 	// Temporary transaction ID.
 	// If empty uses value from the configuration.
-	TID int64 `json:"tid"`
+	Tid int64 `json:"tid"`
+
+	// Collector name.
+	// If empty uses value from the configuration.
+	Collector string `json:"collector"`
 
 	// Summary of the event.
 	Summary string `json:"summary"`
@@ -2440,9 +2444,6 @@ type ZenossHandler struct {
 
 	// Message related to the event.
 	Message string `json:"message"`
-
-	// Collector.
-	Collector string `json:"collector"`
 
 	// Custom fields.
 	// tick:ignore

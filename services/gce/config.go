@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/gce"
 )
 
 // Config is GCE service discovery configuration
@@ -38,14 +39,12 @@ func (g Config) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (g Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.GCESDConfigs = []*config.GCESDConfig{
-		g.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, g.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (g Config) PromConfig() *config.GCESDConfig {
-	return &config.GCESDConfig{
+func (g Config) PromConfig() *gce.SDConfig {
+	return &gce.SDConfig{
 		Project:         g.Project,
 		Zone:            g.Zone,
 		Filter:          g.Filter,

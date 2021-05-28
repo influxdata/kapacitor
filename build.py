@@ -93,8 +93,8 @@ targets = {
 
 supported_builds = {
     'darwin': [ "amd64" ],
-    'linux': [ "amd64", "i386", "armhf", "arm64", "armel", "static_i386", "static_amd64" ],
-    'windows': [ "amd64", "i386" ]
+    'linux': [ "arm64", "amd64" ],
+    'windows': [ "amd64" ]
 }
 
 supported_packages = {
@@ -158,7 +158,11 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go install -mod=mod github.com/golang/protobuf/protoc-gen-go github.com/benbjohnson/tmpl github.com/mailru/easyjson/easyjson")
+    run("""go install -mod=mod 
+        github.com/golang/protobuf/protoc-gen-go \
+        github.com/benbjohnson/tmpl \
+        github.com/mailru/easyjson/easyjson \
+        github.com/influxdata/pkg-config""")
     try:
          subprocess.check_output(["go", "generate", "./..."])
     except subprocess.CalledProcessError as exc:
@@ -218,6 +222,7 @@ def run_tests(race, parallel, timeout, no_vet):
         test_command += " -timeout {}".format(timeout)
     test_command += " ./..."
     logging.info("Running tests...")
+    logging.info("Test command: " + test_command)
     output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
 
@@ -381,13 +386,11 @@ def get_system_arch():
     arch = os.uname()[4]
     if arch == "x86_64":
         arch = "amd64"
-    elif arch == "386":
-        arch = "i386"
     elif arch == "aarch64":
         arch = "arm64"
     elif 'arm' in arch:
         # Prevent uname from reporting full ARM arch (eg 'armv7l')
-        arch = "arm"
+        arch = "arm64"
     return arch
 
 def get_system_platform():
@@ -490,6 +493,7 @@ def build(version=None,
           nightly=False,
           race=False,
           clean=False,
+          cc="",
           outdir=".",
           tags=[],
           static=False):
@@ -521,42 +525,39 @@ def build(version=None,
         logging.info("Building target: {}".format(target))
         build_command = ""
 
-        # Handle static binary output
-        if static is True or "static_" in arch:
-            if "static_" in arch:
-                static = True
-                arch = arch.replace("static_", "")
-            build_command += "CGO_ENABLED=0 "
+        build_command += "CGO_ENABLED=1 "
 
         # Handle variations in architecture output
         fullarch = arch
-        if arch == "i386" or arch == "i686":
-            arch = "386"
-        elif arch == "aarch64" or arch == "arm64":
+        if  arch == "aarch64" or arch == "arm64":
             arch = "arm64"
-        elif "arm" in arch:
-            arch = "arm"
-        build_command += "GOOS={} GOARCH={} ".format(platform, arch)
+
+        if platform == "linux":
+            if arch == "amd64":
+                tags += ["netgo", "osusergo", "static_build"]
+            if arch == "arm64":
+                cc = "aarch64-unknown-linux-musl-cc"
+                tags += ["netgo", "osusergo", "static_build", "noasm"]
+        elif platform == "darwin" and arch == "amd64":
+            cc = "x86_64-apple-darwin15-clang"
+            tags += [ "netgo", "osusergo"]
+        elif  platform == "windows" and arch == "amd64":
+            cc = "x86_64-w64-mingw32-gcc"
+        build_command += "CC={} GOOS={} GOARCH={} ".format(cc, platform, arch)
 
         if "arm" in fullarch:
-            if fullarch == "armel":
-                build_command += "GOARM=5 "
-            elif fullarch == "armhf" or fullarch == "arm":
-                build_command += "GOARM=6 "
-            elif fullarch == "arm64":
-                # GOARM not used - see https://github.com/golang/go/wiki/GoArm
-                pass
-            else:
-                logging.error("Invalid ARM architecture specified: {}".format(arch))
-                logging.error("Please specify either 'armel', 'armhf', or 'arm64'.")
+            if  fullarch != "arm64":
+                logging.error("Invalid ARM architecture specified: {} only arm64 is supported".format(arch))
                 return False
         if platform == 'windows':
             target = target + '.exe'
-        build_command += "go build -o {} ".format(os.path.join(outdir, target))
+            build_command += "go build -buildmode=exe -o {} ".format(os.path.join(outdir, target))
+        else:
+            build_command += "go build -o {} ".format(os.path.join(outdir, target))
         if race:
             build_command += "-race "
         if len(tags) > 0:
-            build_command += "-tags {} ".format(','.join(tags))
+            build_command += "-tags \"{}\" ".format(' '.join(tags))
         if "1.4" in get_go_version():
             if static:
                 build_command += "-ldflags=\"-s -X main.version {} -X main.branch {} -X main.commit {} -X main.platform OSS\" ".format(version,
@@ -758,9 +759,9 @@ def main(args):
         return 1
 
     if args.nightly:
-        args.version = increment_minor_version(args.version)
-        args.version = "{}~n{}".format(args.version,
-                                       datetime.utcnow().strftime("%Y%m%d%H%M"))
+        args.version = "n{}-{}".format(
+                                       datetime.utcnow().strftime("%Y%m%d%H%M"),
+                                       args.commit)
         args.iteration = 0
 
     # Validate version
@@ -912,7 +913,7 @@ if __name__ == '__main__':
                         type=str,
                         help='Name to use for package name (when package is specified)')
     parser.add_argument('--arch',
-                        metavar='<amd64|i386|armhf|arm64|armel|all>',
+                        metavar='<amd64|arm64|all>',
                         type=str,
                         default=get_system_arch(),
                         help='Target architecture for build output')

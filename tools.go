@@ -8,5 +8,6 @@ package kapacitor
 import (
 	_ "github.com/benbjohnson/tmpl"
 	_ "github.com/golang/protobuf/protoc-gen-go"
+	_ "github.com/influxdata/pkg-config"
 	_ "github.com/mailru/easyjson/easyjson"
 )

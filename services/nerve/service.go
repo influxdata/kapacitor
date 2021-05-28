@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 	pnerve "github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
@@ -127,13 +127,16 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pnerve.NewNerveDiscovery(sd, s.diag)
+
+	discoverer, err := pnerve.NewNerveDiscovery(sd, s.diag)
+	if err != nil {
+		return err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	updates := make(chan []*config.TargetGroup)
+	updates := make(chan []*targetgroup.Group)
 	go discoverer.Run(ctx, updates)
 
-	var err error
 	select {
 	case _, ok := <-updates:
 		// Handle the case that a target provider exits and closes the channel

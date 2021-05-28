@@ -22,9 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/discord"
-	"github.com/influxdata/kapacitor/services/discord/discordtest"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/google/go-cmp/cmp"
@@ -45,6 +42,8 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -8713,6 +8712,7 @@ stream
 		c2.Workspace = "company_private"
 		c2.Enabled = true
 		c2.URL = ts.URL + "/test/slack/url2"
+		c2.Token = "my_secret_token"
 		c2.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
 		sl, err := slack.NewService([]slack.Config{c1, c2}, d)
@@ -8725,7 +8725,8 @@ stream
 
 	exp := []interface{}{
 		slacktest.Request{
-			URL: "/test/slack/url",
+			URL:        "/test/slack/url",
+			AuthHeader: "",
 			PostData: slacktest.PostData{
 				Channel:  "@jim",
 				Username: "kapacitor",
@@ -8741,7 +8742,8 @@ stream
 			},
 		},
 		slacktest.Request{
-			URL: "/test/slack/url2",
+			URL:        "/test/slack/url2",
+			AuthHeader: "Bearer my_secret_token",
 			PostData: slacktest.PostData{
 				Channel:  "#alerts",
 				Username: "kapacitor",
@@ -11239,6 +11241,7 @@ stream
 		c := zenoss.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL + "/zport/dmd/evconsole_router"
+		c.Collector = ""
 		svc := zenoss.NewService(c, diagService.NewZenossHandler())
 		tm.ZenossService = svc
 	}

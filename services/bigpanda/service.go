@@ -83,18 +83,18 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	AppKey    string          `json:"app_key"`
-	Message   string          `json:"message"`
-	Level     alert.Level     `json:"level"`
-	Data      alert.EventData `json:"event_data"`
-	Timestamp time.Time       `json:"timestamp"`
+	AppKey            string          `json:"app_key"`
+	Message           string          `json:"message"`
+	Level             alert.Level     `json:"level"`
+	Data              alert.EventData `json:"event_data"`
+	Timestamp         time.Time       `json:"timestamp"`
+	PrimaryProperty   string          `json:"primary_property"`
+	SecondaryProperty string          `json:"secondary_property"`
 }
 
 func (s *Service) TestOptions() interface{} {
-	t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:01Z")
-
 	return &testOptions{
-		AppKey:  "my-app-key-123456",
+		AppKey:  s.config().AppKey,
 		Message: "test bigpanda message",
 		Level:   alert.Critical,
 		Data: alert.EventData{
@@ -103,9 +103,8 @@ func (s *Service) TestOptions() interface{} {
 			Fields: make(map[string]interface{}),
 			Result: models.Result{},
 		},
-		Timestamp: t,
+		Timestamp: time.Now(),
 	}
-
 }
 
 func (s *Service) Test(options interface{}) error {
@@ -114,7 +113,9 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	hc := &HandlerConfig{
-		AppKey: o.AppKey,
+		AppKey:            o.AppKey,
+		PrimaryProperty:   o.PrimaryProperty,
+		SecondaryProperty: o.SecondaryProperty,
 	}
 	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc)
 }

@@ -36,6 +36,8 @@ type Config struct {
 	URLs     []string `toml:"urls" override:"urls"`
 	Username string   `toml:"username" override:"username"`
 	Password string   `toml:"password" override:"password,redact"`
+	Token    string   `toml:"token" override:"token,redact"`
+
 	// Path to CA file
 	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`
 	// Path to host cert file

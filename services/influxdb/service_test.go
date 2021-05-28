@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/flux"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	influxcli "github.com/influxdata/kapacitor/influxdb"
@@ -1244,6 +1245,14 @@ type influxDBClient struct {
 	UpdateFunc  func(influxcli.Config) error
 }
 
+func (c influxDBClient) WriteV2(w influxcli.FluxWrite) error {
+	panic("not implemented")
+}
+
+func (c influxDBClient) QueryFlux(q influxcli.FluxQuery) (flux.ResultIterator, error) {
+	panic("not implemented")
+}
+
 func (c influxDBClient) Close() error {
 	return nil
 }
@@ -1266,6 +1275,7 @@ func (c influxDBClient) Query(q influxcli.Query) (*influxcli.Response, error) {
 	}
 	return &influxcli.Response{}, nil
 }
+
 func (c influxDBClient) Update(config influxcli.Config) error {
 	if c.UpdateFunc != nil {
 		return c.UpdateFunc(config)

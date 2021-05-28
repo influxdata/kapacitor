@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -28,6 +29,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
+	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
@@ -80,6 +82,8 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -88,6 +92,7 @@ var udfDir string
 func init() {
 	dir, _ := os.Getwd()
 	udfDir = filepath.Clean(filepath.Join(dir, "../udf"))
+	fluxinit.FluxInit()
 }
 
 func mustHash(hash []byte, err error) string {
@@ -6504,6 +6509,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		"subscriptions":               nil,
 		"subscriptions-sync-interval": "1m0s",
 		"timeout":                     "0s",
+		"token":                       false,
 		"udp-bind":                    "",
 		"udp-buffer":                  float64(1e3),
 		"udp-read-buffer":             float64(0),
@@ -6584,6 +6590,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					Options: deepCopyMapWithReplace(defMap)(),
 					Redacted: []string{
 						"password",
+						"token",
 					},
 				}},
 			},
@@ -6592,6 +6599,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Options: deepCopyMapWithReplace(defMap)(),
 				Redacted: []string{
 					"password",
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -6611,6 +6619,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6619,6 +6628,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Options: deepCopyMapWithReplace(defMap)(map[string]interface{}{"urls": []interface{}{"http://192.0.2.0:8086"}}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6645,6 +6655,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6659,6 +6670,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6680,6 +6692,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								}),
 							Redacted: []string{
 								"password",
+								"token",
 							},
 						}},
 					},
@@ -6693,6 +6706,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -6718,6 +6732,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									}),
 								Redacted: []string{
 									"password",
+									"token",
 								},
 							},
 							{
@@ -6732,6 +6747,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									}),
 								Redacted: []string{
 									"password",
+									"token",
 								},
 							},
 						},
@@ -6748,6 +6764,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							}),
 						Redacted: []string{
 							"password",
+							"token",
 						},
 					},
 				},
@@ -7855,6 +7872,91 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "bigpanda",
+			setDefaults: func(c *server.Config) {
+				c.BigPanda.URL = "https://api.bigpanda.io/data/v2/alerts"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+					Options: map[string]interface{}{
+						"enabled":              false,
+						"global":               false,
+						"state-changes-only":   false,
+						"url":                  "https://api.bigpanda.io/data/v2/alerts",
+						"insecure-skip-verify": false,
+						"token":                false,
+						"app-key":              "",
+					},
+					Redacted: []string{
+						"token",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+				Options: map[string]interface{}{
+					"enabled":              false,
+					"global":               false,
+					"state-changes-only":   false,
+					"url":                  "https://api.bigpanda.io/data/v2/alerts",
+					"insecure-skip-verify": false,
+					"token":                false,
+					"app-key":              "",
+				},
+				Redacted: []string{
+					"token",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"url":     "https://dev123456.bigpanda.io/data/v2/alerts",
+							"app-key": "appkey-123",
+							"token":   "token-123",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+							Options: map[string]interface{}{
+								"enabled":              true,
+								"global":               false,
+								"state-changes-only":   false,
+								"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
+								"token":                true,
+								"app-key":              "appkey-123",
+								"insecure-skip-verify": false,
+							},
+							Redacted: []string{
+								"token",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/bigpanda/"},
+						Options: map[string]interface{}{
+							"enabled":              true,
+							"global":               false,
+							"state-changes-only":   false,
+							"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
+							"app-key":              "appkey-123",
+							"token":                true,
+							"insecure-skip-verify": false,
+						},
+						Redacted: []string{
+							"token",
+						},
+					},
+				},
+			},
+		},
+
+		{
 			section: "slack",
 			setDefaults: func(c *server.Config) {
 				cfg := &slack.Config{
@@ -7880,6 +7982,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"global":               true,
 						"icon-emoji":           "",
 						"state-changes-only":   false,
+						"token":                false,
 						"url":                  false,
 						"username":             "kapacitor",
 						"ssl-ca":               "",
@@ -7889,6 +7992,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 					Redacted: []string{
 						"url",
+						"token",
 					},
 				}},
 			},
@@ -7903,6 +8007,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"icon-emoji":           "",
 					"state-changes-only":   false,
 					"url":                  false,
+					"token":                false,
 					"username":             "kapacitor",
 					"ssl-ca":               "",
 					"ssl-cert":             "",
@@ -7911,6 +8016,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 				},
 				Redacted: []string{
 					"url",
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -7923,6 +8029,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"channel":   "#general",
 							"username":  slack.DefaultUsername,
 							"url":       "http://slack.example.com/secret-token",
+							"token":     "my_other_secret",
 						},
 					},
 					element: "company_private",
@@ -7939,6 +8046,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"icon-emoji":           "",
 								"state-changes-only":   false,
 								"url":                  false,
+								"token":                false,
 								"username":             "kapacitor",
 								"ssl-ca":               "",
 								"ssl-cert":             "",
@@ -7947,6 +8055,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							},
 							Redacted: []string{
 								"url",
+								"token",
 							},
 						},
 							{
@@ -7960,6 +8069,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -7968,6 +8078,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							}},
 					},
@@ -7982,6 +8093,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                true,
 							"username":             "kapacitor",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -7990,6 +8102,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8019,6 +8132,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8027,6 +8141,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8040,6 +8155,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8048,6 +8164,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8061,6 +8178,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8069,6 +8187,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8084,6 +8203,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "kapacitor",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8092,6 +8212,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8117,6 +8238,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8125,6 +8247,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8138,6 +8261,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8146,6 +8270,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8159,6 +8284,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "testbot",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8167,6 +8293,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8182,6 +8309,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "testbot",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8190,6 +8318,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8212,6 +8341,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  false,
+									"token":                false,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8220,6 +8350,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8233,6 +8364,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                true,
 									"username":             "kapacitor",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8241,6 +8373,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 							{
@@ -8254,6 +8387,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"icon-emoji":           "",
 									"state-changes-only":   false,
 									"url":                  true,
+									"token":                false,
 									"username":             "",
 									"ssl-ca":               "",
 									"ssl-cert":             "",
@@ -8262,6 +8396,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								},
 								Redacted: []string{
 									"url",
+									"token",
 								},
 							},
 						},
@@ -8277,6 +8412,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
+							"token":                false,
 							"username":             "",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
@@ -8285,6 +8421,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						},
 						Redacted: []string{
 							"url",
+							"token",
 						},
 					},
 				},
@@ -8737,6 +8874,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 			section: "zenoss",
 			setDefaults: func(c *server.Config) {
 				c.Zenoss.URL = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+				c.Zenoss.Collector = "Kapacitor"
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/zenoss"},
@@ -8753,6 +8891,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"method":             "add_event",
 						"type":               "rpc",
 						"tid":                float64(1),
+						"collector":          "Kapacitor",
 						"severity-map": map[string]interface{}{
 							"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 						},
@@ -8775,6 +8914,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"method":             "add_event",
 					"type":               "rpc",
 					"tid":                float64(1),
+					"collector":          "Kapacitor",
 					"severity-map": map[string]interface{}{
 						"ok": "Clear", "info": "Info", "warning": "Warning", "critical": "Critical",
 					},
@@ -8813,6 +8953,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"method":             "kapa_handler",
 								"type":               "rpc",
 								"tid":                float64(1),
+								"collector":          "Kapacitor",
 								"severity-map": map[string]interface{}{
 									"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 								},
@@ -8835,6 +8976,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"method":             "kapa_handler",
 							"type":               "rpc",
 							"tid":                float64(1),
+							"collector":          "Kapacitor",
 							"severity-map": map[string]interface{}{
 								"ok": float64(0), "info": float64(2), "warning": float64(3), "critical": float64(5),
 							},
@@ -8998,10 +9140,12 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
 				Name: "bigpanda",
 				Options: client.ServiceTestOptions{
-					"app_key":   "my-app-key-123456",
-					"level":     "CRITICAL",
-					"message":   "test bigpanda message",
-					"timestamp": "1970-01-01T00:00:01Z",
+					"app_key":            "",
+					"level":              "CRITICAL",
+					"message":            "test bigpanda message",
+					"timestamp":          "1970-01-01T00:00:01Z",
+					"primary_property":   "",
+					"secondary_property": "",
 					"event_data": map[string]interface{}{
 						"Fields": map[string]interface{}{},
 						"Result": map[string]interface{}{
@@ -9240,10 +9384,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
 				Name: "servicenow",
 				Options: client.ServiceTestOptions{
-					"alert_id": "id",
-					"source":   "Kapacitor",
-					"level":    "CRITICAL",
-					"message":  "test servicenow alert",
+					"alert_id":        "1001",
+					"message":         "test servicenow message",
+					"level":           "CRITICAL",
+					"source":          "Kapacitor",
+					"node":            "",
+					"type":            "",
+					"resource":        "",
+					"metric_name":     "",
+					"message_key":     "",
+					"additional_info": map[string]interface{}{},
 				},
 			},
 			{
@@ -9307,7 +9457,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/teams"},
 				Name: "teams",
 				Options: client.ServiceTestOptions{
-					"channel_url": "",
+					"channel-url": "",
 					"alert_topic": "test kapacitor alert topic",
 					"alert_id":    "foo/bar/bat",
 					"message":     "test teams message",
@@ -9346,20 +9496,20 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/zenoss"},
 				Name: "zenoss",
 				Options: client.ServiceTestOptions{
-					"alert_id":        "1001",
-					"level":           "CRITICAL",
-					"message":         "test zenoss message",
-					"action":          "EventsRouter",
-					"method":          "add_event",
-					"type":            "rpc",
-					"tid":             float64(1),
-					"summary":         "",
-					"device":          "",
-					"component":       "",
-					"event_class_key": "",
-					"event_class":     "",
-					"collector":       "",
-					"custom_fields":   map[string]interface{}{},
+					"alert_id":      "1001",
+					"level":         "CRITICAL",
+					"message":       "test zenoss message",
+					"action":        "EventsRouter",
+					"method":        "add_event",
+					"type":          "rpc",
+					"tid":           float64(1),
+					"summary":       "",
+					"device":        "",
+					"component":     "",
+					"eventclasskey": "",
+					"eventclass":    "",
+					"collector":     "Kapacitor",
+					"custom_fields": map[string]interface{}{},
 				},
 			},
 		},
@@ -9373,6 +9523,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 	for i := range expServiceTests.Services {
 		exp := expServiceTests.Services[i]
 		got := serviceTests.Services[i]
+		if _, expHasTimestamp := exp.Options["timestamp"]; expHasTimestamp {
+			if _, gotHasTimestamp := got.Options["timestamp"]; !gotHasTimestamp {
+				t.Errorf("timestamp not found in server test %s:\n%s", exp.Name, cmp.Diff(exp, got))
+			}
+			exp.Options["timestamp"] = ""
+			got.Options["timestamp"] = ""
+		}
 		if !reflect.DeepEqual(got, exp) {
 			t.Errorf("unexpected server test %s:\n%s", exp.Name, cmp.Diff(exp, got))
 		}
@@ -9421,10 +9578,16 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/servicenow"},
 				Name: "servicenow",
 				Options: client.ServiceTestOptions{
-					"alert_id": "id",
-					"source":   "Kapacitor",
-					"level":    "CRITICAL",
-					"message":  "test servicenow alert",
+					"alert_id":        "1001",
+					"message":         "test servicenow message",
+					"level":           "CRITICAL",
+					"source":          "Kapacitor",
+					"node":            "",
+					"type":            "",
+					"resource":        "",
+					"metric_name":     "",
+					"message_key":     "",
+					"additional_info": map[string]interface{}{},
 				},
 			},
 			{
@@ -9506,6 +9669,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 	}{
 		{
 			service: "alerta",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "bigpanda",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -11055,6 +11226,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				c.Zenoss.Enabled = true
 				c.Zenoss.URL = ts.URL + "/zport/dmd/evconsole_router"
+				c.Zenoss.Collector = ""
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -13203,6 +13375,104 @@ func TestLogSessions_HeaderGzip(t *testing.T) {
 		t.Fatalf("expected: %v, got: %v\n", exp, got)
 		return
 	}
+}
+
+func TestFluxTasks_Basic(t *testing.T) {
+	conf := NewConfig()
+	conf.FluxTask.Enabled = true
+	conf.FluxTask.TaskRunInfluxDB = "none"
+	s := OpenServer(conf)
+	cli := Client(s)
+	defer s.Close()
+
+	// Check we can query empty tasks
+	u := cli.BaseURL()
+	basePath := "kapacitor/v1/api/v2/tasks"
+	query := func(method string, path string, body string) string {
+		u.Path = path
+		t.Log("Querying: ", method, u.String())
+		req, err := http.NewRequest(method, u.String(), bytes.NewBufferString(body))
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		buf := bytes.Buffer{}
+		_, err = io.Copy(&buf, resp.Body)
+		require.NoError(t, err)
+		return strings.Trim(buf.String(), "\n")
+	}
+
+	assert.Equal(t, `{"links":{"self":"/kapacitor/v1/api/v2/tasks?limit=100"},"tasks":[]}`, query("GET", basePath, ""))
+
+	// Start a simple server. It listens on port and closes requestDone when finished.
+	// This lets us create a task that uses the flux-native http.Post and assert that
+	// flux is configured properly
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	server := &http.Server{}
+	requestStarted := make(chan struct{})
+	requestStopped := make(chan struct{})
+	go func() {
+		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			<-requestStarted
+			<-requestStopped
+		})
+		server.Serve(listener)
+	}()
+	defer server.Close()
+
+	// create a task, assert on the important parts of it
+	fluxScript := fmt.Sprintf(`import "http"
+option task = {concurrency: 1, name:"poster", every:1s}
+http.post(url: "http://localhost:%d")
+`, port)
+	task := fmt.Sprintf(`{"status": "active", "description": "simple post", "flux": %q}`, fluxScript)
+	createResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("POST", basePath, task)), &createResp))
+	id := createResp["id"].(string)
+	assert.Equal(t, 16, len(id))
+	assert.Contains(t, createResp, "orgID")
+	assert.Equal(t, "", createResp["orgID"])
+	assert.Equal(t, "poster", createResp["name"])
+	logPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s/logs", id)
+	runPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s/runs", id)
+	selfPath := fmt.Sprintf("/kapacitor/v1/api/v2/tasks/%s", id)
+	assert.Equal(t, map[string]interface{}{
+		"logs": logPath,
+		"runs": runPath,
+		"self": selfPath,
+	}, createResp["links"])
+
+	t.Log("waiting for request")
+	requestStarted <- struct{}{}
+
+	// Request is now started (it hit our test server with a post) but can't finish - time to assert that we have runs and logs
+	logResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", logPath, task)), &logResp))
+	expectMessage := "Started task from script:"
+	assert.Equal(t, expectMessage, logResp["events"].([]interface{})[0].(map[string]interface{})["message"].(string)[:len(expectMessage)])
+
+	runResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", runPath, task)), &runResp))
+	assert.Equal(t, map[string]interface{}{
+		"task": selfPath,
+		"self": runPath,
+	}, runResp["links"])
+
+	// stop blocking the server
+	close(requestStarted)
+	close(requestStopped)
+
+	// Assert that we can really update a task
+	query("PATCH", selfPath, `{"every": "10m"}`)
+	getResp := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal([]byte(query("GET", selfPath, task)), &getResp))
+	assert.Equal(t, getResp["every"], "10m")
+
+	// Assert that when we delete a task it goes away
+	query("DELETE", selfPath, "")
+	assert.Equal(t, `{"links":{"self":"/kapacitor/v1/api/v2/tasks?limit=100"},"tasks":[]}`, query("GET", basePath, ""))
 
 }
 

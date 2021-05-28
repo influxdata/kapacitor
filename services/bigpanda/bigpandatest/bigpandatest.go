@@ -55,13 +55,15 @@ type Request struct {
 
 // PostData is the default struct to send an element through to BigPanda
 type PostData struct {
-	AppKey      string `json:"app_key"`
-	Status      string `json:"status"`
-	Host        string `json:"host"`
-	Timestamp   int64  `json:"timestamp"`
-	Check       string `json:"check"`
-	Description string `json:"description"`
-	Cluster     string `json:"cluster"`
-	Task        string `json:"task"`
-	Details     string `json:"details"`
+	AppKey            string `json:"app_key"`
+	Status            string `json:"status"`
+	Host              string `json:"host"`
+	Timestamp         int64  `json:"timestamp"`
+	Check             string `json:"check"`
+	Description       string `json:"description"`
+	Cluster           string `json:"cluster"`
+	Task              string `json:"task"`
+	Details           string `json:"details"`
+	PrimaryProperty   string `json:"primary_property"`
+	SecondaryProperty string `json:"secondary_property"`
 }

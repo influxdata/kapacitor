@@ -263,7 +263,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("action", h.Action).
 			Dot("method", h.Method).
 			Dot("type", h.Type).
-			Dot("TID", h.TID).
+			Dot("tid", h.Tid).
 			// standard event data element fields
 			Dot("summary", h.Summary).
 			Dot("device", h.Device).
@@ -282,6 +282,10 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		for _, k := range keys {
 			n.Dot("customField", k, h.CustomFieldsMap[k])
 		}
+	}
+	for _, h := range a.TeamsHandlers {
+		n.Dot("teams").
+			Dot("channelURL", h.ChannelURL)
 	}
 
 	return n.prev, n.err

@@ -1,4 +1,5 @@
 .*.swp
+/.idea/
 dist/*
 /build/*
 /*.conf
@@ -15,9 +16,13 @@ kapacitor*.zip
 *.test
 /test-logs
 *.prof
+/.idea/
 
 # Ignore any built binaries
 /kapacitor
 /kapacitord
 /tickfmt
 /tickdoc
+
+# Ignore go vendor directory
+/vendor

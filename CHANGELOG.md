@@ -7,6 +7,10 @@
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
 - [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
 - [#2530](https://github.com/influxdata/kapacitor/pull/2530): Add a node tricklenode that converts batches to streams, the inverse of windownode.
+- [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
+- [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
+- [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
+- [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
 
 ## v1.5.9 [2021-04-01]
 
@@ -15,6 +19,7 @@
 - [#2488](https://github.com/influxdata/kapacitor/pull/2488): Fix function node name for ServiceNow handler so it is properly camelcased. 
 - [#2489](https://github.com/influxdata/kapacitor/pull/2489): Fix memory leaks in JoinNode and UnionNode.
 - [#2498](https://github.com/influxdata/kapacitor/pull/2498): Avoid infinite hang when closing Kakfa writer, this also prevents the timeout error on an http update to Kafka config.
+- [#2536](https://github.com/influxdata/kapacitor/pull/2536): Update prometheus dependency for service discovery
 
 ### Features
 - [#2472](https://github.com/influxdata/kapacitor/pull/2472): Send full event payload on pagerduty resolve, thanks @asvinours!

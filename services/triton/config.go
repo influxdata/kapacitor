@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
+	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/triton"
 )
 
 // Config is a Triton service discovery configuration
@@ -48,21 +50,19 @@ func (t Config) Validate() error {
 
 // Prom creates a prometheus configuration for Triton
 func (t Config) Prom(c *config.ScrapeConfig) {
-	c.ServiceDiscoveryConfig.TritonSDConfigs = []*config.TritonSDConfig{
-		t.PromConfig(),
-	}
+	c.ServiceDiscoveryConfigs = append(c.ServiceDiscoveryConfigs, t.PromConfig())
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (t Config) PromConfig() *config.TritonSDConfig {
-	return &config.TritonSDConfig{
+func (t Config) PromConfig() *triton.SDConfig {
+	return &triton.SDConfig{
 		Account:         t.Account,
 		DNSSuffix:       t.DNSSuffix,
 		Endpoint:        t.Endpoint,
 		Port:            t.Port,
 		RefreshInterval: model.Duration(t.RefreshInterval),
 		Version:         t.Version,
-		TLSConfig: config.TLSConfig{
+		TLSConfig: config2.TLSConfig{
 			CAFile:             t.SSLCA,
 			CertFile:           t.SSLCert,
 			KeyFile:            t.SSLKey,

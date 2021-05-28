@@ -35,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
+	"github.com/influxdata/kapacitor/services/fluxtask"
 	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -76,9 +77,11 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/influxdata/kapacitor/task/taskmodel"
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
+	"go.uber.org/zap/zapcore"
 )
 
 const clusterIDFilename = "cluster.id"
@@ -117,6 +120,8 @@ type Server struct {
 
 	TaskMaster       *kapacitor.TaskMaster
 	TaskMasterLookup *kapacitor.TaskMasterLookup
+
+	FluxTaskService taskmodel.TaskService
 
 	LoadService           *load.Service
 	SideloadService       *sideload.Service
@@ -248,6 +253,10 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "influxdb service")
 	}
 
+	if err := s.appendFluxTaskService(); err != nil {
+		return nil, errors.Wrap(err, "fluxtask service")
+	}
+
 	if err := s.appendLoadService(); err != nil {
 		return nil, errors.Wrap(err, "load service")
 	}
@@ -308,7 +317,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	}
 
 	// Append Scraper and discovery services
-	s.appendScraperService()
+	if err := s.appendScraperService(); err != nil {
+		return nil, errors.Wrap(err, "scraper service")
+	}
 
 	if err := s.appendK8sService(); err != nil {
 		return nil, errors.Wrap(err, "kubernetes service")
@@ -397,6 +408,17 @@ func (s *Server) initAlertService() {
 
 func (s *Server) appendAlertService() {
 	s.AppendService("alert", s.AlertService)
+}
+
+func (s *Server) appendFluxTaskService() error {
+	// TODO: hook into correct logging level instead of assuming info
+	logger := s.DiagService.NewZapLogger(zapcore.InfoLevel)
+	srv := fluxtask.New(s.config.FluxTask, logger)
+	srv.HTTPDService = s.HTTPDService
+	srv.InfluxDBService = s.InfluxDBService
+	srv.StorageService = s.StorageService
+	s.AppendService("fluxtask", srv)
+	return nil
 }
 
 func (s *Server) appendTesterService() {
@@ -949,7 +971,7 @@ func (s *Server) appendReportingService() {
 	}
 }
 
-func (s *Server) appendScraperService() {
+func (s *Server) appendScraperService() error {
 	c := s.config.Scraper
 	d := s.DiagService.NewScraperHandler()
 	srv := scraper.NewService(c, d)
@@ -957,6 +979,7 @@ func (s *Server) appendScraperService() {
 	s.ScraperService = srv
 	s.SetDynamicService("scraper", srv)
 	s.AppendService("scraper", srv)
+	return nil
 }
 
 func (s *Server) appendAzureService() {
