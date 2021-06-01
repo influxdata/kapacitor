@@ -1005,7 +1005,8 @@ type EC2Handler struct {
 func (h *EC2Handler) WithClusterContext(cluster string) ec2.Diagnostic {
 	return &EC2Handler{
 		ScraperHandler: &ScraperHandler{
-			l: h.ScraperHandler.l.With(String("cluster_id", cluster)),
+			l:   h.ScraperHandler.l.With(String("cluster_id", cluster)),
+			buf: &bytes.Buffer{},
 		},
 	}
 }
@@ -1266,7 +1267,8 @@ func (h *ScraperHandler) With(key string, value interface{}) plog.Logger {
 	}
 
 	return &ScraperHandler{
-		l: h.l.With(field),
+		l:   h.l.With(field),
+		buf: &bytes.Buffer{},
 	}
 }
 
