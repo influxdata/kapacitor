@@ -16,9 +16,6 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
-	alertservice "github.com/influxdata/kapacitor/services/alert"
-	"github.com/influxdata/kapacitor/services/httppost"
-	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/wlog"
 )
 
@@ -2605,6 +2602,42 @@ data
 	testBatcherWithOutput(t, "TestBatch_StateTracking", script, 8*time.Second, er, false)
 }
 
+func TestBatch_Trickle(t *testing.T) {
+	var script = `
+	var data = batch
+	|query('SELECT value FROM "telegraf"."default"."cpu"')
+		.period(4s)
+		.every(4s)
+		.groupBy('host')
+data
+	|trickle()
+	|window().period(10s)
+	|httpOut('TestBatch_Trickle')`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC), 90.38281469458698},
+					{time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC), 80.38281469458698},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC), 83.56930693069836},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Trickle", script, 40*time.Second, er, false)
+}
+
 func TestBatch_StateCount(t *testing.T) {
 	var script = `
 var data = batch
@@ -3689,6 +3722,7 @@ batch
 
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
+	t.Helper()
 	if testing.Verbose() {
 		wlog.SetLevel(wlog.DEBUG)
 	} else {
@@ -3696,20 +3730,10 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Create a new execution env
-	d := diagService.NewKapacitorHandler()
-	tm := kapacitor.NewTaskMaster("testBatcher", newServerInfo(), d)
-	httpdService := newHTTPDService()
-	tm.HTTPDService = httpdService
-	tm.TaskStore = taskStore{}
-	tm.DeadmanService = deadman{}
-	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
-	as := alertservice.NewService(diagService.NewAlertServiceHandler())
-	as.StorageService = storagetest.New()
-	as.HTTPDService = httpdService
-	if err := as.Open(); err != nil {
+	tm, err := createTaskMaster("testBatcher")
+	if err != nil {
 		t.Fatal(err)
 	}
-	tm.AlertService = as
 	tm.Open()
 
 	// Create task
@@ -3764,7 +3788,6 @@ func testBatcherWithOutput(
 	if err != nil {
 		t.Error(err)
 	}
-
 	// Get the result
 	output, err := et.GetOutput(name)
 	if err != nil {

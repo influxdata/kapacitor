@@ -515,6 +515,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newStateCountNode(et, t, d)
 	case *pipeline.SideloadNode:
 		n, err = newSideloadNode(et, t, d)
+	case *pipeline.TrickleNode:
+		n = newTrickleNode(et, t, d)
 	case *pipeline.BarrierNode:
 		n, err = newBarrierNode(et, t, d)
 	default:
