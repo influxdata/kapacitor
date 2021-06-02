@@ -940,54 +940,6 @@ func NewDeleteGroupMessage(info *GroupInfo) *deleteGroupMessage {
 	}
 }
 
-//func NewDeleteGroupMessage(name string, groupKeys []struct {
-//	k string
-//	v string
-//}) deleteGroupMessage { //id models.GroupID) DeleteGroupMessage {
-//
-//	if name=="" && len(groupKeys)==0{
-//		return deleteGroupMessage{}
-//	}
-//
-//	msg:=deleteGroupMessage{
-//		name: name,
-//	}
-//	var buf strings.Builder
-//	l := 0
-//	if dims.ByName {
-//		// add capacity for the name + "\n"
-//		l += len(name) + 1
-//	}
-//	for i, d := range dims.TagNames {
-//		if i != 0 {
-//			// add capacity for the comma after the tagnames
-//			l++
-//		}
-//		// add capacity for the name length, and the tag length, and the "="
-//		l += len(d) + len(tags[d]) + 1
-//	}
-//	buf.Grow(l)
-//	if name!=""{
-//		buf.WriteString(name)
-//
-//	}
-//	for i, d := range dims.TagNames {
-//		if i != 0 {
-//			buf.WriteRune(',')
-//		}
-//		buf.WriteString(d)
-//		buf.WriteRune('=')
-//		buf.WriteString(tags[d])
-//
-//	}
-//	fmt.Println("**in deletemsg**\n", buf.String(), "\n****")
-//	return GroupID(buf.String())
-//
-//	return &deleteGroupMessage{
-//		groupID: ,
-//	}
-//}
-
 func (d *deleteGroupMessage) Type() MessageType {
 	return DeleteGroup
 }
@@ -999,45 +951,3 @@ func (d *deleteGroupMessage) GroupID() models.GroupID {
 func (d *deleteGroupMessage) GroupInfo() *GroupInfo {
 	return d.info
 }
-
-/*
-func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
-	if len(dims.TagNames) == 0 {
-		if dims.ByName {
-			return GroupID(name)
-		}
-		return NilGroup
-	}
-	var buf strings.Builder
-	l := 0
-	if dims.ByName {
-		// add capacity for the name + "\n"
-		l += len(name) + 1
-	}
-	for i, d := range dims.TagNames {
-		if i != 0 {
-			// add capacity for the comma after the tagnames
-			l++
-		}
-		// add capacity for the name length, and the tag length, and the "="
-		l += len(d) + len(tags[d]) + 1
-	}
-	buf.Grow(l)
-	if dims.ByName {
-		buf.WriteString(name)
-		// Add delimiter that is not allowed in name.
-		buf.WriteRune('\n')
-	}
-	for i, d := range dims.TagNames {
-		if i != 0 {
-			buf.WriteRune(',')
-		}
-		buf.WriteString(d)
-		buf.WriteRune('=')
-		buf.WriteString(tags[d])
-
-	}
-	fmt.Println("****\n", buf.String(), "\n****")
-	return GroupID(buf.String())
-}
-*/

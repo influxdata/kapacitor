@@ -20,7 +20,6 @@ type JoinNode struct {
 	j         *pipeline.JoinNode
 	fill      influxql.FillOption
 	fillValue interface{}
-	deleteAll bool
 
 	groupsMu sync.RWMutex
 	groups   map[models.GroupID]*joinGroup
@@ -99,14 +98,14 @@ func (n *JoinNode) Barrier(src int, b edge.BarrierMessage) error {
 }
 
 // Delete deletes the group from the JoinNode, and resets the Low Marks for from the group from that source.
-// if deleteAll is set on the
+// if deleteAll is set on the pipeline.Joinnode, then it any delete will delete
 func (n *JoinNode) Delete(src int, d edge.DeleteGroupMessage) error {
 	groupID := d.GroupID()
 	n.groupsMu.Lock()
 	delete(n.groups, groupID)
 	delete(n.matchGroupsBuffer, groupID)
 	delete(n.specificGroupsBuffer, groupID)
-	if n.deleteAll {
+	if n.j.DeleteAll {
 		for x := range n.lowMarks {
 			delete(n.lowMarks, x)
 		}
