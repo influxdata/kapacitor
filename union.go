@@ -69,6 +69,10 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 	return n.emitReady(false)
 }
 
+func (n *UnionNode) Delete(src int, d edge.DeleteGroupMessage) error {
+	return edge.Forward(n.outs, d)
+}
+
 func (n *UnionNode) Point(src int, p edge.PointMessage) error {
 	n.timer.Start()
 	defer n.timer.Stop()
@@ -135,6 +139,7 @@ func (n *UnionNode) emitReady(drain bool) error {
 			// Unless we are draining the buffer than we can continue.
 			return nil
 		}
+
 		// Emit all values that are at or below the mark.
 		for i = range n.sources {
 			l := n.sources[i].Len()
@@ -157,8 +162,6 @@ func (n *UnionNode) emitReady(drain bool) error {
 	}
 	return nil
 }
-
-var q = 0
 
 func (n *UnionNode) emit(m edge.Message) error {
 	n.timer.Pause()

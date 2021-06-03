@@ -31,6 +31,7 @@ func (n *JoinNode) Build(j *pipeline.JoinNode) (ast.Node, error) {
 		Dot("delimiter", j.Delimiter).
 		Dot("streamName", j.StreamName).
 		Dot("tolerance", j.Tolerance).
+		Dot("deleteAll", j.DeleteAll).
 		DotNotNil("fill", j.Fill)
 	return n.prev, n.err
 }
