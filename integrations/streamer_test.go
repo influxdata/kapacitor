@@ -11735,7 +11735,7 @@ stream
 `
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -11791,7 +11791,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -11923,7 +11923,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12348,7 +12348,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12408,7 +12408,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13459,7 +13459,7 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13540,7 +13540,7 @@ func testStreamerWithInputChannel(
 	}
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13779,9 +13779,9 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 	return nil
 }
 
-func createTaskMaster() (*kapacitor.TaskMaster, error) {
+func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
 	d := diagService.NewKapacitorHandler()
-	tm := kapacitor.NewTaskMaster("testStreamer", newServerInfo(), d)
+	tm := kapacitor.NewTaskMaster(name, newServerInfo(), d)
 	httpdService := newHTTPDService()
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -125,7 +124,7 @@ func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string, 
 	}
 
 	if got != want {
-		t.Errorf("unexpected TICKscript:\n%s", cmp.Diff(got, want))
+		t.Errorf("unexpected TICKscript:\n %s", cmp.Diff(got, want))
 		t.Log(got) // print is helpful to get the correct format.
 	}
 
