@@ -45,6 +45,8 @@ const (
 //            .fill(0.0)
 //            // name the resulting stream
 //            .streamName('error_rate')
+//            // treat a delete from one side of the join as a delete to all sides
+//            .deleteAll(TRUE)
 //        // Both the "value" fields from each parent have been prefixed
 //        // with the respective names 'errors' and 'requests'.
 //        |eval(lambda: "errors.value" / "requests.value")
@@ -69,6 +71,10 @@ type JoinNode struct {
 	// The delimiter for the field name prefixes.
 	// Can be the empty string.
 	Delimiter string `json:"delimiter"`
+
+	// Deletes both sides of the join regardless what
+	// side receive the delete message.
+	DeleteAll bool `json:"deleteAll"`
 
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.

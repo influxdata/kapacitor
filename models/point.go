@@ -113,7 +113,6 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		buf.WriteString(d)
 		buf.WriteRune('=')
 		buf.WriteString(tags[d])
-
 	}
 	return GroupID(buf.String())
 }

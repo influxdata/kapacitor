@@ -4712,6 +4712,61 @@ errorCounts
 	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 
+func TestStream_Delete_Join(t *testing.T) {
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('cpu')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.streamName('error_view')
+		.tolerance(2s)
+		.deleteAll(TRUE)
+	|eval(lambda: "errors.sum" / "views.sum")
+		.as('error_percent')
+		.keep()
+	|httpOut('TestStream_Delete_Join')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
+				Values: [][]interface{}{
+					{time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC), 1.0, 18.0, 18.0},
+				},
+			},
+		},
+	}
+	testStreamerWithOutput(t, "TestStream_Delete_Join", script, 30*time.Second, er, true, nil)
+}
+
 func TestStream_Join_Delimiter(t *testing.T) {
 
 	var script = `
