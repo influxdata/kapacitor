@@ -705,7 +705,6 @@ func (n *FluxQueryNode) doQuery(in edge.Edge) (err error) {
 				n.timer.Stop()
 				break
 			}
-			_ = resp
 			//Collect batches
 			for _, res := range resp.Results {
 				batches, err := edge.ResultToBufferedBatches(res, n.byName)

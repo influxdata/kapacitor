@@ -234,9 +234,7 @@ func (et *ExecutingTask) start(ins []edge.StatsEdge, snapshot *TaskSnapshot) err
 
 func (et *ExecutingTask) stop() (err error) {
 	close(et.stopping)
-	i := 0
 	_ = et.walk(func(n Node) error {
-		i++
 		n.stop()
 		e := n.Wait()
 		if e != nil {
