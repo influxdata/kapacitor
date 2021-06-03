@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	imodels "github.com/influxdata/influxdb/models"
-
 	"github.com/google/go-cmp/cmp"
+	imodels "github.com/influxdata/influxdb/models"
 )
 
 func mustParseTime(s string) time.Time {
@@ -130,7 +129,7 @@ func Test_FluxCSV_Empty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := Response{Results: []Result{{Series: []imodels.Row{}}}}
+	expected := Response{Results: []Result{{}}}
 	if !cmp.Equal(res, &expected) {
 		t.Fatal(cmp.Diff(res, &expected))
 	}
@@ -144,8 +143,9 @@ func Test_FluxCSV_Error(t *testing.T) {
 ,here is an error,`))
 
 	_, err := NewFluxQueryResponse(data)
-	if err.Error() != "here is an error" {
-		t.Fatal("Expected error 'here is an error', but got none")
+	exp := "flux query error: here is an error"
+	if err.Error() != exp {
+		t.Fatalf("Expected error '%s', but got '%s'", exp, err.Error())
 	}
 
 }

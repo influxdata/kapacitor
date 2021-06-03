@@ -1,28 +1,26 @@
 package influxdb
 
 import (
-	"encoding/csv"
 	"fmt"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
-
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/pkg/errors"
 )
 
 func NewFluxQueryResponse(r io.Reader) (*Response, error) {
-	q := &queryCSVResult{
-		csvReader: csv.NewReader(r),
-		tableNum:  "0",
-		buf:       []imodels.Row{},
-		seriesBuf: &imodels.Row{},
+	builder := responseBuilder{}
+	err := NewFluxCSVEventParser(r, &builder).Parse()
+	if err != nil {
+		return nil, err
 	}
-	q.csvReader.FieldsPerRecord = -1
-	q.csvReader.ReuseRecord = true
-	return q.response()
+	if builder.Err != nil {
+		return nil, builder.Err
+	}
+	return &Response{Results: []Result{{Series: builder.buf}}}, nil
 }
 
 // queryCSVResult is the result of a flux query in CSV format
@@ -30,170 +28,107 @@ func NewFluxQueryResponse(r io.Reader) (*Response, error) {
 // Annotations: []string{"datatype", "group"},
 // Delimiter:   ",",
 // Header:      true,
-type queryCSVResult struct {
-	csvReader      *csv.Reader
-	Row            []string
-	ColNames       []string
+type responseBuilder struct {
+	colNames       []string
 	colNamesMap    map[string]int
-	dataTypes      []string
-	group          []bool
 	tags           []int
 	measurementCol int
 	fields         []int
-	fieldsLen      int
 	defaultVals    []string
 	Err            error
 	buf            []imodels.Row
 	seriesBuf      *imodels.Row
-	tableNum       string
 }
 
-const skipNonDataFluxCols = 3
-
-func (q *queryCSVResult) response() (*Response, error) {
-	const (
-		stateOtherRow = iota
-		stateNameRow
-		stateFirstDataRow
-	)
-	state := stateOtherRow
-readRow:
-	q.Row, q.Err = q.csvReader.Read()
+func (q *responseBuilder) TableStart(meta FluxTableMetaData, firstRow []string) {
 	if q.Err != nil {
-		if q.Err == io.EOF {
-			if len(q.buf) != 0 {
-				q.buf = append(q.buf, *q.seriesBuf)
-				q.seriesBuf = nil // clear the seriesBuf so the GC can clear it if necessary.
-			}
-			resp := &Response{Results: []Result{{Series: q.buf}}}
-			q.buf = nil // clear the buf so the GC can clear it if necessary.
-			return resp, nil
-		}
-		return nil, q.Err
+		return
 	}
-
-	// check and process error tables
-	if len(q.Row) > 2 && q.Row[1] == "error" {
-		row, err := q.csvReader.Read()
-		if err != nil || len(row) != len(q.Row) {
-			if err == io.EOF {
-				return nil, errors.Wrap(q.Err, "unexpected EOF in query tables")
-			} else if err == nil && len(row) != len(q.Row) {
-				return nil, errors.Wrap(err, "invalid query data")
-			}
-			return nil, errors.Wrap(err, "failed to read error value")
-		}
-		return nil, errors.New(q.Row[1])
+	q.seriesBuf = &imodels.Row{}
+	tags := make(models.Tags, len(firstRow))
+	// add the tags from the row
+	for _, i := range q.tags {
+		tags[q.colNames[i]] = firstRow[i]
 	}
-
-	// skip short rows, this is so we can skip blank lines
-	if len(q.Row) < skipNonDataFluxCols {
-		goto readRow
+	// add the column names from the row
+	for _, i := range q.fields {
+		q.seriesBuf.Columns = append(q.seriesBuf.Columns, q.colNames[i])
 	}
-	// processes based on first column
-	switch q.Row[0] {
-	case "":
-		if len(q.Row) <= 5 {
-			return nil, errors.New("Unexpectedly few columns")
-		}
-		if state == stateNameRow {
-			q.ColNames = append(q.ColNames[:0], q.Row[skipNonDataFluxCols:]...)
-
-			// replace "_time" that flux uses with "time"
-			for i := range q.ColNames {
-				if q.ColNames[i] == "_time" {
-					q.ColNames[i] = "time"
-				}
-			}
-			q.colNamesMap = make(map[string]int, len(q.Row[skipNonDataFluxCols:]))
-			q.tags = q.tags[:0]
-			q.fieldsLen = 0
-			q.fields = q.fields[:0]
-			for i := range q.ColNames {
-				cn := q.ColNames[i]
-				q.colNamesMap[cn] = i
-				switch cn {
-				case "_measurement", "_start", "_stop":
-				default: // its a tag or a field
-
-					if !q.group[i] { // its a fields
-						q.fieldsLen++
-						q.fields = append(q.fields, i)
-					} else {
-						q.tags = append(q.tags, i)
-					}
-				}
-			}
-			state = stateFirstDataRow
-			goto readRow
-		}
-		if q.tableNum != q.Row[2] { // we have moved on to a new table
-			if q.tableNum != "" {
-				q.buf = append(q.buf, *q.seriesBuf)
-				q.seriesBuf = &imodels.Row{}
-			}
-			if i, ok := q.colNamesMap["_measurement"]; ok {
-				q.seriesBuf.Name = q.Row[i+skipNonDataFluxCols]
-			}
-			state = stateFirstDataRow
-			q.tableNum = q.Row[2]
-		}
-		values := make([]interface{}, 0, q.fieldsLen)
-		if state == stateFirstDataRow {
-			tags := make(models.Tags, len(q.Row)-skipNonDataFluxCols)
-			// add the tags from the row
-			for _, i := range q.tags {
-				tags[q.ColNames[i]] = q.Row[i+skipNonDataFluxCols]
-			}
-			// add the fields and Column names from the row
-			for _, i := range q.fields {
-				q.seriesBuf.Columns = append(q.seriesBuf.Columns, q.ColNames[i])
-				var err error
-				val, err := q.convert(i)
-				if err != nil {
-					return nil, err
-				}
-				values = append(values, val)
-			}
-			q.seriesBuf.Tags = tags
-			q.seriesBuf.Values = append(q.seriesBuf.Values, values)
-			if i, ok := q.colNamesMap["_measurement"]; ok {
-				q.seriesBuf.Name = q.Row[i+skipNonDataFluxCols]
-			}
-			state = stateOtherRow
-			goto readRow
-		}
-		// convert and append the fields
-		for _, i := range q.fields {
-			var err error
-			val, err := q.convert(i)
-			if err != nil {
-				return nil, err
-			}
-			values = append(values, val)
-		}
-		q.seriesBuf.Values = append(q.seriesBuf.Values, values)
-		goto readRow
-	case "#datatype":
-		// parse datatypes here
-		q.dataTypes = append(q.dataTypes[:0], q.Row[skipNonDataFluxCols:]...)
-		goto readRow
-	case "#group":
-		q.group = q.group[:0]
-		for _, x := range q.Row[skipNonDataFluxCols:] {
-			q.group = append(q.group, x == "true")
-		}
-		state = stateNameRow
-		goto readRow
-	default:
-		// if the first column isn't empty, and it isn't #datatype or #group or data row  and we don't need it
-		goto readRow
+	q.seriesBuf.Tags = tags
+	if i, ok := q.colNamesMap["_measurement"]; ok {
+		q.seriesBuf.Name = firstRow[i]
 	}
+}
+
+func (q *responseBuilder) TableEnd() {
+	if q.Err != nil {
+		return
+	}
+	if q.seriesBuf != nil {
+		q.buf = append(q.buf, *q.seriesBuf)
+	}
+	q.seriesBuf = nil
+}
+
+func (q *responseBuilder) Error(err string) {
+	if q.Err != nil {
+		return
+	}
+	q.Err = errors.New("flux query error: " + err)
+}
+
+func (q *responseBuilder) GroupStart(names []string, types []string, groups []bool) {
+	if q.Err != nil {
+		return
+	}
+	q.colNames = q.colNames[:0]
+	// replace "_time" that flux uses with "time"
+	for i := range names {
+		if names[i] == "_time" {
+			q.colNames = append(q.colNames, "time")
+		} else {
+			q.colNames = append(q.colNames, names[i])
+		}
+	}
+	q.colNamesMap = make(map[string]int, len(q.colNames))
+	q.tags = q.tags[:0]
+	q.fields = q.fields[:0]
+	for i := range q.colNames {
+		cn := q.colNames[i]
+		q.colNamesMap[cn] = i
+		switch cn {
+		case "_measurement", "_start", "_stop":
+		default: // its a tag or a field
+			if !groups[i] { // its a fields
+				q.fields = append(q.fields, i)
+			} else {
+				q.tags = append(q.tags, i)
+			}
+		}
+	}
+}
+
+func (q *responseBuilder) DataRow(meta FluxTableMetaData, row []string) {
+	if q.Err != nil {
+		return
+	}
+	// Add the field values for the row
+	values := make([]interface{}, 0, len(q.fields))
+	for _, i := range q.fields {
+		var err error
+		val, err := q.convert(meta.DataTypes[i], row[i])
+		if err != nil {
+			q.Err = err
+			return
+		}
+		values = append(values, val)
+	}
+	q.seriesBuf.Values = append(q.seriesBuf.Values, values)
 }
 
 // if it is part of the group key and not a time value named either _time, _start, or _stop
 
-func (q *queryCSVResult) convert(column int) (interface{}, error) {
+func (q *responseBuilder) convert(dataType, value string) (interface{}, error) {
 	const (
 		stringDatatype      = "string"
 		timeDatatype        = "dateTime"
@@ -203,8 +138,8 @@ func (q *queryCSVResult) convert(column int) (interface{}, error) {
 		uintDatatype        = "unsignedLong"
 		timeDataTypeWithFmt = "dateTime:RFC3339"
 	)
-	s := q.Row[column+skipNonDataFluxCols]
-	switch q.dataTypes[column] {
+	s := value
+	switch dataType {
 	case stringDatatype:
 		return s, nil
 	case timeDatatype, timeDataTypeWithFmt:
@@ -221,6 +156,6 @@ func (q *queryCSVResult) convert(column int) (interface{}, error) {
 	case uintDatatype:
 		return strconv.ParseUint(s, 10, 64)
 	default:
-		return nil, fmt.Errorf("%s has unknown data type %s", s, q.dataTypes[column])
+		return nil, fmt.Errorf("%s has unknown data type %s", s, dataType)
 	}
 }
