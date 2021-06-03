@@ -624,11 +624,17 @@ func (c *HTTPClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.doFlux(req, http.StatusOK)
+	reader, err := c.doFlux(req, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
-	panic("flux kapacitor response parsing not implemented")
+
+	resp, err := NewFluxQueryResponse(reader)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+
 }
 
 func (c *HTTPClient) QueryFlux(q FluxQuery) (flux.ResultIterator, error) {
