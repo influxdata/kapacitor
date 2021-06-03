@@ -25,6 +25,7 @@ func (q *QueryFlux) Clone() (*QueryFlux, error) {
 		stmt:  q.stmt,
 		org:   q.org,
 		orgID: q.orgID,
+		Now:   q.Now,
 	}, nil
 
 }

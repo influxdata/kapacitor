@@ -144,7 +144,6 @@ func (n *BatchNode) Queries(start, stop time.Time) ([]BatchQueries, error) {
 			queries[i] = BatchQueries{
 				FluxQueries: qs,
 				Cluster:     qn.Cluster(),
-				//GroupByMeasurement: qn.GroupByMeasurement(),
 			}
 
 		default:
@@ -658,7 +657,7 @@ func (n *FluxQueryNode) Queries(start, stop time.Time) ([]*QueryFlux, error) {
 		if err != nil {
 			return nil, err
 		}
-		q.Now = time.Now()
+		q.Now = now
 		queries = append(queries, q)
 	}
 	return queries, nil
