@@ -64,6 +64,7 @@ func (e *channelEdge) Collect(m Message) error {
 }
 
 func (e *channelEdge) Emit() (m Message, ok bool) {
+	// locked here
 	select {
 	case m, ok = <-e.messages:
 	case <-e.aborting:

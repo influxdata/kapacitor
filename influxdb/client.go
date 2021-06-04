@@ -45,6 +45,12 @@ type Client interface {
 	// The response is checked for an error and the is returned
 	// if it exists
 	QueryFlux(q FluxQuery) (flux.ResultIterator, error)
+
+	// QueryFlux is for querying Influxdb with the Flux language
+	// The response is checked for an error and the is returned
+	// if it exists.  Unlike QueryFlux, this returns a *Response
+	// object.
+	QueryFluxResponse(q FluxQuery) (*Response, error)
 }
 
 type ClientUpdater interface {
@@ -618,11 +624,17 @@ func (c *HTTPClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.doFlux(req, http.StatusOK)
+	reader, err := c.doFlux(req, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
-	panic("flux kapacitor response parsing not implemented")
+
+	resp, err := NewFluxQueryResponse(reader)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+
 }
 
 func (c *HTTPClient) QueryFlux(q FluxQuery) (flux.ResultIterator, error) {

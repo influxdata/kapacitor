@@ -173,8 +173,9 @@ func init() {
 
 	// Filters modify the source and produce a specific data stream
 	sourceFilters = map[string]func([]byte, Node) (Node, error){
-		"from":  unmarshalFrom,
-		"query": unmarshalQuery,
+		"from":      unmarshalFrom,
+		"query":     unmarshalQuery,
+		"queryFlux": unmarshalQueryFlux,
 	}
 
 	// Add default construction of chain nodes
@@ -405,6 +406,16 @@ func unmarshalQuery(data []byte, source Node) (Node, error) {
 		return nil, fmt.Errorf("parent of query node must be a BatchNode but is %T", source)
 	}
 	child := batch.Query("")
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func unmarshalQueryFlux(data []byte, source Node) (Node, error) {
+	batch, ok := source.(*BatchNode)
+	if !ok {
+		return nil, fmt.Errorf("parent of query node must be a BatchNode but is %T", source)
+	}
+	child := batch.QueryFlux("")
 	err := json.Unmarshal(data, child)
 	return child, err
 }

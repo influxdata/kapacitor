@@ -97,6 +97,13 @@ func BatchQuery(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, q
 	return pipe, batch, query
 }
 
+func BatchQueryFlux(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, query *pipeline.QueryFluxNode) {
+	batch = &pipeline.BatchNode{}
+	pipe = pipeline.CreatePipelineSources(batch)
+	query = batch.QueryFlux(q)
+	return pipe, batch, query
+}
+
 func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
 	ast := tick.AST{}
 	err := ast.Build(pipe)

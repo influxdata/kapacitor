@@ -139,6 +139,7 @@ func TestQuery_Clone(t *testing.T) {
 		}
 	}
 }
+
 func TestQuery_IsGroupedByTime(t *testing.T) {
 	q, err := kapacitor.NewQuery("SELECT usage FROM telegraf.autogen.cpu")
 	if err != nil {
