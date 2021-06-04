@@ -598,7 +598,6 @@ func (tm *TaskMaster) stopTask(id string) (err error) {
 		case BatchTask:
 			delete(tm.batches, id)
 		}
-
 		err = et.stop()
 		if err != nil {
 			tm.diag.StoppedTaskWithError(id, err)

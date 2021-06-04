@@ -1,0 +1,12 @@
+{
+    "name":"yeas",
+    "tags": {"vote": "should we orange juice"},
+    "points":[
+        {"fields":{"value":"yea"},"time":"2015-10-18T00:00:00Z"},
+        {"fields":{"value":"nay"},"time":"2015-10-18T00:00:02Z"},
+        {"fields":{"value":"yea"},"time":"2015-10-18T00:00:04Z"},
+        {"fields":{"value":"yea"},"time":"2015-10-18T00:00:05Z"},
+        {"fields":{"value":"nay"},"time":"2015-10-18T00:00:06Z"},
+        {"fields":{"value":"yea"},"time":"2015-10-18T00:00:08Z"}
+    ]
+}

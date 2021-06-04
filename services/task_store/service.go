@@ -2001,7 +2001,6 @@ func (ts *Service) startTask(task Task) error {
 		ts.saveLastError(t.ID, err.Error())
 		return err
 	}
-
 	// Start batching
 	if t.Type == kapacitor.BatchTask {
 		err := et.StartBatching()

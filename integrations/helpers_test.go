@@ -20,6 +20,14 @@ import (
 	"github.com/influxdata/kapacitor/uuid"
 )
 
+func mustParseTime(s string) time.Time {
+	ts, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return ts
+}
+
 func newHTTPDService() *httpd.Service {
 	// create API server
 	config := httpd.NewConfig()
