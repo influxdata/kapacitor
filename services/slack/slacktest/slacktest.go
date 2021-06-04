@@ -19,7 +19,8 @@ func NewServer() *Server {
 	s := new(Server)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sr := Request{
-			URL: r.URL.String(),
+			URL:        r.URL.String(),
+			AuthHeader: r.Header.Get("Authorization"),
 		}
 		dec := json.NewDecoder(r.Body)
 		dec.Decode(&sr.PostData)
@@ -45,8 +46,9 @@ func (s *Server) Close() {
 }
 
 type Request struct {
-	URL      string
-	PostData PostData
+	URL        string
+	AuthHeader string
+	PostData   PostData
 }
 
 type PostData struct {

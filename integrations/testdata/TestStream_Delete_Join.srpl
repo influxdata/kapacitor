@@ -1,0 +1,24 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=9,anothervalue=4.2 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverA value=9,anothervalue=4.2 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverA value=9,anothervalue=4.2 0000000021
+dbname
+rpname
+cpu,type=idle,host=serverA value=9,anothervalue=4.2 0000000022
+dbname
+rpname
+views,type=idle,host=serverA value=9,anothervalue=4.2 0000000001
+dbname
+rpname
+views,type=idle,host=serverA value=9,anothervalue=4.2 0000000002
+dbname
+rpname
+views,type=idle,host=serverA value=9,anothervalue=4.2 0000000021
+dbname
+rpname
+views,type=idle,host=serverA value=9,anothervalue=4.2 0000000022

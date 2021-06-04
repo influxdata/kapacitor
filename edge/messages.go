@@ -927,16 +927,16 @@ func (b *barrierMessage) Time() time.Time {
 
 type DeleteGroupMessage interface {
 	Message
-	GroupIDGetter
+	GroupInfoer
 }
 
 type deleteGroupMessage struct {
-	groupID models.GroupID
+	info *GroupInfo
 }
 
-func NewDeleteGroupMessage(id models.GroupID) DeleteGroupMessage {
+func NewDeleteGroupMessage(info *GroupInfo) *deleteGroupMessage {
 	return &deleteGroupMessage{
-		groupID: id,
+		info: info,
 	}
 }
 
@@ -945,5 +945,9 @@ func (d *deleteGroupMessage) Type() MessageType {
 }
 
 func (d *deleteGroupMessage) GroupID() models.GroupID {
-	return d.groupID
+	return d.info.ID
+}
+
+func (d *deleteGroupMessage) GroupInfo() *GroupInfo {
+	return d.info
 }

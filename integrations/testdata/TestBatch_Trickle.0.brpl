@@ -1,0 +1,34 @@
+{
+  "name": "cpu_usage_idle",
+  "tags": {
+    "cpu": "cpu-total"
+  },
+  "points": [
+    {
+      "fields": {
+        "mean": 90.38281469458698
+      },
+      "time": "2015-10-30T17:14:12Z"
+    },
+    {
+      "fields": {
+        "mean": 80.38281469458698
+      },
+      "time": "2015-10-30T17:14:13Z"
+    }
+  ]
+}
+{
+  "name": "cpu_usage_idle",
+  "tags": {
+    "cpu": "cpu0"
+  },
+  "points": [
+    {
+      "fields": {
+        "mean": 83.56930693069836
+      },
+      "time": "2015-10-30T17:14:12Z"
+    }
+  ]
+}

@@ -203,7 +203,7 @@ func (n *idleBarrier) emitBarrier() error {
 		return err
 	}
 	if n.del {
-		return n.in.Collect(edge.NewDeleteGroupMessage(n.group.ID))
+		return n.in.Collect(edge.NewDeleteGroupMessage(&n.group))
 	}
 	return nil
 }
@@ -318,7 +318,7 @@ func (n *periodicBarrier) emitBarrier() error {
 	}
 	if n.del {
 		// Send DeleteGroupMessage into self
-		return n.in.Collect(edge.NewDeleteGroupMessage(n.group.ID))
+		return n.in.Collect(edge.NewDeleteGroupMessage(&n.group))
 	}
 	return nil
 }

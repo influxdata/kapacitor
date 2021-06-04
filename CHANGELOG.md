@@ -4,11 +4,16 @@
 
 ### Features
 - [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
-- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
+- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
+- [#2530](https://github.com/influxdata/kapacitor/pull/2530): Add a node tricklenode that converts batches to streams, the inverse of windownode.
 - [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
 - [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
+- [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
+
+### Bugfixes
+- [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
 
 ## v1.5.9 [2021-04-01]
 

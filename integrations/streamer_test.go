@@ -22,9 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/discord"
-	"github.com/influxdata/kapacitor/services/discord/discordtest"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/google/go-cmp/cmp"
@@ -45,6 +42,8 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/bigpanda/bigpandatest"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -4713,6 +4712,61 @@ errorCounts
 	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 
+func TestStream_Delete_Join(t *testing.T) {
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('cpu')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+	|barrier()
+		.idle(1s)
+		.delete(TRUE)
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.streamName('error_view')
+		.tolerance(2s)
+		.deleteAll(TRUE)
+	|eval(lambda: "errors.sum" / "views.sum")
+		.as('error_percent')
+		.keep()
+	|httpOut('TestStream_Delete_Join')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
+				Values: [][]interface{}{
+					{time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC), 1.0, 18.0, 18.0},
+				},
+			},
+		},
+	}
+	testStreamerWithOutput(t, "TestStream_Delete_Join", script, 30*time.Second, er, true, nil)
+}
+
 func TestStream_Join_Delimiter(t *testing.T) {
 
 	var script = `
@@ -8713,6 +8767,7 @@ stream
 		c2.Workspace = "company_private"
 		c2.Enabled = true
 		c2.URL = ts.URL + "/test/slack/url2"
+		c2.Token = "my_secret_token"
 		c2.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
 		sl, err := slack.NewService([]slack.Config{c1, c2}, d)
@@ -8725,7 +8780,8 @@ stream
 
 	exp := []interface{}{
 		slacktest.Request{
-			URL: "/test/slack/url",
+			URL:        "/test/slack/url",
+			AuthHeader: "",
 			PostData: slacktest.PostData{
 				Channel:  "@jim",
 				Username: "kapacitor",
@@ -8741,7 +8797,8 @@ stream
 			},
 		},
 		slacktest.Request{
-			URL: "/test/slack/url2",
+			URL:        "/test/slack/url2",
+			AuthHeader: "Bearer my_secret_token",
 			PostData: slacktest.PostData{
 				Channel:  "#alerts",
 				Username: "kapacitor",
@@ -11733,7 +11790,7 @@ stream
 `
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -11789,7 +11846,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -11921,7 +11978,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12346,7 +12403,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12406,7 +12463,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13457,7 +13514,7 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13538,7 +13595,7 @@ func testStreamerWithInputChannel(
 	}
 
 	// Create a new execution env
-	tm, err := createTaskMaster()
+	tm, err := createTaskMaster("testStreamer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13777,9 +13834,9 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 	return nil
 }
 
-func createTaskMaster() (*kapacitor.TaskMaster, error) {
+func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
 	d := diagService.NewKapacitorHandler()
-	tm := kapacitor.NewTaskMaster("testStreamer", newServerInfo(), d)
+	tm := kapacitor.NewTaskMaster(name, newServerInfo(), d)
 	httpdService := newHTTPDService()
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
