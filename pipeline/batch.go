@@ -426,6 +426,10 @@ type QueryFluxNode struct {
 	// The influxdb 2x organization-id for flux
 	// if empty the default orgid will be used
 	OrgID string `json:"orgid"`
+
+	// Local says if we should run using the local
+	// Flux executor.
+	Local bool `json:"local"`
 }
 
 func newQueryFluxNode() *QueryFluxNode {

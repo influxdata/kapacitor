@@ -2,9 +2,18 @@ package kapacitor
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/influxdata/flux/lang"
+	"github.com/influxdata/flux/runtime"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/gorhill/cronexpr"
 	"github.com/influxdata/influxdb/influxql"
@@ -12,7 +21,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/pkg/errors"
+	"github.com/influxdata/kapacitor/task/fluxlocal"
 )
 
 const (
@@ -676,7 +685,7 @@ func (n *FluxQueryNode) doQuery(in edge.Edge) (err error) {
 		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
 	}
 
-	con, err := n.et.tm.InfluxDBService.NewNamedClient(n.b.Cluster)
+	//con, err := n.et.tm.InfluxDBService.NewNamedClient(n.b.Cluster)
 	if err != nil {
 		return errors.Wrap(err, "failed to get InfluxDB client")
 	}
@@ -692,19 +701,34 @@ func (n *FluxQueryNode) doQuery(in edge.Edge) (err error) {
 			// Update times for query
 			n.query.Now = now.Add(-1 * n.b.Offset) //SetStartTime(stop.Add(-1 * n.b.Period))
 			n.diag.StartingBatchQuery(n.query.stmt)
+			ctx := context.Background()
+			querier := fluxlocal.NewFluxQueryer(map[string]string{}, diag2Logger(n.node.diag).With(zap.String("node", "flux-query-node")))
+			pkg, err := runtime.ParseToJSON(n.query.stmt)
+			if err != nil {
+				return err
+			}
 
-			// Execute query
-			resp, err := con.QueryFluxResponse(influxdb.FluxQuery{
-				Query: n.query.stmt,
-				Org:   n.query.org,
-				OrgID: n.query.orgID,
-				Now:   n.query.Now,
+			r, err := querier.Query(ctx, lang.ASTCompiler{
+				AST: pkg,
+				Now: now,
 			})
+			if err != nil {
+				return err
+			}
+r.Next().
+			// Execute query
+			//resp, err := con.QueryFluxResponse(influxdb.FluxQuery{
+			//	Query: n.query.stmt,
+			//	Org:   n.query.org,
+			//	OrgID: n.query.orgID,
+			//	Now:   n.query.Now,
+			//})
 			if err != nil {
 				n.diag.Error("error executing query", err)
 				n.timer.Stop()
 				break
 			}
+
 			//Collect batches
 			for _, res := range resp.Results {
 				batches, err := edge.ResultToBufferedBatches(res, n.byName)
@@ -782,4 +806,32 @@ func (n *FluxQueryNode) stopBatch() {
 		n.ticker.Stop()
 	}
 	close(n.closing)
+}
+
+type diagWriteSyncer struct {
+	diag NodeDiagnostic
+	strings.Builder
+}
+
+var fluxError = errors.New("the flux engine has encountered an error")
+
+func (d *diagWriteSyncer) Sync() error {
+	d.diag.Error(d.Builder.String(), fluxError)
+	d.Builder.Reset()
+	return nil
+}
+
+func diag2Logger(diag NodeDiagnostic) *zap.Logger {
+	encoderCfg := zapcore.EncoderConfig{
+		MessageKey:     "msg",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+	}
+
+	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), zapcore.Lock(&diagWriteSyncer{diag: diag, Builder: strings.Builder{}}), zap.ErrorLevel)
+
+	return zap.New(core)
 }

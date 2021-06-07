@@ -29,6 +29,7 @@ func (n *QueryFluxNode) Build(q *pipeline.QueryFluxNode) (ast.Node, error) {
 		Dot("offset", q.Offset).
 		Dot("cluster", q.Cluster).
 		Dot("orgID", q.OrgID).
-		Dot("org", q.Org)
+		Dot("org", q.Org).
+		Dot("local", q.Local)
 	return n.prev, n.err
 }

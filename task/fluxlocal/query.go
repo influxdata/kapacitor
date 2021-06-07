@@ -56,3 +56,18 @@ func (f *fluxQueryer) Query(ctx context.Context, compiler flux.Compiler) (flux.R
 	}
 	return flux.NewResultIteratorFromQuery(query), nil
 }
+
+func (f *fluxQueryer) QueryRows(ctx context.Context, compiler flux.Compiler) (batch, error) {
+	f.logger.Info("executed flux query")
+	ctx = f.injectDependencies(context.Background())
+	program, err := compiler.Compile(ctx, runtime.Default)
+	alloc := &memory.Allocator{}
+	query, err := program.Start(ctx, alloc)
+	if err != nil {
+		return nil, errors.Wrap(err, "error while executing flux program")
+	}
+	flux.NewResultIteratorFromQuery(query)
+
+	return nil
+
+}

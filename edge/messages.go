@@ -1,13 +1,20 @@
 package edge
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/influxdata/flux/codes"
+	"github.com/influxdata/flux/execute"
+	"github.com/influxdata/flux/semantic"
+	"github.com/influxdata/flux/values"
 	"io"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/influxdata/flux"
 
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/influxdb"
@@ -795,6 +802,63 @@ func (bb *bufferedBatchMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type BufferedBatchIterator struct{
+	itr flux.ResultIterator
+}
+
+func (b *BufferedBatchIterator) Next() BufferedBatchMessage {
+	return nil
+}
+
+func (b *BufferedBatchIterator) More() bool {
+
+}
+
+func (b *BufferedBatchIterator) Err() error{
+	return nil
+}
+
+func GetTags(t flux.Table) map[string]struct{} {
+
+	return nil
+}
+
+func ResultIteratorToBufferedBatchIterator(itr flux.ResultIterator) (BufferedBatchIterator, error) {
+
+	go func() {
+		for itr.More() {
+			res := itr.Next()
+			name := res.Name()
+			res.Tables().Do(func(table flux.Table) error {
+				if table.Empty(){
+					return nil
+				}
+				rows := imodels.Rows{}
+				groupKeyCols:=table.Key().Cols()
+
+				keys :=
+
+				for i := range groupKeyCols{
+					groupKeyCols[i].Label
+				}
+				table.Do(func(col flux.ColReader) error{
+					metas:=col.Cols()
+					for i := range metas{
+							ty:=metas[i].Type
+							label:=metas[i].Label
+
+							/*rows = append(rows, imodels.Row{
+								Name: name,
+								Columns
+							})*/
+					}
+				})
+			})
+		}
+	}
+	return BufferedBatchIterator{itr: itr}
+}
+
 func ResultToBufferedBatches(res influxdb.Result, groupByName bool) ([]BufferedBatchMessage, error) {
 	if res.Err != "" {
 		return nil, errors.New(res.Err)
@@ -955,3 +1019,146 @@ func (d *deleteGroupMessage) GroupID() models.GroupID {
 func (d *deleteGroupMessage) GroupInfo() *GroupInfo {
 	return d.info
 }
+
+
+//func tableToRows(ctx context.Context, tbl flux.Table) (err error) {
+//
+//	// cache tag columns
+//	columns := tbl.Cols()
+//	// isTag := make([]bool, len(columns))
+//	//for i, col := range columns {
+//		//tagIdx := sort.SearchStrings(spec.TagColumns, col.Label)
+//		//isTag[i] = tagIdx < len(spec.TagColumns) && spec.TagColumns[tagIdx] == col.Label
+//	//}
+//
+//	//// do measurement
+//	//measurementColLabel := spec.MeasurementColumn
+//	//measurementColIdx := execute.ColIdx(measurementColLabel, columns)
+//	//
+//	//if measurementColIdx < 0 {
+//	//	return errors.Newf(codes.Invalid, "no column with label %s exists", measurementColLabel)
+//	//} else if columns[measurementColIdx].Type != flux.TString {
+//	//	return errors.Newf(codes.Invalid, "column %s of type %s is not of type %s", measurementColLabel, columns[measurementColIdx].Type, flux.TString)
+//	//}
+//	//
+//	//// do time
+//	//timeColLabel := spec.TimeColumn
+//	//timeColIdx := execute.ColIdx(timeColLabel, columns)
+//	//
+//	//if timeColIdx < 0 {
+//	//	return errors.New(codes.Invalid, "no time column detected")
+//	//} else if columns[timeColIdx].Type != flux.TTime {
+//	//	return errors.Newf(codes.Invalid, "column %s of type %s is not of type %s", timeColLabel, columns[timeColIdx].Type, flux.TTime)
+//	//}
+//	//
+//	//// prepare field function if applicable and record the number of values to write per row
+//	//var fn *execute.RowMapPreparedFn
+//	//if spec.FieldFn.Fn != nil {
+//	//	var err error
+//	//	if fn, err = t.fn.Prepare(columns); err != nil {
+//	//		return err
+//	//	}
+//	//}
+//	//
+//	//var fieldValues values.Object
+//	//return tbl.Do(func(er flux.ColReader) error {
+//	//	var metrics []lp.Metric
+//	//	metrics = make([]lp.Metric, 0, er.Len())
+//	//
+//	//outer:
+//	//	for i := 0; i < er.Len(); i++ {
+//	//		metric := &internal.RowMetric{
+//	//			Tags: make([]*lp.Tag, 0, len(spec.TagColumns)),
+//	//		}
+//	//
+//	//		// gather the timestamp, tags and measurement name
+//	//		for j, col := range er.Cols() {
+//	//			switch {
+//	//			case col.Label == spec.MeasurementColumn:
+//	//				metric.NameStr = er.Strings(j).ValueString(i)
+//	//			case col.Label == timeColLabel:
+//	//				valueTime := execute.ValueForRow(er, i, j)
+//	//				if valueTime.IsNull() {
+//	//					// skip rows with null timestamp
+//	//					continue outer
+//	//				}
+//	//				metric.TS = valueTime.Time().Time()
+//	//			case isTag[j]:
+//	//				if col.Type != flux.TString {
+//	//					return errors.New(codes.Invalid, "invalid type for tag column")
+//	//				}
+//	//
+//	//				metric.Tags = append(metric.Tags, &lp.Tag{
+//	//					Key:   col.Label,
+//	//					Value: er.Strings(j).ValueString(i),
+//	//				})
+//	//			}
+//	//		}
+//	//
+//	//		if metric.TS.IsZero() {
+//	//			return errors.New(codes.Invalid, "timestamp missing from block")
+//	//		}
+//	//
+//	//		if fn == nil {
+//	//			if fieldValues, err = defaultFieldMapping(er, i); err != nil {
+//	//				return err
+//	//			}
+//	//		} else if fieldValues, err = fn.Eval(t.ctx, i, er); err != nil {
+//	//			return err
+//	//		}
+//	//
+//	//		metric.Fields = make([]*lp.Field, 0, fieldValues.Len())
+//	//
+//	//		var err error
+//	//
+//	//		fieldValues.Range(func(k string, v values.Value) {
+//	//			if !v.IsNull() {
+//	//				field := &lp.Field{Key: k}
+//	//
+//	//				switch v.Type().Nature() {
+//	//				case semantic.Float:
+//	//					field.Value = v.Float()
+//	//				case semantic.Int:
+//	//					field.Value = v.Int()
+//	//				case semantic.UInt:
+//	//					field.Value = v.UInt()
+//	//				case semantic.String:
+//	//					field.Value = v.Str()
+//	//				case semantic.Time:
+//	//					field.Value = int64(v.Time())
+//	//				case semantic.Bool:
+//	//					field.Value = v.Bool()
+//	//				default:
+//	//					if err == nil {
+//	//						err = fmt.Errorf("unsupported field type %v", v.Type())
+//	//					}
+//	//
+//	//					return
+//	//				}
+//	//
+//	//				metric.Fields = append(metric.Fields, field)
+//	//			}
+//	//		})
+//	//
+//	//		if err != nil {
+//	//			return err
+//	//		}
+//	//
+//	//		// drop metrics without any measurements
+//	//		if len(metric.Fields) > 0 {
+//	//			metrics = append(metrics, metric)
+//	//		}
+//	//
+//	//		if err := execute.AppendRecord(i, er, builder); err != nil {
+//	//			return err
+//	//		}
+//	//	}
+//	//
+//	//	// only write if we have any metrics to write
+//	//	if len(metrics) > 0 {
+//	//		err = t.writer.Write(metrics...)
+//	//	}
+//	//
+//	//	return err
+//	//})
+//}
