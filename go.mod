@@ -65,8 +65,10 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	github.com/urfave/cli/v2 v2.3.0
+	github.com/zeebo/xxh3 v0.11.0
 	go.etcd.io/bbolt v1.3.5
 	go.uber.org/zap v1.14.1
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20201222180813-1025295fd063
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
