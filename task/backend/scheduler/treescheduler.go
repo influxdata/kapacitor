@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/cespare/xxhash"
 	"github.com/google/btree"
+	"github.com/zeebo/xxh3"
 )
 
 const (
@@ -252,7 +252,7 @@ func (s *TreeScheduler) iterator(ts time.Time) btree.ItemIterator {
 		{
 			buf := [8]byte{}
 			binary.LittleEndian.PutUint64(buf[:], uint64(it.id))
-			wc := xxhash.Sum64(buf[:]) % uint64(len(s.workchans)) // we just hash so that the number is uniformly distributed
+			wc := xxh3.Hash(buf[:]) % uint64(len(s.workchans)) // we just hash so that the number is uniformly distributed
 			select {
 			case s.workchans[wc] <- it:
 				s.items.toDelete = append(s.items.toDelete, it)
