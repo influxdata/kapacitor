@@ -9207,6 +9207,10 @@ stream
 			.value('{{ index .Fields "count" }}')
 			.services('serviceA', 'serviceB', '{{ .Name }}')
 			.correlated('{{ .Name }}')
+			.attribute('attributeA', '{{ .Name }}')
+			.attribute('attributeB', TRUE)
+			.attribute('attributeC', 9001.0)
+
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := alerta.NewConfig()
@@ -9231,6 +9235,7 @@ stream
 				Origin:      "Kapacitor",
 				Service:     []string{"cpu"},
 				Correlate:   []string{"cpu"},
+				Attributes:  nil,
 				Timeout:     3600,
 			},
 		},
@@ -9247,6 +9252,7 @@ stream
 				Service:     []string{"serviceA", "serviceB", "cpu"},
 				Correlate:   []string{"cpu"},
 				Value:       "10",
+				Attributes:  map[string]interface{}{"attributeA": "cpu", "attributeB": true, "attributeC": 9001.0},
 				Timeout:     86400,
 			},
 		},

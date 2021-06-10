@@ -53,14 +53,15 @@ type Request struct {
 }
 
 type PostData struct {
-	Resource    string   `json:"resource"`
-	Event       string   `json:"event"`
-	Group       string   `json:"group"`
-	Environment string   `json:"environment"`
-	Text        string   `json:"text"`
-	Origin      string   `json:"origin"`
-	Service     []string `json:"service"`
-	Correlate   []string `json:"correlate"`
-	Value       string   `json:"value"`
-	Timeout     int64    `json:"timeout"`
+	Resource    string                 `json:"resource"`
+	Event       string                 `json:"event"`
+	Group       string                 `json:"group"`
+	Environment string                 `json:"environment"`
+	Text        string                 `json:"text"`
+	Origin      string                 `json:"origin"`
+	Service     []string               `json:"service"`
+	Correlate   []string               `json:"correlate"`
+	Attributes  map[string]interface{} `json:"attributes"`
+	Value       string                 `json:"value"`
+	Timeout     int64                  `json:"timeout"`
 }

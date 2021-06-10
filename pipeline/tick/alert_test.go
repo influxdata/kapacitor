@@ -667,6 +667,9 @@ func TestAlertAlerta(t *testing.T) {
 	handler.Services("legion", "vent", "garrus", "distraction team", "grunt", "crew", "samara", "barrier")
 	handler.Correlated("Harbinger")
 	handler.Timeout = 10 * time.Second
+	handler.Attribute("source", "Dragon Ball Z")
+	handler.Attribute("power", float64(9001))
+	handler.Attribute("o rly?", true)
 
 	want := `stream
     |from()
@@ -686,6 +689,9 @@ func TestAlertAlerta(t *testing.T) {
         .services('legion', 'vent', 'garrus', 'distraction team', 'grunt', 'crew', 'samara', 'barrier')
         .correlated('Harbinger')
         .timeout(10s)
+        .attribute('o rly?', TRUE)
+        .attribute('power', 9001.0)
+        .attribute('source', 'Dragon Ball Z')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }

@@ -51,17 +51,18 @@ func NewService(c Config, d Diagnostic) *Service {
 }
 
 type testOptions struct {
-	Resource    string   `json:"resource"`
-	Event       string   `json:"event"`
-	Environment string   `json:"environment"`
-	Severity    string   `json:"severity"`
-	Group       string   `json:"group"`
-	Value       string   `json:"value"`
-	Message     string   `json:"message"`
-	Origin      string   `json:"origin"`
-	Service     []string `json:"service"`
-	Correlate   []string `json:"correlate"`
-	Timeout     string   `json:"timeout"`
+	Resource    string                 `json:"resource"`
+	Event       string                 `json:"event"`
+	Environment string                 `json:"environment"`
+	Severity    string                 `json:"severity"`
+	Group       string                 `json:"group"`
+	Value       string                 `json:"value"`
+	Message     string                 `json:"message"`
+	Origin      string                 `json:"origin"`
+	Service     []string               `json:"service"`
+	Correlate   []string               `json:"correlate"`
+	Attributes  map[string]interface{} `json:"attributes"`
+	Timeout     string                 `json:"timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -77,7 +78,12 @@ func (s *Service) TestOptions() interface{} {
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
 		Correlate:   []string{"testServiceX", "testServiceY"},
-		Timeout:     "24h0m0s",
+		Attributes: map[string]interface{}{
+			"testAttributeA": "A",
+			"testAttributeB": true,
+			"testAttributeC": 9001.0,
+		},
+		Timeout: "24h0m0s",
 	}
 }
 
@@ -101,6 +107,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Origin,
 		o.Service,
 		o.Correlate,
+		o.Attributes,
 		timeout,
 		map[string]string{},
 		models.Result{},
@@ -133,12 +140,12 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, timeout time.Duration, tags map[string]string, data models.Result) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, attributes map[string]interface{}, timeout time.Duration, tags map[string]string, data models.Result) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, correlate, timeout, tags, data)
+	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, correlate, attributes, timeout, tags, data)
 	if err != nil {
 		return err
 	}
@@ -166,7 +173,7 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	return nil
 }
 
-func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, timeout time.Duration, tags map[string]string, data models.Result) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, correlate []string, attributes map[string]interface{}, timeout time.Duration, tags map[string]string, data models.Result) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -214,6 +221,9 @@ func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, 
 	}
 	if len(correlate) > 0 {
 		postData["correlate"] = correlate
+	}
+	if len(attributes) > 0 {
+		postData["attributes"] = attributes
 	}
 	postData["timeout"] = int64(timeout / time.Second)
 
@@ -284,6 +294,9 @@ type HandlerConfig struct {
 	// List of correlated events
 	Correlate []string `mapstructure:"correlate"`
 
+	// Map of alert attributes
+	Attributes map[string]interface{} `mapstructure:"attributes"`
+
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `mapstructure:"timeout"`
@@ -301,6 +314,8 @@ type handler struct {
 	groupTmpl       *text.Template
 	serviceTmpl     []*text.Template
 	correlateTmpl   []*text.Template
+
+	attributes map[string]interface{}
 }
 
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
@@ -353,6 +368,21 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 		ctmpl = append(ctmpl, tmpl)
 	}
 
+	attrs := make(map[string]interface{})
+	for k, v := range c.Attributes {
+		switch value := v.(type) {
+		case string:
+			// resolve templates
+			tmpl, err := text.New(k).Parse(value)
+			if err != nil {
+				return nil, err
+			}
+			attrs[k] = tmpl
+		default:
+			attrs[k] = value
+		}
+	}
+
 	return &handler{
 		s:               s,
 		c:               c,
@@ -364,6 +394,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 		valueTmpl:       vtmpl,
 		serviceTmpl:     stmpl,
 		correlateTmpl:   ctmpl,
+		attributes:      attrs,
 	}, nil
 }
 
@@ -464,6 +495,24 @@ func (h *handler) Handle(event alert.Event) {
 		}
 	}
 
+	attributes := make(map[string]interface{})
+	if len(h.attributes) != 0 {
+		for k, v := range h.attributes {
+			switch value := v.(type) {
+			case *text.Template:
+				err = value.Execute(&buf, td)
+				if err != nil {
+					h.diag.TemplateError(err, keyvalue.KV("attributes", value.Name()))
+					return
+				}
+				attributes[k] = buf.String()
+				buf.Reset()
+			default:
+				attributes[k] = value
+			}
+		}
+	}
+
 	var severity string
 
 	switch event.State.Level {
@@ -492,6 +541,7 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Origin,
 		service,
 		correlate,
+		attributes,
 		h.c.Timeout,
 		event.Data.Tags,
 		event.Data.Result,

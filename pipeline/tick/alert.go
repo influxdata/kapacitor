@@ -227,6 +227,15 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("services", args(h.Service)...).
 			Dot("correlated", args(h.Correlate)...).
 			Dot("timeout", h.Timeout)
+
+		var attributes []string
+		for k := range h.Attributes {
+			attributes = append(attributes, k)
+		}
+		sort.Strings(attributes)
+		for _, k := range attributes {
+			n.Dot("attribute", k, h.Attributes[k])
+		}
 	}
 
 	for _, h := range a.OpsGenieHandlers {
