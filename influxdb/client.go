@@ -126,13 +126,14 @@ type Credentials struct {
 	Method AuthenticationMethod
 
 	// UserAuthentication fields
-
 	Username string
 	Password string
 
-	// BearerAuthentication fields
-
+	// TokenAuthentication fields
 	Token string
+
+	// BearerAuthentication fields
+	HttpSharedSecret bool
 }
 
 // HTTPClient is safe for concurrent use.
