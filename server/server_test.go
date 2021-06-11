@@ -6497,6 +6497,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		"http-port":                   float64(0),
 		"insecure-skip-verify":        false,
 		"kapacitor-hostname":          "",
+		"http-shared-secret":          false,
 		"name":                        "default",
 		"password":                    true,
 		"ssl-ca":                      "",
