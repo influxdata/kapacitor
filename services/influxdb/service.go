@@ -511,6 +511,12 @@ func httpConfig(c Config) (influxdb.Config, error) {
 			Method: influxdb.TokenAuthentication,
 			Token:  c.Token,
 		}
+	} else if c.HttpSharedSecret {
+		credentials = influxdb.Credentials{
+			Method:           influxdb.BearerAuthentication,
+			Username:         c.Username,
+			HttpSharedSecret: true,
+		}
 	} else if c.Username != "" {
 		credentials = influxdb.Credentials{
 			Method:   influxdb.UserAuthentication,

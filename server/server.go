@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/collectd"
@@ -473,6 +474,11 @@ func (s *Server) appendLoadService() error {
 	return nil
 }
 
+const (
+	// Tokens for the InfluxDB clusters are generate with an expiration this far into the future.
+	tokenExpirationDuration = 10 * time.Minute
+)
+
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
 	d := s.DiagService.NewInfluxDBHandler()
@@ -493,7 +499,7 @@ func (s *Server) appendInfluxDBService() error {
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
 	srv.AuthService = s.AuthService
-	srv.ClientCreator = iclient.ClientCreator{}
+	srv.ClientCreator = iclient.NewTokenClientCreator([]byte(s.config.HTTP.SharedSecret), tokenExpirationDuration, s.DiagService.NewInfluxDBHandler())
 
 	s.InfluxDBService = srv
 	s.TaskMaster.InfluxDBService = srv
