@@ -223,7 +223,7 @@ func main() {
 
 	err = commandF(commandArgs)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, fmt.Sprintf("Error: %s", err.Error()))
 		os.Exit(3)
 	}
 }
