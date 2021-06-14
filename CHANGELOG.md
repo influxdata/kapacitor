@@ -15,6 +15,7 @@
 
 ### Bugfixes
 - [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
+- [#2579](https://github.com/influxdata/kapacitor/pull/2579): Fix: cli auth and error handling for flux tasks
 
 ## v1.5.9 [2021-04-01]
 
