@@ -14,7 +14,9 @@ package istrings
 // The GitHub repo this code is based on is https://github.com/go4org/intern
 
 import (
+	"encoding/json"
 	"runtime"
+	"sort"
 	"sync"
 	"unsafe"
 
@@ -40,10 +42,13 @@ var (
 	}()
 )
 
-// A IString pointer is the handle to an underlying comparable value.
-// See func Get for how IString pointers may be used. A nil pointer to IString
-// always represents an empty string.
+// A IString is the handle to an underlying comparable value.
+// See func Get for how IString pointers may be used.
 type IString struct {
+	*value
+}
+
+type value struct {
 	_ [0]func() // prevent people from accidentally using value type as comparable
 	s string
 	// resurrected is guarded by mu (for all instances of IString).
@@ -52,7 +57,7 @@ type IString struct {
 }
 
 // Len returns true iff s is an empty string (or nil).
-func (s *IString) Len() int {
+func (s *value) Len() int {
 	if s == nil {
 		return 0
 	}
@@ -73,26 +78,40 @@ func init() {
 	reset()
 }
 
-func (v IString) mID() int {
+func (v value) mID() int {
 	return int(xxh3.HashString(v.s) & (istringMutexLen - 1))
 }
 
 // Get returns the comparable value passed to the Get func
 // that returned v.
-func (v *IString) String() string { return v.s }
+func (v *value) String() string {
+	if v == nil {
+		return ""
+	}
+	return v.s
+}
+
+func (v *IString) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	v.value = get(s)
+	return nil
+}
 
 // Get  is specialized for strings.
 // It avoids an allocation from putting a string into an interface{}
 // to pass as an argument to Get.
-func Get(k string) *IString {
-	return get(k)
+func Get(k string) IString {
+	return IString{get(k)}
 }
 
 // We play unsafe games that violate Go's rules (and assume a non-moving
 // collector). So we quiet Go here.
 // See the comment below Get for more implementation details.
 //go:nocheckptr
-func get(k string) *IString {
+func get(k string) *value {
 	if k == "" {
 		return nil
 	}
@@ -101,13 +120,13 @@ func get(k string) *IString {
 	defer mu[mID].Unlock()
 
 	localMap := valMap[mID]
-	var v *IString
+	var v *value
 	if addr, ok := localMap[k]; ok {
-		v = (*IString)((unsafe.Pointer)(addr))
+		v = (*value)((unsafe.Pointer)(addr))
 		v.resurrected = true
 		return v
 	}
-	v = &IString{s: k}
+	v = &value{s: k}
 	// SetFinalizer before uintptr conversion (theoretical concern;
 	// see https://github.com/go4org/intern/issues/13)
 	runtime.SetFinalizer(v, finalize)
@@ -115,7 +134,7 @@ func get(k string) *IString {
 	return v
 }
 
-func finalize(v *IString) {
+func finalize(v *value) {
 	mID := v.mID()
 	mu[mID].Lock()
 	defer mu[mID].Unlock()
@@ -128,6 +147,20 @@ func finalize(v *IString) {
 	}
 	delete(valMap[mID], v.String())
 }
+
+func Sort(s []IString) {
+	sort.Sort(IStringSlice(s))
+}
+
+// IStringSlice attaches the methods of Interface to []iString, sorting in increasing order.
+type IStringSlice []IString
+
+func (x IStringSlice) Len() int           { return len(x) }
+func (x IStringSlice) Less(i, j int) bool { return x[i].String() < x[j].String() }
+func (x IStringSlice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
+
+// Sort is a convenience method: x.Sort() calls Sort(x).
+func (x IStringSlice) Sort() { Sort(x) }
 
 // Interning is simple if you don't require that unused values be
 // garbage collectable. But we do require that; we don't want to be

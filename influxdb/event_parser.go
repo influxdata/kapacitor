@@ -4,28 +4,32 @@ import (
 	"encoding/csv"
 	"io"
 
+	"github.com/influxdata/kapacitor/istrings"
+
 	"github.com/pkg/errors"
 )
 
 type FluxTableMetaData struct {
-	TableNumber string
-	DataTypes   []string
-	ColumnNames []string
+	TableNumber istrings.IString
+	DataTypes   []istrings.IString
+	ColumnNames []istrings.IString
 	Groups      []bool
 }
 
 type FluxCSVEventHandler interface {
-	// Error event represents a ',error' table in the flux result, which is special
+	// Error event represents a ',error' table in the flux result, which is special.
+	// We use a regular string instead of a istrings.IString because its unlikely
+	// that we need  errors to be interned
 	Error(err string)
 
 	// GroupStart gives the metadata for a new group of tables
-	GroupStart(names []string, types []string, groups []bool)
+	GroupStart(names []istrings.IString, types []istrings.IString, groups []bool)
 
 	// TableStart marks the start of a table
-	TableStart(meta FluxTableMetaData, firstRow []string)
+	TableStart(meta FluxTableMetaData, firstRow []istrings.IString)
 
 	// DataRow is called for each regular data row
-	DataRow(meta FluxTableMetaData, row []string)
+	DataRow(meta FluxTableMetaData, row []istrings.IString)
 
 	// TableEnd marks the end of a table
 	TableEnd()
@@ -39,19 +43,21 @@ type FluxCSVEventHandler interface {
 type FluxCSVEventParser struct {
 	handler       FluxCSVEventHandler
 	csvReader     *csv.Reader
-	row           []string
-	colNames      []string
-	dataTypes     []string
+	row           []istrings.IString
+	colNames      []istrings.IString
+	dataTypes     []istrings.IString
 	group         []bool
-	tableNum      string
+	tableNum      istrings.IString // no need to intern this, as it gets thrown away pretty quickly
 	sawTableStart bool
 }
+
+var zeroIString = istrings.Get("0")
 
 func NewFluxCSVEventParser(r io.Reader, handler FluxCSVEventHandler) *FluxCSVEventParser {
 	q := &FluxCSVEventParser{
 		handler:   handler,
 		csvReader: csv.NewReader(r),
-		tableNum:  "0",
+		tableNum:  zeroIString,
 	}
 	q.csvReader.FieldsPerRecord = -1
 	q.csvReader.ReuseRecord = true
@@ -59,6 +65,13 @@ func NewFluxCSVEventParser(r io.Reader, handler FluxCSVEventHandler) *FluxCSVEve
 }
 
 const skipNonDataFluxCols = 3
+
+var (
+	errorIString        = istrings.Get("error")
+	hashdatatypeIString = istrings.Get("#datatype")
+	hashgroupIString    = istrings.Get("#group")
+	trueIString         = istrings.Get("true")
+)
 
 func (q *FluxCSVEventParser) Parse() error {
 	const (
@@ -69,7 +82,7 @@ func (q *FluxCSVEventParser) Parse() error {
 	state := stateOtherRow
 readRow:
 	var err error
-	q.row, err = q.csvReader.Read()
+	q.row, err = istrings.SliceAndErr(q.csvReader.Read())
 	if err != nil {
 		if err == io.EOF {
 			if q.sawTableStart {
@@ -81,7 +94,7 @@ readRow:
 	}
 
 	// check and process error tables
-	if len(q.row) > 2 && q.row[1] == "error" {
+	if len(q.row) > 2 && q.row[1] == errorIString {
 		// note the call to Read invalidates the data in q.row but not the size
 		row, err := q.csvReader.Read()
 		if err != nil || len(row) != len(q.row) {
@@ -102,14 +115,14 @@ readRow:
 	}
 	// processes based on first column
 	switch q.row[0] {
-	case "":
+	case istrings.IString{}:
 		if len(q.row) <= 5 {
 			return errors.New("Unexpectedly few columns")
 		}
 		if state == stateNameRow {
 			newNames := q.row[skipNonDataFluxCols:]
 			if cap(q.colNames) < len(newNames) {
-				q.colNames = make([]string, len(newNames))
+				q.colNames = make([]istrings.IString, len(newNames))
 			} else {
 				q.colNames = q.colNames[:len(newNames)]
 			}
@@ -140,19 +153,19 @@ readRow:
 		}
 		q.handler.DataRow(meta, q.row[skipNonDataFluxCols:])
 		goto readRow
-	case "#datatype":
+	case hashdatatypeIString:
 		newTypes := q.row[skipNonDataFluxCols:]
 		if cap(q.dataTypes) < len(newTypes) {
-			q.dataTypes = make([]string, len(newTypes))
+			q.dataTypes = make([]istrings.IString, len(newTypes))
 		} else {
 			q.dataTypes = q.dataTypes[:len(newTypes)]
 		}
 		copy(q.dataTypes, newTypes)
 		goto readRow
-	case "#group":
+	case hashgroupIString:
 		q.group = q.group[:0]
 		for _, x := range q.row[skipNonDataFluxCols:] {
-			q.group = append(q.group, x == "true")
+			q.group = append(q.group, x == trueIString)
 		}
 		state = stateNameRow
 		goto readRow

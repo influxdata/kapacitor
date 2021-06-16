@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	imodels "github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/istrings"
+
 	"github.com/pkg/errors"
 )
 
@@ -29,23 +29,31 @@ func NewFluxQueryResponse(r io.Reader) (*Response, error) {
 // Delimiter:   ",",
 // Header:      true,
 type responseBuilder struct {
-	colNames       []string
-	colNamesMap    map[string]int
+	colNames       []istrings.IString
+	colNamesMap    map[istrings.IString]int
 	tags           []int
 	measurementCol int
 	fields         []int
-	defaultVals    []string
+	defaultVals    []istrings.IString
 	Err            error
-	buf            []imodels.Row
-	seriesBuf      *imodels.Row
+	buf            []Row
+	seriesBuf      *Row
 }
 
-func (q *responseBuilder) TableStart(meta FluxTableMetaData, firstRow []string) {
+var (
+	measurementIString = istrings.Get("_measurement")
+	fluxTimeIString    = istrings.Get("_time")
+	influxQLTimeString = istrings.Get("time")
+	stopIString        = istrings.Get("_stop")
+	startIString       = istrings.Get("_start")
+)
+
+func (q *responseBuilder) TableStart(meta FluxTableMetaData, firstRow []istrings.IString) {
 	if q.Err != nil {
 		return
 	}
-	q.seriesBuf = &imodels.Row{}
-	tags := make(models.Tags, len(firstRow))
+	q.seriesBuf = &Row{}
+	tags := make(map[istrings.IString]istrings.IString, len(firstRow))
 	// add the tags from the row
 	for _, i := range q.tags {
 		tags[q.colNames[i]] = firstRow[i]
@@ -55,7 +63,7 @@ func (q *responseBuilder) TableStart(meta FluxTableMetaData, firstRow []string) 
 		q.seriesBuf.Columns = append(q.seriesBuf.Columns, q.colNames[i])
 	}
 	q.seriesBuf.Tags = tags
-	if i, ok := q.colNamesMap["_measurement"]; ok {
+	if i, ok := q.colNamesMap[measurementIString]; ok {
 		q.seriesBuf.Name = firstRow[i]
 	}
 }
@@ -77,27 +85,27 @@ func (q *responseBuilder) Error(err string) {
 	q.Err = errors.New("flux query error: " + err)
 }
 
-func (q *responseBuilder) GroupStart(names []string, types []string, groups []bool) {
+func (q *responseBuilder) GroupStart(names []istrings.IString, types []istrings.IString, groups []bool) {
 	if q.Err != nil {
 		return
 	}
 	q.colNames = q.colNames[:0]
 	// replace "_time" that flux uses with "time"
 	for i := range names {
-		if names[i] == "_time" {
-			q.colNames = append(q.colNames, "time")
+		if names[i] == fluxTimeIString {
+			q.colNames = append(q.colNames, influxQLTimeString)
 		} else {
 			q.colNames = append(q.colNames, names[i])
 		}
 	}
-	q.colNamesMap = make(map[string]int, len(q.colNames))
+	q.colNamesMap = make(map[istrings.IString]int, len(q.colNames))
 	q.tags = q.tags[:0]
 	q.fields = q.fields[:0]
 	for i := range q.colNames {
 		cn := q.colNames[i]
 		q.colNamesMap[cn] = i
 		switch cn {
-		case "_measurement", "_start", "_stop":
+		case measurementIString, startIString, stopIString:
 		default: // its a tag or a field
 			if !groups[i] { // its a fields
 				q.fields = append(q.fields, i)
@@ -108,7 +116,7 @@ func (q *responseBuilder) GroupStart(names []string, types []string, groups []bo
 	}
 }
 
-func (q *responseBuilder) DataRow(meta FluxTableMetaData, row []string) {
+func (q *responseBuilder) DataRow(meta FluxTableMetaData, row []istrings.IString) {
 	if q.Err != nil {
 		return
 	}
@@ -127,34 +135,36 @@ func (q *responseBuilder) DataRow(meta FluxTableMetaData, row []string) {
 }
 
 // if it is part of the group key and not a time value named either _time, _start, or _stop
+var (
+	stringDatatype      = istrings.Get("string")
+	timeDatatype        = istrings.Get("dateTime")
+	floatDatatype       = istrings.Get("double")
+	boolDatatype        = istrings.Get("boolean")
+	intDatatype         = istrings.Get("long")
+	uintDatatype        = istrings.Get("unsignedLong")
+	timeDataTypeWithFmt = istrings.Get("dateTime:RFC3339")
 
-func (q *responseBuilder) convert(dataType, value string) (interface{}, error) {
-	const (
-		stringDatatype      = "string"
-		timeDatatype        = "dateTime"
-		floatDatatype       = "double"
-		boolDatatype        = "boolean"
-		intDatatype         = "long"
-		uintDatatype        = "unsignedLong"
-		timeDataTypeWithFmt = "dateTime:RFC3339"
-	)
+	falseString = istrings.Get("false")
+)
+
+func (q *responseBuilder) convert(dataType, value istrings.IString) (interface{}, error) {
 	s := value
 	switch dataType {
 	case stringDatatype:
 		return s, nil
 	case timeDatatype, timeDataTypeWithFmt:
-		return time.Parse(time.RFC3339, s)
+		return time.Parse(time.RFC3339, s.String())
 	case floatDatatype:
-		return strconv.ParseFloat(s, 64)
+		return strconv.ParseFloat(s.String(), 64)
 	case boolDatatype:
-		if s == "false" {
+		if s == falseString {
 			return false, nil
 		}
 		return true, nil
 	case intDatatype:
-		return strconv.ParseInt(s, 10, 64)
+		return strconv.ParseInt(s.String(), 10, 64)
 	case uintDatatype:
-		return strconv.ParseUint(s, 10, 64)
+		return strconv.ParseUint(s.String(), 10, 64)
 	default:
 		return nil, fmt.Errorf("%s has unknown data type %s", s, dataType)
 	}

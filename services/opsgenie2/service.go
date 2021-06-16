@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/influxdata/kapacitor/istrings"
+
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
@@ -143,6 +145,10 @@ func (s *Service) Alert(teams []string, recipients []string, recoveryAction stri
 	return nil
 }
 
+var (
+	entityIString = istrings.Get("entity")
+)
+
 func (s *Service) preparePost(teams []string, recipients []string, recoveryAction string, level alert.Level, message, entityID string, t time.Time, eventDetails string, details models.Result) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
@@ -200,11 +206,11 @@ func (s *Service) preparePost(teams []string, recipients []string, recoveryActio
 			if err != nil {
 				return nil, err
 			}
-			ogData["description"] = string(b)
+			ogData["description"] = istrings.Get(string(b))
 		}
 
 		//Extra Fields (can be used for filtering)
-		ogDetails := make(map[string]string)
+		ogDetails := make(map[string]istrings.IString)
 		ogDetails["Monitoring Tool"] = "Kapacitor"
 		ogDetails["Level"] = level.String()
 

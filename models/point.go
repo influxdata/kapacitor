@@ -1,19 +1,20 @@
 package models
 
 import (
-	"sort"
-	"strings"
+	"bytes"
+
+	"github.com/influxdata/kapacitor/istrings"
 )
 
-type GroupID string
+type GroupID istrings.IString
 
-const (
-	NilGroup GroupID = ""
+var (
+	NilGroup GroupID
 )
 
 type Dimensions struct {
 	ByName   bool
-	TagNames []string
+	TagNames []istrings.IString
 }
 
 func (d Dimensions) Equal(o Dimensions) bool {
@@ -28,20 +29,20 @@ func (d Dimensions) Equal(o Dimensions) bool {
 	return true
 }
 func (d Dimensions) Copy() Dimensions {
-	tags := make([]string, len(d.TagNames))
+	tags := make([]istrings.IString, len(d.TagNames))
 	copy(tags, d.TagNames)
 	return Dimensions{ByName: d.ByName, TagNames: tags}
 }
 
-func (d Dimensions) ToSet() map[string]bool {
-	set := make(map[string]bool, len(d.TagNames))
+func (d Dimensions) ToSet() map[istrings.IString]bool {
+	set := make(map[istrings.IString]bool, len(d.TagNames))
 	for _, dim := range d.TagNames {
 		set[dim] = true
 	}
 	return set
 }
 
-type Fields map[string]interface{}
+type Fields map[istrings.IString]interface{}
 
 func (f Fields) Copy() Fields {
 	cf := make(Fields, len(f))
@@ -51,16 +52,42 @@ func (f Fields) Copy() Fields {
 	return cf
 }
 
-func SortedFields(fields Fields) []string {
-	a := make([]string, 0, len(fields))
+// MarshalBinary encodes all the fields to their proper type and returns the binary
+// represenation
+// NOTE: uint64 is specifically not supported due to potential overflow when we decode
+// again later to an int64
+// NOTE2: uint is accepted, and may be 64 bits, and is for some reason accepted...
+func (p Fields) MarshalBinary() []byte {
+	var b []byte
+	keys := make([]istrings.IString, 0, len(p))
+
+	for k := range p {
+		keys = append(keys, k)
+	}
+
+	// Not really necessary, can probably be removed.
+	istrings.Sort(keys)
+
+	for i, k := range keys {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		b = appendField(b, k, p[k])
+	}
+
+	return b
+}
+
+func SortedFields(fields Fields) []istrings.IString {
+	a := make([]istrings.IString, 0, len(fields))
 	for k := range fields {
 		a = append(a, k)
 	}
-	sort.Strings(a)
+	istrings.Sort(a)
 	return a
 }
 
-type Tags map[string]string
+type Tags map[istrings.IString]istrings.IString
 
 func (t Tags) Copy() Tags {
 	ct := make(Tags, len(t))
@@ -70,27 +97,33 @@ func (t Tags) Copy() Tags {
 	return ct
 }
 
-func SortedKeys(tags map[string]string) []string {
-	a := make([]string, 0, len(tags))
+type byteSlices [][]byte
+
+func (a byteSlices) Len() int           { return len(a) }
+func (a byteSlices) Less(i, j int) bool { return bytes.Compare(a[i], a[j]) == -1 }
+func (a byteSlices) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+func SortedKeys(tags map[istrings.IString]istrings.IString) []istrings.IString {
+	a := make([]istrings.IString, 0, len(tags))
 	for k := range tags {
 		a = append(a, k)
 	}
-	sort.Strings(a)
+	istrings.Sort(a)
 	return a
 }
 
-func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
+func ToGroupID(name istrings.IString, tags Tags, dims Dimensions) GroupID {
 	if len(dims.TagNames) == 0 {
 		if dims.ByName {
 			return GroupID(name)
 		}
 		return NilGroup
 	}
-	var buf strings.Builder
+	var buf istrings.Builder
 	l := 0
 	if dims.ByName {
 		// add capacity for the name + "\n"
-		l += len(name) + 1
+		l += name.Len() + 1
 	}
 	for i, d := range dims.TagNames {
 		if i != 0 {
@@ -98,11 +131,11 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 			l++
 		}
 		// add capacity for the name length, and the tag length, and the "="
-		l += len(d) + len(tags[d]) + 1
+		l += d.Len() + tags[d].Len() + 1
 	}
 	buf.Grow(l)
 	if dims.ByName {
-		buf.WriteString(name)
+		buf.WriteIString(name)
 		// Add delimiter that is not allowed in name.
 		buf.WriteRune('\n')
 	}
@@ -110,9 +143,9 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		if i != 0 {
 			buf.WriteRune(',')
 		}
-		buf.WriteString(d)
+		buf.WriteIString(d)
 		buf.WriteRune('=')
-		buf.WriteString(tags[d])
+		buf.WriteIString(tags[d])
 	}
-	return GroupID(buf.String())
+	return GroupID(buf.IString())
 }

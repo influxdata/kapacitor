@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/influxdata/kapacitor/istrings"
 )
 
 type Result struct {
@@ -36,18 +38,21 @@ type Rows []*Row
 
 // Row represents a single row returned from the execution of a statement.
 type Row struct {
-	Name    string            `json:"name,omitempty"`
-	Tags    map[string]string `json:"tags,omitempty"`
-	Columns []string          `json:"columns,omitempty"`
-	Values  [][]interface{}   `json:"values,omitempty"`
+	Name    istrings.IString                      `json:"name,omitempty"`
+	Tags    map[istrings.IString]istrings.IString `json:"tags,omitempty"`
+	Columns []istrings.IString                    `json:"columns,omitempty"`
+	Values  [][]interface{}                       `json:"values,omitempty"`
 }
+
+var timeIString = istrings.Get("time")
+var stringIString = istrings.Get("string")
 
 func (r *Row) UnmarshalJSON(data []byte) error {
 	var o struct {
-		Name    string            `json:"name,omitempty"`
-		Tags    map[string]string `json:"tags,omitempty"`
-		Columns []string          `json:"columns,omitempty"`
-		Values  [][]interface{}   `json:"values,omitempty"`
+		Name    istrings.IString                      `json:"name,omitempty"`
+		Tags    map[istrings.IString]istrings.IString `json:"tags,omitempty"`
+		Columns []istrings.IString                    `json:"columns,omitempty"`
+		Values  [][]interface{}                       `json:"values,omitempty"`
 	}
 	if err := json.Unmarshal(data, &o); err != nil {
 		return err
@@ -59,18 +64,20 @@ func (r *Row) UnmarshalJSON(data []byte) error {
 
 	// Parse all time columns
 	for i, v := range r.Values {
+	columns:
 		for j, c := range r.Columns {
-			if c == "time" {
-				tStr, ok := v[j].(string)
-				if !ok {
-					continue
-				}
-				t, err := time.Parse(time.RFC3339, tStr)
+			str, ok := v[j].(string)
+			switch {
+			case !ok:
+				continue columns
+			case c == timeIString:
+				t, err := time.Parse(time.RFC3339, str)
 				if err != nil {
 					continue
 				}
 				r.Values[i][j] = t
-				break
+			default:
+				r.Values[i][j] = istrings.Get(str)
 			}
 		}
 	}

@@ -1,18 +1,23 @@
 package edge
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"sort"
-	"strconv"
 	"time"
 
-	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/istrings"
+
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/line-protocol"
 )
+
+// REMOVE THE NEXT LINE
+var _ = protocol.LineProtocol_en_align
 
 // Message represents data to be passed along an edge.
 // Messages can be shared across many contexts.
@@ -53,11 +58,11 @@ type GroupInfoer interface {
 }
 
 type NameGetter interface {
-	Name() string
+	Name() istrings.IString
 }
 type NameSetter interface {
 	NameGetter
-	SetName(string)
+	SetName(istrings.IString)
 }
 
 type DimensionGetter interface {
@@ -118,22 +123,31 @@ type PointMeta interface {
 	TimeGetter
 }
 
-func (m MessageType) String() string {
+var (
+	beginBatchIString    = istrings.Get("begin_batch")
+	BatchPointIString    = istrings.Get("batch_point")
+	EndBatchIString      = istrings.Get("end_batch")
+	BufferedBatchIString = istrings.Get("buffered_batch")
+	PointIString         = istrings.Get("point")
+	BarrierIString       = istrings.Get("barrier")
+)
+
+func (m MessageType) String() istrings.IString {
 	switch m {
 	case BeginBatch:
-		return "begin_batch"
+		return beginBatchIString
 	case BatchPoint:
-		return "batch_point"
+		return BatchPointIString
 	case EndBatch:
-		return "end_batch"
+		return EndBatchIString
 	case BufferedBatch:
-		return "buffered_batch"
+		return BufferedBatchIString
 	case Point:
-		return "point"
+		return PointIString
 	case Barrier:
-		return "barrier"
+		return BarrierIString
 	default:
-		return fmt.Sprintf("unknown message type %d", int(m))
+		return istrings.Get(fmt.Sprintf("unknown message type %d", int(m)))
 	}
 }
 
@@ -145,10 +159,10 @@ type PointMessage interface {
 
 	NameSetter
 
-	Database() string
-	SetDatabase(string)
-	RetentionPolicy() string
-	SetRetentionPolicy(string)
+	Database() istrings.IString
+	SetDatabase(istrings.IString)
+	RetentionPolicy() istrings.IString
+	SetRetentionPolicy(istrings.IString)
 
 	GroupInfoer
 
@@ -157,16 +171,16 @@ type PointMessage interface {
 
 	FieldsTagsTimeSetter
 
-	Bytes(precision string) []byte
+	Bytes(precision istrings.IString) []byte
 
 	ToResult() models.Result
 	ToRow() *models.Row
 }
 
 type pointMessage struct {
-	name            string
-	database        string
-	retentionPolicy string
+	name            istrings.IString
+	database        istrings.IString
+	retentionPolicy istrings.IString
 
 	groupID    models.GroupID
 	dimensions models.Dimensions
@@ -181,7 +195,7 @@ type pointMessage struct {
 func NewPointMessage(
 	name,
 	database,
-	retentionPolicy string,
+	retentionPolicy istrings.IString,
 	dimensions models.Dimensions,
 	fields models.Fields,
 	tags models.Tags,
@@ -209,23 +223,23 @@ func (*pointMessage) Type() MessageType {
 	return Point
 }
 
-func (pm *pointMessage) Name() string {
+func (pm *pointMessage) Name() istrings.IString {
 	return pm.name
 }
-func (pm *pointMessage) SetName(name string) {
+func (pm *pointMessage) SetName(name istrings.IString) {
 	pm.name = name
 	pm.groupID = models.ToGroupID(pm.name, pm.tags, pm.dimensions)
 }
-func (pm *pointMessage) Database() string {
+func (pm *pointMessage) Database() istrings.IString {
 	return pm.database
 }
-func (pm *pointMessage) SetDatabase(database string) {
+func (pm *pointMessage) SetDatabase(database istrings.IString) {
 	pm.database = database
 }
-func (pm *pointMessage) RetentionPolicy() string {
+func (pm *pointMessage) RetentionPolicy() istrings.IString {
 	return pm.retentionPolicy
 }
-func (pm *pointMessage) SetRetentionPolicy(retentionPolicy string) {
+func (pm *pointMessage) SetRetentionPolicy(retentionPolicy istrings.IString) {
 	pm.retentionPolicy = retentionPolicy
 }
 func (pm *pointMessage) GroupID() models.GroupID {
@@ -279,30 +293,9 @@ func (pm *pointMessage) SetTime(time time.Time) {
 }
 
 // Returns byte array of a line protocol representation of the point
-func (pm *pointMessage) Bytes(precision string) []byte {
-	key := imodels.MakeKey([]byte(pm.name), imodels.NewTags(pm.tags))
-	fields := imodels.Fields(pm.fields).MarshalBinary()
-	kl := len(key)
-	fl := len(fields)
-	var bytes []byte
-
-	if pm.time.IsZero() {
-		bytes = make([]byte, fl+kl+1)
-		copy(bytes, key)
-		bytes[kl] = ' '
-		copy(bytes[kl+1:], fields)
-	} else {
-		timeStr := strconv.FormatInt(pm.time.UnixNano()/imodels.GetPrecisionMultiplier(precision), 10)
-		tl := len(timeStr)
-		bytes = make([]byte, fl+kl+tl+2)
-		copy(bytes, key)
-		bytes[kl] = ' '
-		copy(bytes[kl+1:], fields)
-		bytes[kl+fl+1] = ' '
-		copy(bytes[kl+fl+2:], []byte(timeStr))
-	}
-
-	return bytes
+func (pm *pointMessage) Bytes(precision istrings.IString) []byte {
+	buf = &bytes.Buffer{}
+	protocol.NewEncoder(buf)
 }
 
 func (pm *pointMessage) ToResult() models.Result {
@@ -310,18 +303,21 @@ func (pm *pointMessage) ToResult() models.Result {
 		Series: models.Rows{pm.ToRow()},
 	}
 }
+
+var timeIString = istrings.Get("time")
+
 func (pm *pointMessage) ToRow() *models.Row {
 	row := &models.Row{
 		Name: pm.name,
 		Tags: pm.tags,
 	}
-	row.Columns = make([]string, 1, len(pm.fields)+1)
-	row.Columns[0] = "time"
+	row.Columns = make([]istrings.IString, 1, len(pm.fields)+1)
+	row.Columns[0] = timeIString
 	for f := range pm.fields {
 		row.Columns = append(row.Columns, f)
 	}
 	// Sort all columns but leave time as first
-	sort.Strings(row.Columns[1:])
+	istrings.Sort(row.Columns[1:])
 
 	row.Values = make([][]interface{}, 1)
 	row.Values[0] = make([]interface{}, len(row.Columns))
@@ -335,9 +331,9 @@ func (pm *pointMessage) ToRow() *models.Row {
 }
 
 type pointMessageJSON struct {
-	Name            string            `json:"name,omitempty"`
-	Database        string            `json:"database,omitempty"`
-	RetentionPolicy string            `json:"retentionPolicy,omitempty"`
+	Name            istrings.IString  `json:"name,omitempty"`
+	Database        istrings.IString  `json:"database,omitempty"`
+	RetentionPolicy istrings.IString  `json:"retentionPolicy,omitempty"`
 	Group           models.GroupID    `json:"group,omitempty"`
 	Dimensions      models.Dimensions `json:"dimensions,omitempty"`
 	Fields          models.Fields     `json:"fields,omitempty"`
@@ -384,7 +380,7 @@ type BeginBatchMessage interface {
 }
 
 type beginBatchMessage struct {
-	name       string
+	name       istrings.IString
 	groupID    models.GroupID
 	tags       models.Tags
 	dimensions models.Dimensions
@@ -395,7 +391,7 @@ type beginBatchMessage struct {
 }
 
 func NewBeginBatchMessage(
-	name string,
+	name istrings.IString,
 	tags models.Tags,
 	byName bool,
 	tmax time.Time,
@@ -427,10 +423,10 @@ func (bb *beginBatchMessage) ShallowCopy() BeginBatchMessage {
 	return c
 }
 
-func (bb *beginBatchMessage) Name() string {
+func (bb *beginBatchMessage) Name() istrings.IString {
 	return bb.name
 }
-func (bb *beginBatchMessage) SetName(name string) {
+func (bb *beginBatchMessage) SetName(name istrings.IString) {
 	bb.name = name
 	bb.groupID = models.ToGroupID(bb.name, bb.tags, bb.dimensions)
 }
@@ -635,7 +631,7 @@ func (bb *bufferedBatchMessage) SetBegin(begin BeginBatchMessage) {
 	bb.begin = begin
 }
 
-func (bb *bufferedBatchMessage) Name() string {
+func (bb *bufferedBatchMessage) Name() istrings.IString {
 	return bb.begin.Name()
 }
 func (bb *bufferedBatchMessage) GroupID() models.GroupID {
@@ -709,7 +705,7 @@ func (bb *bufferedBatchMessage) ToRow() (row *models.Row) {
 }
 
 type bufferedBatchMessageJSON struct {
-	Name   string                  `json:"name,omitempty"`
+	Name   istrings.IString        `json:"name,omitempty"`
 	TMax   time.Time               `json:"tmax,omitempty"`
 	Group  models.GroupID          `json:"group,omitempty"`
 	ByName bool                    `json:"byname,omitempty"`
@@ -904,8 +900,10 @@ func (b *barrierMessage) ShallowCopy() BarrierMessage {
 	return c
 }
 
-func (*barrierMessage) Name() string {
-	return "barrier"
+var barrierIString = istrings.Get("barrier")
+
+func (*barrierMessage) Name() istrings.IString {
+	return barrierIString
 }
 
 func (*barrierMessage) Dimensions() models.Dimensions {

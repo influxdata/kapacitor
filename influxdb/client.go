@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/influxdata/kapacitor/istrings"
+
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/csv"
 	imodels "github.com/influxdata/influxdb/models"
@@ -550,8 +552,8 @@ func (r *Response) Error() error {
 		return fmt.Errorf(r.Err)
 	}
 	for _, result := range r.Results {
-		if result.Err != "" {
-			return fmt.Errorf(result.Err)
+		if result.Err.Len() != 0 {
+			return fmt.Errorf(result.Err.String())
 		}
 	}
 	return nil
@@ -559,15 +561,15 @@ func (r *Response) Error() error {
 
 // Message represents a user message.
 type Message struct {
-	Level string
-	Text  string
+	Level istrings.IString
+	Text  istrings.IString
 }
 
 // Result represents a resultset returned from a single statement.
 type Result struct {
-	Series   []imodels.Row
+	Series   []Row
 	Messages []*Message
-	Err      string `json:"error,omitempty"`
+	Err      istrings.IString `json:"error,omitempty"`
 }
 
 func (c *HTTPClient) buildFluxRequest(q FluxQuery) (*http.Request, error) {

@@ -7,7 +7,7 @@ import (
 func TestBuilder_IString_alloc(t *testing.T) {
 	s := "hello my friends"
 	Get(s)
-	var a *IString
+	var a IString
 	if testing.AllocsPerRun(10, func() {
 		for i := 0; i < 10000; i++ {
 			a = Get(s)
