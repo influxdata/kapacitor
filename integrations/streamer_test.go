@@ -9198,10 +9198,17 @@ stream
 			.environment('production')
 			.timeout(1h)
 		.alerta()
+			.token('testtoken7654321')
+			.environment('production')
+			.timeout(1h)
+			.addSeverity('fatal', 1, lambda: "count" > 9.0)
+			.addSeverity('disaster', 0, lambda: "count" > 15.0)
+		.alerta()
 			.token('anothertesttoken')
 			.resource('resource: {{ index .Tags "host" }}')
 			.event('event: {{ .TaskName }}')
 			.environment('{{ index .Tags "host" }}')
+			.renameSeverity('crit', 'major')
 			.origin('override')
 			.group('{{ .ID }}')
 			.value('{{ index .Fields "count" }}')
@@ -9227,6 +9234,23 @@ stream
 				Event:       "serverA",
 				Group:       "host=serverA",
 				Environment: "production",
+				Severity:    "critical",
+				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				Origin:      "Kapacitor",
+				Service:     []string{"cpu"},
+				Correlate:   []string{"cpu"},
+				Timeout:     3600,
+			},
+		},
+		alertatest.Request{
+			URL:           "/alert",
+			Authorization: "Bearer testtoken7654321",
+			PostData: alertatest.PostData{
+				Resource:    "cpu",
+				Event:       "serverA",
+				Group:       "host=serverA",
+				Environment: "production",
+				Severity:    "fatal",
 				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
 				Origin:      "Kapacitor",
 				Service:     []string{"cpu"},
@@ -9242,6 +9266,7 @@ stream
 				Event:       "event: TestStream_Alert",
 				Group:       "serverA",
 				Environment: "serverA",
+				Severity:    "major",
 				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
 				Origin:      "override",
 				Service:     []string{"serviceA", "serviceB", "cpu"},

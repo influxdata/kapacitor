@@ -10149,6 +10149,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 						Event:       "id",
 						Group:       "test",
 						Environment: "env",
+						Severity:    "critical",
 						Text:        "message",
 						Origin:      "kapacitor",
 						Service:     []string{"alert"},

@@ -220,8 +220,20 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("token", h.Token).
 			Dot("resource", h.Resource).
 			Dot("event", h.Event).
-			Dot("environment", h.Environment).
-			Dot("group", h.Group).
+			Dot("environment", h.Environment)
+
+		var severitiesOrder = []string{"ok", "info", "warn", "crit"}
+		for _, k := range severitiesOrder {
+			if val, ok := h.RenameSeverities[k]; ok {
+				n.Dot("renameSeverity", k, val)
+			}
+		}
+
+		for _, k := range h.ExtraSeverities {
+			n.Dot("addSeverity", k.Name, k.Code, k.Condition)
+		}
+
+		n.Dot("group", h.Group).
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
 			Dot("services", args(h.Service)...).

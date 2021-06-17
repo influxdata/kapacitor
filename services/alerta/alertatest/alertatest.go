@@ -57,6 +57,7 @@ type PostData struct {
 	Event       string   `json:"event"`
 	Group       string   `json:"group"`
 	Environment string   `json:"environment"`
+	Severity    string   `json:"severity"`
 	Text        string   `json:"text"`
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`

@@ -17,6 +17,8 @@ import (
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
 
@@ -267,6 +269,16 @@ type HandlerConfig struct {
 	// Defaut is set from the configuration.
 	Environment string `mapstructure:"environment"`
 
+	// Renaming rules for severities
+	// Allows to rewrite build-in kapacitor severities (info, warn, crit) to any of Alerta multiple severities
+	RenameSeverities map[string]string `mapstructure:"rename-severities"`
+
+	// Expressions for custom Alerta severities
+	// Allows to fine tune severity levels of kapacitor
+	ExtraSeverityExpressions []stateful.Expression `mapstructure:"severity-expressions"`
+	ExtraSeverityNames       []string              `mapstructure:"severity-names"`
+	ExtraSeverityScopePools  []stateful.ScopePool  `mapstructure:"severity-scope-pool"`
+
 	// Alerta group.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Default: {{ .Group }}
@@ -297,13 +309,17 @@ type handler struct {
 	c    HandlerConfig
 	diag Diagnostic
 
-	resourceTmpl    *text.Template
-	eventTmpl       *text.Template
-	environmentTmpl *text.Template
-	valueTmpl       *text.Template
-	groupTmpl       *text.Template
-	serviceTmpl     []*text.Template
-	correlateTmpl   []*text.Template
+	resourceTmpl        *text.Template
+	eventTmpl           *text.Template
+	environmentTmpl     *text.Template
+	renameSeverities    map[string]string
+	severityLevels      []string
+	severityExpressions []stateful.Expression
+	scopePools          []stateful.ScopePool
+	valueTmpl           *text.Template
+	groupTmpl           *text.Template
+	serviceTmpl         []*text.Template
+	correlateTmpl       []*text.Template
 }
 
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
@@ -357,16 +373,20 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 	}
 
 	return &handler{
-		s:               s,
-		c:               c,
-		diag:            s.diag.WithContext(ctx...),
-		resourceTmpl:    rtmpl,
-		eventTmpl:       evtmpl,
-		environmentTmpl: etmpl,
-		groupTmpl:       gtmpl,
-		valueTmpl:       vtmpl,
-		serviceTmpl:     stmpl,
-		correlateTmpl:   ctmpl,
+		s:                   s,
+		c:                   c,
+		diag:                s.diag.WithContext(ctx...),
+		resourceTmpl:        rtmpl,
+		eventTmpl:           evtmpl,
+		environmentTmpl:     etmpl,
+		renameSeverities:    c.RenameSeverities,
+		severityLevels:      c.ExtraSeverityNames,
+		severityExpressions: c.ExtraSeverityExpressions,
+		scopePools:          c.ExtraSeverityScopePools,
+		groupTmpl:           gtmpl,
+		valueTmpl:           vtmpl,
+		serviceTmpl:         stmpl,
+		correlateTmpl:       ctmpl,
 	}, nil
 }
 
@@ -468,18 +488,38 @@ func (h *handler) Handle(event alert.Event) {
 	}
 
 	var severity string
+	var severityKey string
 
 	switch event.State.Level {
 	case alert.OK:
 		severity = "ok"
+		severityKey = "ok"
 	case alert.Info:
 		severity = "informational"
+		severityKey = "info"
 	case alert.Warning:
 		severity = "warning"
+		severityKey = "warn"
 	case alert.Critical:
 		severity = "critical"
+		severityKey = "crit"
 	default:
 		severity = "indeterminate"
+	}
+
+	if val, ok := h.renameSeverities[severityKey]; ok {
+		severity = val
+	}
+
+	if len(h.severityLevels) != 0 {
+		for i, expression := range h.severityExpressions {
+			if pass, err := EvalPredicate(expression, h.scopePools[i], event.State.Time, event.Data.Fields, event.Data.Tags); err != nil {
+				h.diag.Error("error evaluating expression for Alerta severity", err)
+			} else if pass {
+				severity = h.severityLevels[i]
+				break
+			}
+		}
 	}
 
 	if err := h.s.Alert(
@@ -501,4 +541,55 @@ func (h *handler) Handle(event alert.Event) {
 	); err != nil {
 		h.diag.Error("failed to send event to Alerta", err)
 	}
+}
+
+func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
+	vars := scopePool.Get()
+	defer scopePool.Put(vars)
+	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
+	if err != nil {
+		return false, err
+	}
+
+	// for function signature check
+	if _, err := se.Type(vars); err != nil {
+		return false, err
+	}
+
+	return se.EvalBool(vars)
+}
+
+// fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
+func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
+	for _, refVariableName := range referenceVariables {
+		if refVariableName == "time" {
+			vars.Set("time", now.Local())
+			continue
+		}
+
+		// Support the error with tags/fields collision
+		var fieldValue interface{}
+		var isFieldExists bool
+		var tagValue interface{}
+		var isTagExists bool
+
+		if fieldValue, isFieldExists = fields[refVariableName]; isFieldExists {
+			vars.Set(refVariableName, fieldValue)
+		}
+
+		if tagValue, isTagExists = tags[refVariableName]; isTagExists {
+			if isFieldExists {
+				return fmt.Errorf("cannot have field and tags with same name %q", refVariableName)
+			}
+			vars.Set(refVariableName, tagValue)
+		}
+		if !isFieldExists && !isTagExists {
+			if !vars.Has(refVariableName) {
+				vars.Set(refVariableName, ast.MissingValue)
+			}
+
+		}
+	}
+
+	return nil
 }

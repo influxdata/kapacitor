@@ -661,6 +661,14 @@ func TestAlertAlerta(t *testing.T) {
 	handler.Resource = "Harbinger"
 	handler.Event = "Jump through Omega-4 Relay"
 	handler.Environment = "Collector base"
+	handler.RenameSeverities = make(map[string]string)
+	handler.RenameSeverities["info"] = "notice"
+	handler.ExtraSeverities = make([]*pipeline.AlertaCustomSeverity, 1)
+	handler.ExtraSeverities[0] = &pipeline.AlertaCustomSeverity{
+		Name:      "major",
+		Code:      2,
+		Condition: newLambda(85),
+	}
 	handler.Group = "I brought Jack, Miranda and Tali"
 	handler.Value = "Save the Galaxy"
 	handler.Origin = "Omega"
@@ -680,6 +688,8 @@ func TestAlertAlerta(t *testing.T) {
         .resource('Harbinger')
         .event('Jump through Omega-4 Relay')
         .environment('Collector base')
+        .renameSeverity('info', 'notice')
+        .addSeverity('major', 2, lambda: "cpu" > 85)
         .group('I brought Jack, Miranda and Tali')
         .value('Save the Galaxy')
         .origin('Omega')
