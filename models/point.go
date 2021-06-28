@@ -72,7 +72,9 @@ func (p Fields) MarshalBinary() []byte {
 		if i > 0 {
 			b = append(b, ',')
 		}
-		b = appendField(b, k, p[k])
+		_ = k
+		panic("NOT IMPLEMENTED")
+		//b = appendField(b, k, p[k])
 	}
 
 	return b
@@ -95,6 +97,14 @@ func (t Tags) Copy() Tags {
 		ct[k] = v
 	}
 	return ct
+}
+
+func (t Tags) MapStringString() map[string]string {
+	m := make(map[string]string, len(t))
+	for k, v := range t {
+		m[k.String()] = v.String()
+	}
+	return m
 }
 
 type byteSlices [][]byte

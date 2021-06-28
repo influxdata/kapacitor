@@ -210,7 +210,7 @@ func (s *Service) preparePost(teams []string, recipients []string, recoveryActio
 		}
 
 		//Extra Fields (can be used for filtering)
-		ogDetails := make(map[string]istrings.IString)
+		ogDetails := make(map[string]string)
 		ogDetails["Monitoring Tool"] = "Kapacitor"
 		ogDetails["Level"] = level.String()
 

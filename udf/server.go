@@ -467,7 +467,7 @@ func (s *Server) writeData() error {
 					return err
 				}
 			case edge.EndBatchMessage:
-				err := s.writeEndBatch(begin.Name(), begin.Time(), begin.GroupInfo(), msg)
+				err := s.writeEndBatch(begin.Name().String(), begin.Time(), begin.GroupInfo(), msg)
 				if err != nil {
 					return err
 				}
@@ -500,13 +500,13 @@ func (s *Server) writePoint(p edge.PointMessage) error {
 	strs, floats, ints, bools := s.fieldsToTypedMaps(p.Fields())
 	udfPoint := &agent.Point{
 		Time:            p.Time().UnixNano(),
-		Name:            p.Name(),
-		Database:        p.Database(),
-		RetentionPolicy: p.RetentionPolicy(),
-		Group:           string(p.GroupID()),
+		Name:            p.Name().String(),
+		Database:        p.Database().String(),
+		RetentionPolicy: p.RetentionPolicy().String(),
+		Group:           string(p.GroupID().String()),
 		Dimensions:      p.Dimensions().TagNames,
 		ByName:          p.Dimensions().ByName,
-		Tags:            p.Tags(),
+		Tags:            p.Tags().MapStringString(),
 		FieldsDouble:    floats,
 		FieldsInt:       ints,
 		FieldsString:    strs,

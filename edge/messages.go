@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"time"
 
 	"github.com/influxdata/kapacitor/istrings"
@@ -171,7 +170,7 @@ type PointMessage interface {
 
 	FieldsTagsTimeSetter
 
-	Bytes(precision istrings.IString) []byte
+	Bytes(precision time.Duration) []byte
 
 	ToResult() models.Result
 	ToRow() *models.Row
@@ -269,6 +268,7 @@ func (pm *pointMessage) SetDimensions(dimensions models.Dimensions) {
 func (pm *pointMessage) Tags() models.Tags {
 	return pm.tags
 }
+
 func (pm *pointMessage) SetTags(tags models.Tags) {
 	pm.tags = tags
 	pm.groupID = models.ToGroupID(pm.name, pm.tags, pm.dimensions)
@@ -293,9 +293,12 @@ func (pm *pointMessage) SetTime(time time.Time) {
 }
 
 // Returns byte array of a line protocol representation of the point
-func (pm *pointMessage) Bytes(precision istrings.IString) []byte {
-	buf = &bytes.Buffer{}
-	protocol.NewEncoder(buf)
+func (pm *pointMessage) Bytes(precision time.Duration) []byte {
+	buf := &bytes.Buffer{}
+	enc := protocol.NewEncoder(buf)
+	enc.SetPrecision(precision)
+	enc.Encode((*pointMessageMetric)(pm))
+	return buf.Bytes()
 }
 
 func (pm *pointMessage) ToResult() models.Result {
@@ -328,6 +331,26 @@ func (pm *pointMessage) ToRow() *models.Row {
 		}
 	}
 	return row
+}
+
+type pointMessageMetric pointMessage
+
+func (m *pointMessageMetric) Time() time.Time {
+	return m.time
+}
+
+func (m *pointMessageMetric) Name() string {
+	return m.name.String()
+}
+
+func (m *pointMessageMetric) TagList() []*protocol.Tag {
+	panic("UNIMPLEMENTED")
+	return nil
+}
+
+func (m *pointMessageMetric) FieldList() []*protocol.Field {
+	panic("UNIMPLEMENTED")
+	return nil
 }
 
 type pointMessageJSON struct {
@@ -676,7 +699,7 @@ func (bb *bufferedBatchMessage) ToRow() (row *models.Row) {
 	if len(bb.points) == 0 {
 		return
 	}
-	row.Columns = []string{"time"}
+	row.Columns = []istrings.IString{timeIString} //string{"time"}
 	p := bb.points[0]
 	for f := range p.Fields() {
 		row.Columns = append(row.Columns, f)
@@ -688,7 +711,7 @@ func (bb *bufferedBatchMessage) ToRow() (row *models.Row) {
 		}
 	}
 	// Sort all columns but leave time as first
-	sort.Strings(row.Columns[1:])
+	istrings.Sort(row.Columns[1:])
 	row.Values = make([][]interface{}, len(bb.points))
 	for i, p := range bb.points {
 		row.Values[i] = make([]interface{}, len(row.Columns))
@@ -792,8 +815,8 @@ func (bb *bufferedBatchMessage) UnmarshalJSON(data []byte) error {
 }
 
 func ResultToBufferedBatches(res influxdb.Result, groupByName bool) ([]BufferedBatchMessage, error) {
-	if res.Err != "" {
-		return nil, errors.New(res.Err)
+	if res.Err != (istrings.IString{}) {
+		return nil, errors.New(res.Err.String())
 	}
 	batches := make([]BufferedBatchMessage, 0, len(res.Series))
 	for _, series := range res.Series {
@@ -814,7 +837,7 @@ func ResultToBufferedBatches(res influxdb.Result, groupByName bool) ([]BufferedB
 			fields := make(models.Fields)
 			var t time.Time
 			for i, c := range series.Columns {
-				if c == "time" {
+				if c == timeIString {
 					//tStr, ok := v[i].(string)
 					switch ts := v[i].(type) {
 					case string:

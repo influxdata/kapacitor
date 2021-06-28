@@ -57,11 +57,11 @@ type value struct {
 }
 
 // Len returns true iff s is an empty string (or nil).
-func (s *value) Len() int {
-	if s == nil {
+func (v *value) Len() int {
+	if v == nil {
 		return 0
 	}
-	return len(s.s)
+	return len(v.s)
 }
 
 // reset resets and initalizes the valMap
@@ -82,13 +82,17 @@ func (v value) mID() int {
 	return int(xxh3.HashString(v.s) & (istringMutexLen - 1))
 }
 
-// Get returns the comparable value passed to the Get func
+// String returns the string func
 // that returned v.
 func (v *value) String() string {
 	if v == nil {
 		return ""
 	}
 	return v.s
+}
+
+func (v value) Bytes() []byte {
+	return []byte(v.s)
 }
 
 func (v *IString) UnmarshalJSON(data []byte) error {
