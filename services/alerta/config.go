@@ -17,7 +17,7 @@ type Config struct {
 	// The authentication token for this notification, can be overridden per alert.
 	Token string `toml:"token" override:"token,redact"`
 	// The prefix for the Authentication field where the token is stored
-	// This defaults to Bearer but you may need to set this to "Key" for older versions of alerta
+	// This defaults to Key
 	TokenPrefix string `toml:"token-prefix" override:"token-prefix"`
 	// The environment in which to raise the alert.
 	Environment string `toml:"environment" override:"environment"`

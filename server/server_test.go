@@ -10122,7 +10122,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Kind: "alerta",
 				Options: map[string]interface{}{
 					"token":        "testtoken1234567",
-					"token-prefix": "Bearer",
+					"token-prefix": "Key",
 					"origin":       "kapacitor",
 					"group":        "test",
 					"environment":  "env",
@@ -10143,7 +10143,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				got := ts.Requests()
 				exp := []alertatest.Request{{
 					URL:           "/alert",
-					Authorization: "Bearer testtoken1234567",
+					Authorization: "Key testtoken1234567",
 					PostData: alertatest.PostData{
 						Resource:    "alert",
 						Event:       "id",

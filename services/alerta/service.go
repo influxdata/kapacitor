@@ -25,7 +25,7 @@ const (
 	defaultEvent       = "{{ .ID }}"
 	defaultGroup       = "{{ .Group }}"
 	defaultTimeout     = time.Duration(24 * time.Hour)
-	defaultTokenPrefix = "Bearer"
+	defaultTokenPrefix = "Key"
 )
 
 type Diagnostic interface {
