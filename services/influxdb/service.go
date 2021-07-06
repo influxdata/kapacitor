@@ -504,7 +504,7 @@ func httpConfig(c Config) (influxdb.Config, error) {
 	if err != nil {
 		return influxdb.Config{}, errors.Wrap(err, "invalid TLS options")
 	}
-	tr := khttp.NewDefaultTransportWithTLS(tlsConfig)
+	tr := khttp.NewDefaultTransportWithTLS(tlsConfig, nil)
 	var credentials influxdb.Credentials
 	if c.Token != "" {
 		credentials = influxdb.Credentials{

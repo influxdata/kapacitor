@@ -443,27 +443,17 @@ func New(conf Config) (*Client, error) {
 			return nil, errors.Wrap(err, "invalid credentials")
 		}
 	}
-
-	rt := conf.Transport
-	var tr *http.Transport
-
-	if rt == nil {
-		tr = khttp.NewDefaultTransportWithTLS(&tls.Config{
-			InsecureSkipVerify: conf.InsecureSkipVerify,
-		})
-		if conf.TLSConfig != nil {
-			tr.TLSClientConfig = conf.TLSConfig
-		}
-
-		rt = tr
+	var khttpClient *http.Client
+	if conf.Transport == nil {
+		khttpClient = khttp.NewDefaultClientWithTLS(&tls.Config{InsecureSkipVerify: conf.InsecureSkipVerify}, khttp.DefaultValidator)
+	} else {
+		khttpClient = khttp.NewDefaultClientWithTLS(conf.TLSConfig, khttp.DefaultValidator)
 	}
+	khttpClient.Timeout = conf.Timeout
 	return &Client{
-		url:       u,
-		userAgent: conf.UserAgent,
-		httpClient: &http.Client{
-			Timeout:   conf.Timeout,
-			Transport: rt,
-		},
+		url:         u,
+		userAgent:   conf.UserAgent,
+		httpClient:  khttpClient,
 		credentials: conf.Credentials,
 	}, nil
 }
