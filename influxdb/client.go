@@ -245,8 +245,8 @@ func (c *HTTPClient) Update(new Config) error {
 			tr = old.Transport
 		}
 		tr.DialContext = (&net.Dialer{
-			Timeout:   new.Timeout, // I am not sure if this is the right value to set it to
-			KeepAlive: new.Timeout, // I am not sure if this is the right value to set it to
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
 			Control:   khttp.Control(khttp.DefaultValidator),
 			// DualStack is deprecated
 		}).DialContext

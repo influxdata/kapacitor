@@ -26,12 +26,8 @@ func NewDefaultTransport(dialer *net.Dialer) *http.Transport {
 
 	// These defaults are copied from http.DefaultTransport.
 	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (dialer).DialContext,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -74,7 +70,7 @@ func NewDefaultClientWithTLS(tlsConfig *tls.Config, urlValidator furl.Validator)
 
 	// These defaults are copied from http.DefaultTransport.
 	return &http.Client{
-		Transport: NewDefaultTransport(&net.Dialer{
+		Transport: NewDefaultTransportWithTLS(tlsConfig, &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			Control:   Control(urlValidator),
