@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/flux/fluxinit"
@@ -103,7 +104,6 @@ func (cmd *Command) Run(args ...string) error {
 	if options.LogLevel != "" {
 		config.Logging.Level = options.LogLevel
 	}
-
 	// Initialize Logging Services
 	cmd.diagService = diagnostic.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
 	if err := cmd.diagService.Open(); err != nil {
@@ -127,8 +127,13 @@ func (cmd *Command) Run(args ...string) error {
 	fluxinit.FluxInit()
 
 	// Create server from config and start it.
+	disabledAlertHandlers := map[string]struct{}{}
+	for _, x := range strings.Split(options.DisabledAlertHandlers, ",") {
+		disabledAlertHandlers[strings.TrimSpace(x)] = struct{}{}
+	}
+
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch, Platform: cmd.Platform}
-	s, err := server.New(config, buildInfo, cmd.diagService)
+	s, err := server.New(config, buildInfo, cmd.diagService, disabledAlertHandlers)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -192,6 +197,7 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
 	fs.StringVar(&options.LogFile, "log-file", "", "")
 	fs.StringVar(&options.LogLevel, "log-level", "", "")
+	fs.StringVar(&options.DisabledAlertHandlers, "disable-handlers", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err
@@ -262,11 +268,12 @@ run starts the Kapacitor server.
 
 // Options represents the command line options that can be parsed.
 type Options struct {
-	ConfigPath string
-	PIDFile    string
-	Hostname   string
-	CPUProfile string
-	MemProfile string
-	LogFile    string
-	LogLevel   string
+	ConfigPath            string
+	PIDFile               string
+	Hostname              string
+	CPUProfile            string
+	MemProfile            string
+	LogFile               string
+	LogLevel              string
+	DisabledAlertHandlers string
 }
