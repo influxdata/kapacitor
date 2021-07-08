@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -443,17 +444,31 @@ func New(conf Config) (*Client, error) {
 			return nil, errors.Wrap(err, "invalid credentials")
 		}
 	}
-	var khttpClient *http.Client
-	if conf.Transport == nil {
-		khttpClient = khttp.NewDefaultClientWithTLS(&tls.Config{InsecureSkipVerify: conf.InsecureSkipVerify}, khttp.DefaultValidator)
-	} else {
-		khttpClient = khttp.NewDefaultClientWithTLS(conf.TLSConfig, khttp.DefaultValidator)
+
+	rt := conf.Transport
+	var tr *http.Transport
+
+	if rt == nil {
+		tr = khttp.NewDefaultTransportWithTLS(&tls.Config{
+			InsecureSkipVerify: conf.InsecureSkipVerify,
+		}, &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Control:   khttp.Control(khttp.DefaultValidator),
+		})
+		if conf.TLSConfig != nil {
+			tr.TLSClientConfig = conf.TLSConfig
+		}
+
+		rt = tr
 	}
-	khttpClient.Timeout = conf.Timeout
 	return &Client{
-		url:         u,
-		userAgent:   conf.UserAgent,
-		httpClient:  khttpClient,
+		url:       u,
+		userAgent: conf.UserAgent,
+		httpClient: &http.Client{
+			Timeout:   conf.Timeout,
+			Transport: rt,
+		},
 		credentials: conf.Credentials,
 	}, nil
 }
@@ -925,20 +940,15 @@ func (c *Client) decodeError(resp *http.Response) error {
 // If result is not nil the response body is JSON decoded into result.
 // Codes is a list of valid response codes.
 func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.Response, error) {
-	println("here15")
 	err := c.prepRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	println("here16")
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		println("here16.1")
 		return nil, err
 	}
 	defer resp.Body.Close()
-	println("here17")
 
 	valid := false
 	for _, code := range codes {
@@ -947,22 +957,16 @@ func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.
 			break
 		}
 	}
-	println("here18")
-
 	if !valid {
 		return nil, c.decodeError(resp)
 	}
 	if result != nil {
-		println("here19")
-
 		d := json.NewDecoder(resp.Body)
 		err := d.Decode(result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode JSON: %v", err)
 		}
 	}
-	println("here20")
-
 	return resp, nil
 }
 
@@ -1304,29 +1308,21 @@ type CreateTemplateOptions struct {
 // Create a new template.
 // Errors if the template already exists.
 func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
-	println("here10")
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(opt)
 	if err != nil {
-		panic("here4: " + err.Error())
 		return Template{}, err
 	}
-	println("here11")
 
 	u := *c.url
 	u.Path = templatesPath
-	println("here12")
 
 	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
-		panic("here5: " + err.Error())
 		return Template{}, err
 	}
-	println("here13")
-
 	req.Header.Set("Content-Type", "application/json")
-	println("here14: " + u.String() + "\n" + buf.String())
 
 	t := Template{}
 	_, err = c.Do(req, &t, http.StatusOK)

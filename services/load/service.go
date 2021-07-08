@@ -218,7 +218,6 @@ func (s *Service) Load() error {
 	if err := s.load(); err != nil {
 		s.diag.Error("failed to load new files", err)
 		s.errorCount.Add(1)
-		panic("here1: " + err.Error())
 		return err
 	}
 
@@ -242,9 +241,6 @@ func (s *Service) load() error {
 	err := s.loadTemplates()
 	if err != nil && !os.IsNotExist(err) {
 		return err
-	}
-	if err != nil {
-		println(err.Error())
 	}
 	s.diag.Debug("loading tasks")
 	err = s.loadTasks()
@@ -346,14 +342,12 @@ func (s *Service) loadTask(f string) error {
 func (s *Service) loadTemplates() error {
 	files, err := s.templateFiles()
 	if err != nil {
-		panic("here2: " + err.Error())
 		return err
 	}
 
 	for _, f := range files {
 		s.diag.Loading("template", f)
 		if err := s.loadTemplate(f); err != nil {
-			panic("here3: " + err.Error())
 			return fmt.Errorf("failed to load file %s: %s", f, err.Error())
 		}
 	}
@@ -366,34 +360,28 @@ func (s *Service) loadTemplate(f string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
-	println("here0")
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}
-	println("here1")
 
 	script := string(data)
 	fn := file.Name()
 	id := strings.TrimSuffix(filepath.Base(fn), filepath.Ext(fn))
-	println("here2")
 
 	l := s.cli.TemplateLink(id)
 	task, _ := s.cli.Template(l, nil)
 	if task.ID == "" {
-		println("here6")
 
 		o := client.CreateTemplateOptions{
 			ID:         id,
 			TICKscript: script,
 		}
-		println("here3")
 
 		if _, err := s.cli.CreateTemplate(o); err != nil {
 			return fmt.Errorf("failed to create template: %v", err)
 		}
 	} else {
-		println("here5")
 
 		o := client.UpdateTemplateOptions{
 			ID:         id,
@@ -403,7 +391,6 @@ func (s *Service) loadTemplate(f string) error {
 			return fmt.Errorf("failed to update template: %v", err)
 		}
 	}
-	println("here4")
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -411,8 +398,6 @@ func (s *Service) loadTemplate(f string) error {
 		return err
 	}
 	s.templates[id] = true
-	println("here7")
-
 	return nil
 }
 
