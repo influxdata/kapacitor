@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	khttp "github.com/influxdata/kapacitor/http"
-
 	"github.com/ghodss/yaml"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"

@@ -218,6 +218,7 @@ func (s *Service) Load() error {
 	if err := s.load(); err != nil {
 		s.diag.Error("failed to load new files", err)
 		s.errorCount.Add(1)
+		panic("here1: " + err.Error())
 		return err
 	}
 
@@ -242,7 +243,9 @@ func (s *Service) load() error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
+	if err != nil {
+		println(err.Error())
+	}
 	s.diag.Debug("loading tasks")
 	err = s.loadTasks()
 	if err != nil && !os.IsNotExist(err) {
@@ -343,12 +346,14 @@ func (s *Service) loadTask(f string) error {
 func (s *Service) loadTemplates() error {
 	files, err := s.templateFiles()
 	if err != nil {
+		panic("here2: " + err.Error())
 		return err
 	}
 
 	for _, f := range files {
 		s.diag.Loading("template", f)
 		if err := s.loadTemplate(f); err != nil {
+			panic("here3: " + err.Error())
 			return fmt.Errorf("failed to load file %s: %s", f, err.Error())
 		}
 	}

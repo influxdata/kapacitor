@@ -1309,6 +1309,7 @@ func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(opt)
 	if err != nil {
+		panic("here4: " + err.Error())
 		return Template{}, err
 	}
 	println("here11")
@@ -1319,12 +1320,13 @@ func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
 
 	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
+		panic("here5: " + err.Error())
 		return Template{}, err
 	}
 	println("here13")
 
 	req.Header.Set("Content-Type", "application/json")
-	println("here14")
+	println("here14: " + u.String() + "\n" + buf.String())
 
 	t := Template{}
 	_, err = c.Do(req, &t, http.StatusOK)

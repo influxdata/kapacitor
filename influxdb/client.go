@@ -158,8 +158,21 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 		return nil, errors.Wrap(err, "invalid URLs")
 	}
 	if conf.Transport == nil {
-		conf.Transport = khttp.NewDefaultTransport(nil)
+		conf.Transport = khttp.NewDefaultTransport(&net.Dialer{
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+			Control:   khttp.Control(khttp.DefaultValidator),
+			// DualStack is deprecated
+		})
 	}
+
+	conf.Transport.DialContext = (&net.Dialer{
+		Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+		KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+		Control:   khttp.Control(khttp.DefaultValidator),
+		// DualStack is deprecated
+	}).DialContext
+
 	c := &HTTPClient{
 		config: conf,
 		urls:   urls,
