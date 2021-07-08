@@ -774,6 +774,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 
 	if _, ok := s.disabled[spec.Kind]; ok {
 		s.diag.Error(fmt.Sprintf("handler '%s' is disabled", spec.Kind), ErrHandlerDIsabled)
+		return handler{}, nil
 	}
 
 	var h alert.Handler
