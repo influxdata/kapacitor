@@ -361,36 +361,44 @@ func (s *Service) loadTemplate(f string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
-
+	println("here0")
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}
+	println("here1")
 
 	script := string(data)
 	fn := file.Name()
 	id := strings.TrimSuffix(filepath.Base(fn), filepath.Ext(fn))
+	println("here2")
 
 	l := s.cli.TemplateLink(id)
 	task, _ := s.cli.Template(l, nil)
 	if task.ID == "" {
+		println("here6")
+
 		o := client.CreateTemplateOptions{
 			ID:         id,
 			TICKscript: script,
 		}
+		println("here3")
 
 		if _, err := s.cli.CreateTemplate(o); err != nil {
 			return fmt.Errorf("failed to create template: %v", err)
 		}
 	} else {
+		println("here5")
+
 		o := client.UpdateTemplateOptions{
 			ID:         id,
 			TICKscript: script,
 		}
 		if _, err := s.cli.UpdateTemplate(l, o); err != nil {
-			return fmt.Errorf("failed to create template: %v", err)
+			return fmt.Errorf("failed to update template: %v", err)
 		}
 	}
+	println("here4")
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -398,6 +406,7 @@ func (s *Service) loadTemplate(f string) error {
 		return err
 	}
 	s.templates[id] = true
+	println("here7")
 
 	return nil
 }

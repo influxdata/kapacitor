@@ -925,15 +925,20 @@ func (c *Client) decodeError(resp *http.Response) error {
 // If result is not nil the response body is JSON decoded into result.
 // Codes is a list of valid response codes.
 func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.Response, error) {
+	println("here15")
 	err := c.prepRequest(req)
 	if err != nil {
 		return nil, err
 	}
+	println("here16")
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		println("here16.1")
 		return nil, err
 	}
 	defer resp.Body.Close()
+	println("here17")
 
 	valid := false
 	for _, code := range codes {
@@ -942,16 +947,22 @@ func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.
 			break
 		}
 	}
+	println("here18")
+
 	if !valid {
 		return nil, c.decodeError(resp)
 	}
 	if result != nil {
+		println("here19")
+
 		d := json.NewDecoder(resp.Body)
 		err := d.Decode(result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode JSON: %v", err)
 		}
 	}
+	println("here20")
+
 	return resp, nil
 }
 
@@ -1293,21 +1304,27 @@ type CreateTemplateOptions struct {
 // Create a new template.
 // Errors if the template already exists.
 func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
+	println("here10")
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(opt)
 	if err != nil {
 		return Template{}, err
 	}
+	println("here11")
 
 	u := *c.url
 	u.Path = templatesPath
+	println("here12")
 
 	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
 		return Template{}, err
 	}
+	println("here13")
+
 	req.Header.Set("Content-Type", "application/json")
+	println("here14")
 
 	t := Template{}
 	_, err = c.Do(req, &t, http.StatusOK)

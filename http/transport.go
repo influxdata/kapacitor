@@ -39,13 +39,6 @@ func NewDefaultTransport(dialer *net.Dialer) *http.Transport {
 
 // NewDefaultTransportWithTLS creates a new transport with the specified TLS configuration.
 func NewDefaultTransportWithTLS(tlsConfig *tls.Config, dialer *net.Dialer) *http.Transport {
-	if dialer == nil {
-		dialer = &net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}
-	}
 	t := NewDefaultTransport(dialer)
 	t.TLSClientConfig = tlsConfig
 	return t
