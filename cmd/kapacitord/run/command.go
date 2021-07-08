@@ -264,6 +264,9 @@ run starts the Kapacitor server.
 
         -log-level <level>
                           Sets the log level. One of debug,info,error.
+
+        -disable-handlers <comma-separated list of alert-handlers>
+                          Disables certain alert handlers.  This is useful for security, reasons.  For example: disabling exec on a shared system.
 `
 
 // Options represents the command line options that can be parsed.
