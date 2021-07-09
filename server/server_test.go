@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"
@@ -5534,7 +5534,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 }
 
 func testStreamAgent(t *testing.T, c *server.Config) {
-	s := NewServer(c)
+	s := NewServer(c, nil)
 	err := s.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -5740,7 +5740,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 }
 
 func testStreamAgentSocket(t *testing.T, c *server.Config) {
-	s := NewServer(c)
+	s := NewServer(c, nil)
 	err := s.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -5989,7 +5989,7 @@ func testBatchAgent(t *testing.T, c *server.Config) {
 	})
 	c.InfluxDB[0].URLs = []string{db.URL()}
 	c.InfluxDB[0].Enabled = true
-	s := NewServer(c)
+	s := NewServer(c, nil)
 	err := s.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -10081,6 +10081,119 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+func TestServer_AlertHandlers_disable(t *testing.T) {
+
+	testCases := []struct {
+		handler client.TopicHandler
+		setup   func(*server.Config, *client.TopicHandler) (context.Context, error)
+		result  func(context.Context) error
+		disable map[string]struct{}
+	}{{
+		disable: map[string]struct{}{"alerta": struct{}{}},
+		handler: client.TopicHandler{
+			Kind: "alerta",
+			Options: map[string]interface{}{
+				"token":        "testtoken1234567",
+				"token-prefix": "Bearer",
+				"origin":       "kapacitor",
+				"group":        "test",
+				"environment":  "env",
+				"timeout":      time.Duration(24 * time.Hour),
+			},
+		},
+		setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+			ts := alertatest.NewServer()
+			ctxt := context.WithValue(context.Background(), "server", ts)
+
+			c.Alerta.Enabled = true
+			c.Alerta.URL = ts.URL
+			return ctxt, nil
+		},
+		result: func(ctxt context.Context) error {
+			ts := ctxt.Value("server").(*alertatest.Server)
+			ts.Close()
+			got := ts.Requests()
+			exp := []alertatest.Request(nil)
+			if !reflect.DeepEqual(exp, got) {
+				return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+			}
+			return nil
+		},
+	}}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-%d", tc.handler.Kind, i), func(t *testing.T) {
+			kind := tc.handler.Kind
+
+			// Create default config
+			c := NewConfig()
+			var ctxt context.Context
+			if tc.setup != nil {
+				var err error
+				ctxt, err = tc.setup(c, &tc.handler)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			s := OpenServerWithDisabledHandlers(c, tc.disable)
+			cli := Client(s)
+			closed := false
+			defer func() {
+				if !closed {
+					s.Close()
+				}
+			}()
+			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
+
+			if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
+				ID:      "testAlertHandlers",
+				Kind:    tc.handler.Kind,
+				Options: tc.handler.Options,
+			}); err != nil {
+				t.Fatalf("%s: %v", kind, err)
+			}
+
+			tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.topic('test')
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+`
+
+			if _, err := cli.CreateTask(client.CreateTaskOptions{
+				ID:   "testAlertHandlers",
+				Type: client.StreamTask,
+				DBRPs: []client.DBRP{{
+					Database:        "mydb",
+					RetentionPolicy: "myrp",
+				}},
+				TICKscript: tick,
+				Status:     client.Enabled,
+			}); err != nil {
+				t.Fatalf("%s: %v", kind, err)
+			}
+
+			point := "alert value=1 0000000000"
+			v := url.Values{}
+			v.Add("precision", "s")
+			s.MustWrite("mydb", "myrp", point, v)
+
+			// Close the entire server to ensure all data is processed
+			s.Close()
+			closed = true
+
+			if err := tc.result(ctxt); err != nil {
+				t.Errorf("%s: %v", kind, err)
+			}
+		})
 	}
 }
 

@@ -53,8 +53,8 @@ type Diagnostic interface {
 }
 
 type Service struct {
-	mu sync.RWMutex
-
+	mu            sync.RWMutex
+	disabled      map[string]struct{}
 	specsDAO      HandlerSpecDAO
 	topicsDAO     TopicStateDAO
 	PersistTopics bool
@@ -154,8 +154,9 @@ type Service struct {
 	}
 }
 
-func NewService(d Diagnostic) *Service {
+func NewService(d Diagnostic, disabled map[string]struct{}) *Service {
 	s := &Service{
+		disabled:        disabled,
 		handlers:        make(map[string]map[string]handler),
 		closedTopics:    make(map[string]bool),
 		topics:          alert.NewTopics(),
@@ -767,7 +768,15 @@ func decodeStringToTextUnmarshaler(f, t reflect.Type, data interface{}) (interfa
 	return data, nil
 }
 
+var ErrHandlerDIsabled = errors.New("handler disabled")
+
 func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
+
+	if _, ok := s.disabled[spec.Kind]; ok {
+		s.diag.Error(fmt.Sprintf("handler '%s' is disabled", spec.Kind), ErrHandlerDIsabled)
+		return handler{}, nil
+	}
+
 	var h alert.Handler
 	var err error
 	ctx := []keyvalue.T{
