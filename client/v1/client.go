@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -450,6 +451,10 @@ func New(conf Config) (*Client, error) {
 	if rt == nil {
 		tr = khttp.NewDefaultTransportWithTLS(&tls.Config{
 			InsecureSkipVerify: conf.InsecureSkipVerify,
+		}, &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Control:   khttp.Control(khttp.DefaultValidator),
 		})
 		if conf.TLSConfig != nil {
 			tr.TLSClientConfig = conf.TLSConfig

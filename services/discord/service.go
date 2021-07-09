@@ -39,13 +39,9 @@ func NewWorkspace(c Config) (*Workspace, error) {
 		return nil, err
 	}
 
-	cl := &http.Client{
-		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
-	}
-
 	return &Workspace{
 		config: c,
-		client: cl,
+		client: khttp.NewDefaultClientWithTLS(tlsConfig, khttp.DefaultValidator),
 	}, nil
 }
 
@@ -67,11 +63,7 @@ func (w *Workspace) Update(c Config) error {
 		return err
 	}
 
-	cl := &http.Client{
-		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
-	}
-
-	w.client = cl
+	w.client = khttp.NewDefaultClientWithTLS(tlsConfig, khttp.DefaultValidator)
 	w.config = c
 
 	return nil
