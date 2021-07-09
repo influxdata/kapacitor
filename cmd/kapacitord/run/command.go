@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	furl "github.com/influxdata/flux/dependencies/url"
-	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/BurntSushi/toml"
+	furl "github.com/influxdata/flux/dependencies/url"
 	"github.com/influxdata/flux/fluxinit"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 )
@@ -212,7 +212,7 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.LogFile, "log-file", "", "")
 	fs.StringVar(&options.LogLevel, "log-level", "", "")
 	fs.StringVar(&options.BlackListCIDRS, "blacklist-cidrs", "", "")
-        fs.StringVar(&options.DisabledAlertHandlers, "disable-handlers", "", "")
+	fs.StringVar(&options.DisabledAlertHandlers, "disable-handlers", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err
