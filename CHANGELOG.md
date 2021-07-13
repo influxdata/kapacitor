@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.6.0 [2021-06-28]
 
 ### Features
 - [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
@@ -13,9 +13,11 @@
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
 - [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
 - [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
+- [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
 
 ### Bugfixes
 - [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
+- [#2579](https://github.com/influxdata/kapacitor/pull/2579): Fix: cli auth and error handling for flux tasks
 
 ## v1.5.9 [2021-04-01]
 

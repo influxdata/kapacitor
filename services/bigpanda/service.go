@@ -40,9 +40,7 @@ func NewService(c Config, d Diagnostic) (*Service, error) {
 		diag: d,
 	}
 	s.configValue.Store(c)
-	s.clientValue.Store(&http.Client{
-		Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
-	})
+	s.clientValue.Store(khttp.NewDefaultClientWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}, khttp.DefaultValidator))
 
 	return s, nil
 }
@@ -67,9 +65,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
 		s.configValue.Store(c)
-		s.clientValue.Store(&http.Client{
-			Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
-		})
+		s.clientValue.Store(khttp.NewDefaultClientWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}, khttp.DefaultValidator))
 	}
 	return nil
 }

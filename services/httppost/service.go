@@ -369,9 +369,7 @@ func (h *handler) Handle(event alert.Event) {
 		}
 	}
 
-	httpClient := &http.Client{
-		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
-	}
+	httpClient := khttp.NewDefaultClientWithTLS(tlsConfig, khttp.DefaultValidator)
 
 	// Execute the request
 	resp, err := httpClient.Do(req)

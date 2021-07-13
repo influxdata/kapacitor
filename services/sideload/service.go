@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -272,9 +273,8 @@ func (s *httpSource) UpdateCache() error {
 		req.SetBasicAuth(s.e.Auth.Username, s.e.Auth.Password)
 	}
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
+	client := khttp.NewDefaultClient(khttp.DefaultValidator)
+	client.Timeout = time.Second * 10
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

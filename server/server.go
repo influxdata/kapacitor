@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/collectd"
@@ -123,6 +124,9 @@ type Server struct {
 
 	FluxTaskService taskmodel.TaskService
 
+	// DisabledHandlers are the disabled alert handlers.
+	DisabledHandlers map[string]struct{}
+
 	LoadService           *load.Service
 	SideloadService       *sideload.Service
 	AuthService           auth.Interface
@@ -166,7 +170,7 @@ type Server struct {
 }
 
 // New returns a new instance of Server built from a config.
-func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Server, error) {
+func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service, disabledAlertHandlers map[string]struct{}) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("invalid configuration: %s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
@@ -180,8 +184,12 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		tlsConfig = new(tls.Config)
 	}
 	d := diagService.NewServerHandler()
+	if disabledAlertHandlers == nil {
+		disabledAlertHandlers = map[string]struct{}{}
+	}
 	s := &Server{
 		config:           c,
+		DisabledHandlers: disabledAlertHandlers,
 		tlsConfig:        tlsConfig,
 		BuildInfo:        buildInfo,
 		dataDir:          c.DataDir,
@@ -396,7 +404,7 @@ func (s *Server) appendConfigOverrideService() {
 
 func (s *Server) initAlertService() {
 	d := s.DiagService.NewAlertServiceHandler()
-	srv := alert.NewService(d)
+	srv := alert.NewService(d, s.DisabledHandlers)
 
 	srv.Commander = s.Commander
 	srv.HTTPDService = s.HTTPDService
@@ -473,6 +481,11 @@ func (s *Server) appendLoadService() error {
 	return nil
 }
 
+const (
+	// Tokens for the InfluxDB clusters are generate with an expiration this far into the future.
+	tokenExpirationDuration = 10 * time.Minute
+)
+
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
 	d := s.DiagService.NewInfluxDBHandler()
@@ -493,7 +506,7 @@ func (s *Server) appendInfluxDBService() error {
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
 	srv.AuthService = s.AuthService
-	srv.ClientCreator = iclient.ClientCreator{}
+	srv.ClientCreator = iclient.NewTokenClientCreator([]byte(s.config.HTTP.SharedSecret), tokenExpirationDuration, s.DiagService.NewInfluxDBHandler())
 
 	s.InfluxDBService = srv
 	s.TaskMaster.InfluxDBService = srv

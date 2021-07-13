@@ -935,10 +935,10 @@ type DeleteGroupMessage interface {
 }
 
 type deleteGroupMessage struct {
-	info *GroupInfo
+	info GroupInfo
 }
 
-func NewDeleteGroupMessage(info *GroupInfo) *deleteGroupMessage {
+func NewDeleteGroupMessage(info GroupInfo) *deleteGroupMessage {
 	return &deleteGroupMessage{
 		info: info,
 	}
@@ -952,6 +952,6 @@ func (d *deleteGroupMessage) GroupID() models.GroupID {
 	return d.info.ID
 }
 
-func (d *deleteGroupMessage) GroupInfo() *GroupInfo {
+func (d *deleteGroupMessage) GroupInfo() GroupInfo {
 	return d.info
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -126,13 +127,14 @@ type Credentials struct {
 	Method AuthenticationMethod
 
 	// UserAuthentication fields
-
 	Username string
 	Password string
 
-	// BearerAuthentication fields
-
+	// TokenAuthentication fields
 	Token string
+
+	// BearerAuthentication fields
+	HttpSharedSecret bool
 }
 
 // HTTPClient is safe for concurrent use.
@@ -156,8 +158,21 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 		return nil, errors.Wrap(err, "invalid URLs")
 	}
 	if conf.Transport == nil {
-		conf.Transport = khttp.NewDefaultTransport()
+		conf.Transport = khttp.NewDefaultTransport(&net.Dialer{
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+			Control:   khttp.Control(khttp.DefaultValidator),
+			// DualStack is deprecated
+		})
 	}
+
+	conf.Transport.DialContext = (&net.Dialer{
+		Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+		KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+		Control:   khttp.Control(khttp.DefaultValidator),
+		// DualStack is deprecated
+	}).DialContext
+
 	c := &HTTPClient{
 		config: conf,
 		urls:   urls,
@@ -242,6 +257,12 @@ func (c *HTTPClient) Update(new Config) error {
 		if tr == nil {
 			tr = old.Transport
 		}
+		tr.DialContext = (&net.Dialer{
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+			Control:   khttp.Control(khttp.DefaultValidator),
+			// DualStack is deprecated
+		}).DialContext
 		c.client = &http.Client{
 			Timeout:   new.Timeout,
 			Transport: tr,

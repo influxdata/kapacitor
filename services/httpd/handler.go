@@ -555,13 +555,17 @@ func serveExpvar(w http.ResponseWriter, r *http.Request) {
 
 // HttpError writes an error to the client in a standard format.
 func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 
 	type errResponse struct {
+		// Kapacitor 1.5 used only 'error'
 		Error string `json:"error"`
+		// Kapacitor 1.6 also uses 'message' to match InfluxDB 2.x
+		Message string `json:"message"`
 	}
 
-	response := errResponse{Error: err}
+	response := errResponse{Error: err, Message: err}
 	var b []byte
 	if pretty {
 		b, _ = json.MarshalIndent(response, "", "    ")

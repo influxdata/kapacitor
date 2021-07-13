@@ -242,7 +242,6 @@ func (s *Service) load() error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
 	s.diag.Debug("loading tasks")
 	err = s.loadTasks()
 	if err != nil && !os.IsNotExist(err) {
@@ -361,7 +360,6 @@ func (s *Service) loadTemplate(f string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
-
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
@@ -374,6 +372,7 @@ func (s *Service) loadTemplate(f string) error {
 	l := s.cli.TemplateLink(id)
 	task, _ := s.cli.Template(l, nil)
 	if task.ID == "" {
+
 		o := client.CreateTemplateOptions{
 			ID:         id,
 			TICKscript: script,
@@ -383,12 +382,13 @@ func (s *Service) loadTemplate(f string) error {
 			return fmt.Errorf("failed to create template: %v", err)
 		}
 	} else {
+
 		o := client.UpdateTemplateOptions{
 			ID:         id,
 			TICKscript: script,
 		}
 		if _, err := s.cli.UpdateTemplate(l, o); err != nil {
-			return fmt.Errorf("failed to create template: %v", err)
+			return fmt.Errorf("failed to update template: %v", err)
 		}
 	}
 
@@ -398,7 +398,6 @@ func (s *Service) loadTemplate(f string) error {
 		return err
 	}
 	s.templates[id] = true
-
 	return nil
 }
 

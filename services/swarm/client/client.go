@@ -52,9 +52,7 @@ func New(c Config) (Client, error) {
 	return &httpClient{
 		config: c,
 		urls:   urls,
-		client: &http.Client{
-			Transport: khttp.NewDefaultTransportWithTLS(c.TLSConfig),
-		},
+		client: khttp.NewDefaultClientWithTLS(c.TLSConfig, khttp.DefaultValidator),
 	}, nil
 }
 
@@ -90,9 +88,7 @@ func (c *httpClient) Update(new Config) error {
 	c.urls = urls
 
 	if old.TLSConfig != new.TLSConfig {
-		c.client = &http.Client{
-			Transport: khttp.NewDefaultTransportWithTLS(new.TLSConfig),
-		}
+		c.client = khttp.NewDefaultClientWithTLS(new.TLSConfig, khttp.DefaultValidator)
 	}
 	return nil
 }
