@@ -234,7 +234,7 @@ func (s *Service) preparePost(id string, message string, details string, level a
 	}
 
 	for k, v := range data.Fields {
-		bpData[k] = fmt.Sprintf("%v", v)
+		bpData[k] = v
 	}
 
 	var post bytes.Buffer
