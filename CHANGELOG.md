@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.6.0 [2021-06-28]
 
 ### Features
 - [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
@@ -8,9 +8,11 @@
 - [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
 - [#2530](https://github.com/influxdata/kapacitor/pull/2530): Add a node tricklenode that converts batches to streams, the inverse of windownode.
 - [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
+- [#2550](https://github.com/influxdata/kapacitor/pull/2550): add queryFluxNode that allows for querying flux in batch tasks
 - [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
 - [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
+- [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
 - [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
 
 ### Bugfixes
