@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+feat: flag to allow blacklisting CIDR ranges (#2589) …
+- [#2589](https://github.com/influxdata/kapacitor/pull/2581): Flag for blacklisting CIDR ranges for certain handlers, and nodes.
+- [#2591](https://github.com/influxdata/kapacitor/pull/2591): Flag for disabling alert handlers, this is useful for security (such as disabling exec on a shared machine).
+- 
+### Bugfixes
+- [2585]Make DeleteGroupMessage align with GroupInfoer interface, thanks @prashanthjbabu!
+
 ## v1.6.0 [2021-06-28]
 
 ### Features
