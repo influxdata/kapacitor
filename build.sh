@@ -12,7 +12,7 @@ BUILD_NUM=${BUILD_NUM-$RANDOM}
 # Home dir of the docker user
 HOME_DIR=/root
 
-GO_VERSION=1.16.4
+GO_VERSION=1.16.6
 
 imagename=kapacitor-builder-img-$BUILD_NUM
 dataname=kapacitor-data-$BUILD_NUM
