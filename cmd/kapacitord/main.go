@@ -43,6 +43,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(1)
 }
 
 // Main represents the program execution.
