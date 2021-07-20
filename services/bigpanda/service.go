@@ -234,7 +234,16 @@ func (s *Service) preparePost(id string, message string, details string, level a
 	}
 
 	for k, v := range data.Fields {
-		bpData[k] = v
+		switch value := v.(type) {
+		case string:
+			bpData[k] = value
+		default:
+			b, err := json.Marshal(v)
+			if err != nil {
+				return nil, err
+			}
+			bpData[k] = string(b)
+		}
 	}
 
 	var post bytes.Buffer

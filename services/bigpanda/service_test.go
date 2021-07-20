@@ -21,7 +21,19 @@ func TestService_SerializeEventData(t *testing.T) {
 	}{
 		{
 			fields:  map[string]interface{}{"primitive_type": 10},
-			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"primitive_type\":10,\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
+			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"primitive_type\":\"10\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
+		},
+		{
+			fields:  map[string]interface{}{"primitive_type": "string"},
+			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"primitive_type\":\"string\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
+		},
+		{
+			fields:  map[string]interface{}{"primitive_type": true},
+			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"primitive_type\":\"true\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
+		},
+		{
+			fields:  map[string]interface{}{"primitive_type": 123.45},
+			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"primitive_type\":\"123.45\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
 		},
 		{
 			fields:  map[string]interface{}{"escape": "\n"},
@@ -29,7 +41,7 @@ func TestService_SerializeEventData(t *testing.T) {
 		},
 		{
 			fields:  map[string]interface{}{"array": []interface{}{10, true, "string value"}},
-			expBody: "{\"app_key\":\"key\",\"array\":[10,true,\"string value\"],\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
+			expBody: "{\"app_key\":\"key\",\"array\":\"[10,true,\\\"string value\\\"]\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}\n",
 		},
 	}
 
