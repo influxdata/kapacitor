@@ -523,7 +523,7 @@ def build(version=None,
     tmp_build_dir = create_temp_dir()
     for target, path in targets.items():
         logging.info("Building target: {}".format(target))
-        build_command = ""
+        build_command = ". /root/.cargo/env && "
 
         build_command += "CGO_ENABLED=1 "
 
@@ -539,7 +539,7 @@ def build(version=None,
                 cc = "aarch64-unknown-linux-musl-cc"
                 tags += ["netgo", "osusergo", "static_build", "noasm"]
         elif platform == "darwin" and arch == "amd64":
-            cc = "x86_64-apple-darwin15-clang"
+            cc = "x86_64-apple-darwin16-clang"
             tags += [ "netgo", "osusergo"]
         elif  platform == "windows" and arch == "amd64":
             cc = "x86_64-w64-mingw32-gcc"
