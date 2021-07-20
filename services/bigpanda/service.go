@@ -238,7 +238,7 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		case string:
 			bpData[k] = value
 		default:
-			b, err := json.Marshal(v)
+			b, err := json.Marshal(value)
 			if err != nil {
 				return nil, err
 			}

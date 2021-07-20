@@ -8,7 +8,7 @@
 
 ### Bugfixes
 - [#2585](https://github.com/influxdata/kapacitor/pull/2585):Make DeleteGroupMessage align with GroupInfoer interface, thanks @prashanthjbabu!
-- [#2592](https://github.com/influxdata/kapacitor/pull/2592): Fix: payload serialization for BigPanda
+- [#2596](https://github.com/influxdata/kapacitor/pull/2596): Fix: payload serialization for BigPanda
 
 ## v1.6.0 [2021-06-28]
 
