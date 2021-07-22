@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.6.1 [2021-07-22]
 
 ### Features
 - [#2589](https://github.com/influxdata/kapacitor/pull/2589): Flag for blacklisting CIDR ranges for certain handlers, and nodes
