@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"

@@ -12,7 +12,6 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cespare/xxhash v1.1.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-bits v0.0.0-20180113010104-bd8a69a71dc2 // indirect
 	github.com/docker/docker v20.10.5+incompatible
 	github.com/dustin/go-humanize v1.0.0
@@ -21,6 +20,7 @@ require (
 	github.com/frankban/quicktest v1.11.0 // indirect
 	github.com/geoffgarside/ber v0.0.0-20170306085127-854377f11dfb // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.4.3
 	github.com/google/btree v1.0.0
 	github.com/google/go-cmp v0.5.5
