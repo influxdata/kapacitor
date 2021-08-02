@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/influxdata/flux"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
