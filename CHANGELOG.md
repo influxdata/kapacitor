@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Bugfixes
+- [#2484](https://github.com/influxdata/kapacitor/pull/2582): fix expvar string json encoding to handle special chars, thanks @prashanthjbabu!
+
 ### Features
 - [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
