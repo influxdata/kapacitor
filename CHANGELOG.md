@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.2 [2021-08-04]
+
+### Bugfixes
+- [#2582](https://github.com/influxdata/kapacitor/pull/2582): expvar string json encoding to handle special chars, thanks @prashanthjbabu! 
+- [#2605](https://github.com/influxdata/kapacitor/pull/2605): Updated jwt dependencies of libraries because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
+- [#2601](https://github.com/influxdata/kapacitor/pull/2601): Switched to github.com/golang-jwt/jwt for kapacitor's use because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
+
 ## v1.6.1 [2021-07-22]
 
 ### Features
