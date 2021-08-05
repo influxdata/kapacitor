@@ -9,8 +9,11 @@ commands:
                   - run:
                         name: Deploy Release Packages
                         command:  |
+                              GHR_VERSION = v0.14.0
+                              wget https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/ghr_${GHR_VERSION}_linux_amd64.tar.gz
+                              tar -xzf ghr_${GHR_VERSION}_linux_amd64.tar.gz
                               ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
-                              ghr -p4 -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} -replace ./build/
+                              ./ghr_${GHR_VERSION}_linux_amd64/ghr -p4 -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} -replace ./build/
 
       run_tests:
             description:  >

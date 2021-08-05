@@ -21,7 +21,7 @@ require (
 	github.com/geoffgarside/ber v0.0.0-20170306085127-854377f11dfb // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.4.3
 	github.com/google/btree v1.0.0
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -63,13 +63,12 @@ require (
 	github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 // indirect
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/stretchr/testify v1.7.0
-	github.com/tcnksm/ghr v0.14.0
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	github.com/urfave/cli/v2 v2.3.0
 	go.etcd.io/bbolt v1.3.5
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.25.0
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/gomail.v2 v2.0.0-20150902115704-41f357289737
