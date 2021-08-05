@@ -12,7 +12,4 @@ import (
 	// so we can use the rust dependencies of flux
 	_ "github.com/influxdata/pkg-config"
 	_ "github.com/mailru/easyjson/easyjson"
-
-	// for github release binary uploading
-	_ "github.com/tcnksm/ghr"
 )
