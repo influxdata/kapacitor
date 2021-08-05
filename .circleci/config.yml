@@ -10,6 +10,7 @@ commands:
                         name: Deploy Release Packages
                         command:  |
                               ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
+                              ghr -p4 -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} -replace ./build/
 
       run_tests:
             description:  >
