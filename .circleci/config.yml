@@ -13,7 +13,7 @@ commands:
                               wget https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/ghr_${GHR_VERSION}_linux_amd64.tar.gz
                               tar -xzf ghr_${GHR_VERSION}_linux_amd64.tar.gz
                               ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
-                              ./ghr_${GHR_VERSION}_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} -replace ./build/
+                              ./ghr_${GHR_VERSION}_linux_amd64/ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete -replace ${CIRCLE_TAG} ./build/
 
       run_tests:
             description:  >
@@ -41,6 +41,9 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
+                  - restore_cache: # restores saved cache if no changes are detected since last run
+                        keys:
+                              - go-mod-{{ checksum "go.sum" }}
                   - setup_remote_docker:
                         docker_layer_caching: true
                   - run_tests

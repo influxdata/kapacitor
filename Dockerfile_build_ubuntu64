@@ -49,7 +49,6 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
 ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
-#ENV PKG_CONFIG  $PROJECT_DIR/pkg-config.sh
 ENV PATH $GOPATH/bin:$PATH
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
