@@ -9,7 +9,7 @@ commands:
                   - run:
                         name: Deploy Release Packages
                         command:  |
-                              GHR_VERSION = v0.14.0
+                              GHR_VERSION=v0.14.0
                               wget https://github.com/tcnksm/ghr/releases/download/${GHR_VERSION}/ghr_${GHR_VERSION}_linux_amd64.tar.gz
                               tar -xzf ghr_${GHR_VERSION}_linux_amd64.tar.gz
                               ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
