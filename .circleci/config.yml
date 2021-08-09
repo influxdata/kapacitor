@@ -23,6 +23,7 @@ commands:
                         name: Running Kapacitor Tests
                         no_output_timeout: 30m
                         command:  |
+                              mkdir -p /go
                               ./circle-test.sh
       deploy_nightly:
             description:  >
@@ -38,25 +39,40 @@ jobs:
             docker:
                   - image: nathanielc/docker-client
             parallelism: 2
+            resource_class: large
             working_directory: ~/kapacitor
             steps:
                   - checkout
                   - restore_cache: # restores saved cache if no changes are detected since last run
                         keys:
-                              - go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod-
                   - setup_remote_docker:
                         docker_layer_caching: true
                   - run_tests
+                  - save_cache:
+                          key: v0-go-mod-{{ checksum "go.sum" }}
+                          paths:
+                                - "/go/pkg/mod"
 
       release:
             docker:
                   - image: nathanielc/docker-client
             working_directory: ~/kapacitor
+            resource_class: large
             steps:
                   - checkout
+                  - restore_cache: # restores saved cache if no changes are detected since last run
+                        keys:
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod-
                   - setup_remote_docker:
                         docker_layer_caching: true
                   - deploy_release_packages
+                  - save_cache:
+                          key: v0-go-mod-{{ checksum "go.sum" }}
+                          paths:
+                                - "/go/pkg/mod"
 
       nightly-build:
             docker:
@@ -64,9 +80,17 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
+                  - restore_cache: # restores saved cache if no changes are detected since last run
+                        keys:
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod-
                   - setup_remote_docker:
                           docker_layer_caching: true
                   - run_tests
+                  - save_cache:
+                        key: v0-go-mod-{{ checksum "go.sum" }}
+                        paths:
+                              - "/go/pkg/mod"
                   - deploy_nightly
 
 
