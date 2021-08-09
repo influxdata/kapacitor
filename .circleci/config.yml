@@ -32,6 +32,13 @@ commands:
                         name: Deploy Nightly Build
                         command:  |
                                 ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
+      go_get:
+            description: Get go dependencies
+            steps:
+                  - run:
+                        name: go get
+                        command:  |
+                                go get -t
 
 jobs:
       build:
@@ -43,7 +50,9 @@ jobs:
                   - checkout
                   - restore_cache: # restores saved cache if no changes are detected since last run
                         keys:
-                              - go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod
+                  = go_get
                   - setup_remote_docker:
                         docker_layer_caching: true
                   - run_tests
@@ -54,6 +63,11 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
+                  - restore_cache: # restores saved cache if no changes are detected since last run
+                        keys:
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod
+                  - go_get
                   - setup_remote_docker:
                         docker_layer_caching: true
                   - deploy_release_packages
@@ -64,6 +78,15 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
+                  - restore_cache: # restores saved cache if no changes are detected since last run
+                        keys:
+                              - v0-go-mod-{{ checksum "go.sum" }}
+                              - v0-go-mod
+                  - go_get
+                  - save_cache:
+                        key: go-mod-v4-{{ checksum "go.sum" }}
+                        paths:
+                        - "/go/pkg/mod"
                   - setup_remote_docker:
                           docker_layer_caching: true
                   - run_tests
@@ -75,11 +98,13 @@ workflows:
       build-and-deploy:
             jobs:
                   - build:
+                        resource_class: large
                         filters:
                               tags:
                                     only: /.*/
                   - release:
-                        requires:
+                          resource_class: large
+                          requires:
                               - build
                         filters:
                               tags:

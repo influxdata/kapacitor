@@ -36,7 +36,7 @@ RUN gem install fpm
 # Install protobuf3 protoc binary
 ENV PROTO_VERSION 3.11.1
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
-    && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
+    && unzip -oj protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
     rm protoc-${PROTO_VERSION}-linux-x86_64.zip
 
 # Install protobuf3 python library
