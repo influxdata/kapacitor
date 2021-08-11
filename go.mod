@@ -68,6 +68,7 @@ require (
 	go.etcd.io/bbolt v1.3.5
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/tools v0.1.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
