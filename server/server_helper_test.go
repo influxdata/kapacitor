@@ -34,7 +34,7 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server.
-func NewServer(c *server.Config) *Server {
+func NewServer(c *server.Config, disabled map[string]struct{}) *Server {
 	configureLogging()
 	buildInfo := server.BuildInfo{
 		Version: "testServer",
@@ -44,7 +44,7 @@ func NewServer(c *server.Config) *Server {
 	c.HTTP.LogEnabled = testing.Verbose()
 	ds := diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
 	ds.Open()
-	srv, err := server.New(c, buildInfo, ds)
+	srv, err := server.New(c, buildInfo, ds, disabled)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +62,7 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Start() {
-	srv, err := server.New(s.Config, s.buildInfo, s.ds)
+	srv, err := server.New(s.Config, s.buildInfo, s.ds, s.Server.DisabledHandlers)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -97,7 +97,16 @@ func OpenLoadServer() (*Server, *server.Config, *client.Client) {
 
 // OpenServer opens a test server.
 func OpenServer(c *server.Config) *Server {
-	s := NewServer(c)
+	s := NewServer(c, nil)
+	if err := s.Open(); err != nil {
+		panic(err.Error())
+	}
+	return s
+}
+
+// OpenServer opens a test server.
+func OpenServerWithDisabledHandlers(c *server.Config, disabledAlertHandlers map[string]struct{}) *Server {
+	s := NewServer(c, disabledAlertHandlers)
 	if err := s.Open(); err != nil {
 		panic(err.Error())
 	}

@@ -819,17 +819,21 @@ func ResultToBufferedBatches(res influxdb.Result, groupByName bool) ([]BufferedB
 			var t time.Time
 			for i, c := range series.Columns {
 				if c == "time" {
-					tStr, ok := v[i].(string)
-					if !ok {
-						return nil, fmt.Errorf("unexpected time value: %v", v[i])
-					}
-					var err error
-					t, err = time.Parse(time.RFC3339Nano, tStr)
-					if err != nil {
-						t, err = time.Parse(time.RFC3339, tStr)
+					//tStr, ok := v[i].(string)
+					switch ts := v[i].(type) {
+					case string:
+						var err error
+						t, err = time.Parse(time.RFC3339Nano, ts)
 						if err != nil {
-							return nil, fmt.Errorf("unexpected time format: %v", err)
+							t, err = time.Parse(time.RFC3339, ts)
+							if err != nil {
+								return nil, fmt.Errorf("unexpected time format: %v", err)
+							}
 						}
+					case time.Time:
+						t = ts
+					default:
+						return nil, fmt.Errorf("unexpected time value: %v", v[i])
 					}
 				} else {
 					value := v[i]
@@ -927,16 +931,16 @@ func (b *barrierMessage) Time() time.Time {
 
 type DeleteGroupMessage interface {
 	Message
-	GroupIDGetter
+	GroupInfoer
 }
 
 type deleteGroupMessage struct {
-	groupID models.GroupID
+	info GroupInfo
 }
 
-func NewDeleteGroupMessage(id models.GroupID) DeleteGroupMessage {
+func NewDeleteGroupMessage(info GroupInfo) *deleteGroupMessage {
 	return &deleteGroupMessage{
-		groupID: id,
+		info: info,
 	}
 }
 
@@ -945,5 +949,9 @@ func (d *deleteGroupMessage) Type() MessageType {
 }
 
 func (d *deleteGroupMessage) GroupID() models.GroupID {
-	return d.groupID
+	return d.info.ID
+}
+
+func (d *deleteGroupMessage) GroupInfo() GroupInfo {
+	return d.info
 }

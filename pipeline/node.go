@@ -535,3 +535,14 @@ func (n *chainnode) Sideload() *SideloadNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a node that converts batches (such as windowed data) into non-batches.
+func (n *chainnode) Trickle() *TrickleNode {
+	if n.Provides() != BatchEdge {
+		panic("cannot Trickle stream edge")
+	}
+
+	s := newTrickleNode()
+	n.linkChild(s)
+	return s
+}

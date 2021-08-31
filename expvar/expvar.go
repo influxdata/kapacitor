@@ -4,6 +4,7 @@ package expvar
 
 import (
 	"bytes"
+	"encoding/json"
 	"expvar"
 	"fmt"
 	"math"
@@ -281,7 +282,8 @@ type String struct {
 func (v *String) String() string {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	return strconv.Quote(v.s)
+	b, _ := json.Marshal(v.s)
+	return string(b)
 }
 
 func (v *String) Set(value string) {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -45,6 +46,12 @@ type Client interface {
 	// The response is checked for an error and the is returned
 	// if it exists
 	QueryFlux(q FluxQuery) (flux.ResultIterator, error)
+
+	// QueryFlux is for querying Influxdb with the Flux language
+	// The response is checked for an error and the is returned
+	// if it exists.  Unlike QueryFlux, this returns a *Response
+	// object.
+	QueryFluxResponse(q FluxQuery) (*Response, error)
 }
 
 type ClientUpdater interface {
@@ -120,13 +127,14 @@ type Credentials struct {
 	Method AuthenticationMethod
 
 	// UserAuthentication fields
-
 	Username string
 	Password string
 
-	// BearerAuthentication fields
-
+	// TokenAuthentication fields
 	Token string
+
+	// BearerAuthentication fields
+	HttpSharedSecret bool
 }
 
 // HTTPClient is safe for concurrent use.
@@ -150,8 +158,21 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 		return nil, errors.Wrap(err, "invalid URLs")
 	}
 	if conf.Transport == nil {
-		conf.Transport = khttp.NewDefaultTransport()
+		conf.Transport = khttp.NewDefaultTransport(&net.Dialer{
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+			Control:   khttp.Control(khttp.DefaultValidator),
+			// DualStack is deprecated
+		})
 	}
+
+	conf.Transport.DialContext = (&net.Dialer{
+		Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+		KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+		Control:   khttp.Control(khttp.DefaultValidator),
+		// DualStack is deprecated
+	}).DialContext
+
 	c := &HTTPClient{
 		config: conf,
 		urls:   urls,
@@ -236,6 +257,12 @@ func (c *HTTPClient) Update(new Config) error {
 		if tr == nil {
 			tr = old.Transport
 		}
+		tr.DialContext = (&net.Dialer{
+			Timeout:   30 * time.Second, // I am not sure if this is the right value to set it to
+			KeepAlive: 30 * time.Second, // I am not sure if this is the right value to set it to
+			Control:   khttp.Control(khttp.DefaultValidator),
+			// DualStack is deprecated
+		}).DialContext
 		c.client = &http.Client{
 			Timeout:   new.Timeout,
 			Transport: tr,
@@ -618,11 +645,17 @@ func (c *HTTPClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.doFlux(req, http.StatusOK)
+	reader, err := c.doFlux(req, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
-	panic("flux kapacitor response parsing not implemented")
+
+	resp, err := NewFluxQueryResponse(reader)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+
 }
 
 func (c *HTTPClient) QueryFlux(q FluxQuery) (flux.ResultIterator, error) {

@@ -9,9 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
+	furl "github.com/influxdata/flux/dependencies/url"
 	"github.com/influxdata/flux/fluxinit"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 )
@@ -104,6 +107,17 @@ func (cmd *Command) Run(args ...string) error {
 		config.Logging.Level = options.LogLevel
 	}
 
+	switch options.BlackListCIDRS {
+	case "":
+		khttp.DefaultValidator = furl.PassValidator{}
+	case "private":
+		khttp.DefaultValidator = furl.PrivateIPValidator{}
+	default:
+		if khttp.DefaultValidator, err = khttp.ParseCIDRsString(options.BlackListCIDRS); err != nil {
+			return fmt.Errorf("flag error: improper CIDRs: %s", err)
+		}
+	}
+
 	// Initialize Logging Services
 	cmd.diagService = diagnostic.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
 	if err := cmd.diagService.Open(); err != nil {
@@ -127,8 +141,13 @@ func (cmd *Command) Run(args ...string) error {
 	fluxinit.FluxInit()
 
 	// Create server from config and start it.
+	disabledAlertHandlers := map[string]struct{}{}
+	for _, x := range strings.Split(options.DisabledAlertHandlers, ",") {
+		disabledAlertHandlers[strings.TrimSpace(x)] = struct{}{}
+	}
+
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch, Platform: cmd.Platform}
-	s, err := server.New(config, buildInfo, cmd.diagService)
+	s, err := server.New(config, buildInfo, cmd.diagService, disabledAlertHandlers)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -192,6 +211,8 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
 	fs.StringVar(&options.LogFile, "log-file", "", "")
 	fs.StringVar(&options.LogLevel, "log-level", "", "")
+	fs.StringVar(&options.BlackListCIDRS, "blacklist-cidrs", "", "")
+	fs.StringVar(&options.DisabledAlertHandlers, "disable-handlers", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err
@@ -242,10 +263,18 @@ func (cmd *Command) ParseConfig(path string) (*server.Config, error) {
 var usage = `usage: run [flags]
 
 run starts the Kapacitor server.
+        -blacklist-cidrs <CIDR1,CIDR2,...>
+                           Comma seperated list of CIDRs to blacklist for
+                           most http get/post operations
 
         -config <path>
                           Set the path to the configuration file.
 
+        -disable-handlers <comma-separated list of alert-handlers>
+                          Disables certain alert handlers.  This is useful for
+                          security, reasons.  For example: disabling exec on 
+                          a shared system.
+        
         -hostname <name>
                           Override the hostname, the 'hostname' configuration
                           option will be overridden.
@@ -258,15 +287,18 @@ run starts the Kapacitor server.
 
         -log-level <level>
                           Sets the log level. One of debug,info,error.
+
 `
 
 // Options represents the command line options that can be parsed.
 type Options struct {
-	ConfigPath string
-	PIDFile    string
-	Hostname   string
-	CPUProfile string
-	MemProfile string
-	LogFile    string
-	LogLevel   string
+	ConfigPath            string
+	PIDFile               string
+	Hostname              string
+	CPUProfile            string
+	MemProfile            string
+	LogFile               string
+	LogLevel              string
+	DisabledAlertHandlers string
+	BlackListCIDRS        string
 }

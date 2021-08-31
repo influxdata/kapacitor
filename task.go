@@ -253,7 +253,6 @@ func (et *ExecutingTask) StartBatching() error {
 	if et.Task.Type != BatchTask {
 		return ErrWrongTaskType
 	}
-
 	batcher := et.source.(*BatchNode)
 
 	err := et.checkDBRPs(batcher)
@@ -455,6 +454,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newBatchNode(et, t, d)
 	case *pipeline.QueryNode:
 		n, err = newQueryNode(et, t, d)
+	case *pipeline.QueryFluxNode:
+		n, err = newQueryFluxNode(et, t, d)
 	case *pipeline.WindowNode:
 		n, err = newWindowNode(et, t, d)
 	case *pipeline.HTTPOutNode:
@@ -515,6 +516,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newStateCountNode(et, t, d)
 	case *pipeline.SideloadNode:
 		n, err = newSideloadNode(et, t, d)
+	case *pipeline.TrickleNode:
+		n = newTrickleNode(et, t, d)
 	case *pipeline.BarrierNode:
 		n, err = newBarrierNode(et, t, d)
 	default:

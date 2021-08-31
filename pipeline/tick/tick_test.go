@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -96,6 +97,13 @@ func BatchQuery(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, q
 	return pipe, batch, query
 }
 
+func BatchQueryFlux(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, query *pipeline.QueryFluxNode) {
+	batch = &pipeline.BatchNode{}
+	pipe = pipeline.CreatePipelineSources(batch)
+	query = batch.QueryFlux(q)
+	return pipe, batch, query
+}
+
 func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
 	ast := tick.AST{}
 	err := ast.Build(pipe)
@@ -116,7 +124,7 @@ func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string, 
 	}
 
 	if got != want {
-		t.Errorf("unexpected TICKscript:\ngot:\n%v\nwant:\n%v\n", got, want)
+		t.Errorf("unexpected TICKscript:\n %s", cmp.Diff(got, want))
 		t.Log(got) // print is helpful to get the correct format.
 	}
 

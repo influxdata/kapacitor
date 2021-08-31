@@ -30,13 +30,14 @@ const (
 )
 
 type Config struct {
-	Enabled  bool     `toml:"enabled" override:"enabled"`
-	Name     string   `toml:"name" override:"name"`
-	Default  bool     `toml:"default" override:"default"`
-	URLs     []string `toml:"urls" override:"urls"`
-	Username string   `toml:"username" override:"username"`
-	Password string   `toml:"password" override:"password,redact"`
-	Token    string   `toml:"token" override:"token,redact"`
+	Enabled          bool     `toml:"enabled" override:"enabled"`
+	Name             string   `toml:"name" override:"name"`
+	Default          bool     `toml:"default" override:"default"`
+	URLs             []string `toml:"urls" override:"urls"`
+	Username         string   `toml:"username" override:"username"`
+	Password         string   `toml:"password" override:"password,redact"`
+	Token            string   `toml:"token" override:"token,redact"`
+	HttpSharedSecret bool     `toml:"http-shared-secret" override:"http-shared-secret"`
 
 	// Path to CA file
 	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`

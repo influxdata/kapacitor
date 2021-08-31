@@ -4,7 +4,7 @@ Dependencies
 * github.com/BurntSushi/toml [MIT](https://github.com/BurntSushi/toml/blob/master/COPYING)
 * github.com/boltdb/bolt [MIT](https://github.com/boltdb/bolt/blob/master/LICENSE)
 * github.com/cenkalti/backoff [MIT](https://github.com/cenkalti/backoff/blob/master/LICENSE)
-* github.com/dgrijalva/jwt-go [MIT](https://github.com/dgrijalva/jwt-go/blob/master/LICENSE)
+* github.com/golang-jwt/jwt [MIT](https://github.com/golang-jwt/jwt/blob/master/LICENSE)
 * github.com/dustin/go-humanize [MIT](https://github.com/dustin/go-humanize/blob/master/LICENSE)
 * github.com/golang/protobuf [BSD](https://github.com/golang/protobuf/blob/master/LICENSE)
 * github.com/google/uuid [BSD](https://github.com/google/uuid/blob/master/LICENSE)

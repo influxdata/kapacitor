@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"net"
 	"net/http"
 	"net/url"
@@ -80,6 +81,11 @@ func withApi(u string, skipSsl bool) cli.BeforeFunc {
 		conf.Host = parsedUrl.Host
 		conf.Scheme = parsedUrl.Scheme
 		conf.UserAgent = kclient.DefaultUserAgent
+		if parsedUrl.User != nil {
+			conf.AddDefaultHeader("Authorization",
+				"Basic "+base64.StdEncoding.EncodeToString([]byte(parsedUrl.User.String())),
+			)
+		}
 		// All the client code we share with influxdb assumes the /api/v2/tasks endpoint. Translate to
 		// the /kapacitor/v1/api/v2/tasks endpoint
 		conf.HTTPClient = &http.Client{Transport: urlPrefixer{

@@ -1,15 +1,40 @@
 # Changelog
 
-## Unreleased
+## v1.6.2 [2021-08-04]
+
+### Bugfixes
+- [#2582](https://github.com/influxdata/kapacitor/pull/2582): expvar string json encoding to handle special chars, thanks @prashanthjbabu! 
+- [#2605](https://github.com/influxdata/kapacitor/pull/2605): Updated jwt dependencies of libraries because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
+- [#2601](https://github.com/influxdata/kapacitor/pull/2601): Switched to github.com/golang-jwt/jwt for kapacitor's use because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
+
+## v1.6.1 [2021-07-22]
+
+### Features
+- [#2589](https://github.com/influxdata/kapacitor/pull/2589): Flag for blacklisting CIDR ranges for certain handlers, and nodes
+- [#2591](https://github.com/influxdata/kapacitor/pull/2591): Flag for disabling alert handlers, this is useful for security (such as disabling exec on a shared machine)
+
+### Bugfixes
+- [#2585](https://github.com/influxdata/kapacitor/pull/2585): Make DeleteGroupMessage align with GroupInfoer interface, thanks @prashanthjbabu!
+- [#2596](https://github.com/influxdata/kapacitor/pull/2596): Fix payload serialization for BigPanda
+
+## v1.6.0 [2021-06-28]
 
 ### Features
 - [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
-- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
 - [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
+- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
+- [#2530](https://github.com/influxdata/kapacitor/pull/2530): Add a node tricklenode that converts batches to streams, the inverse of windownode.
 - [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
+- [#2550](https://github.com/influxdata/kapacitor/pull/2550): add queryFluxNode that allows for querying flux in batch tasks
 - [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
 - [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
+- [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
+- [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
+
+### Bugfixes
+- [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
+- [#2579](https://github.com/influxdata/kapacitor/pull/2579): Fix: cli auth and error handling for flux tasks
 
 ## v1.5.9 [2021-04-01]
 

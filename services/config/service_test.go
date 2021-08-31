@@ -1033,67 +1033,76 @@ func TestService_GetConfig(t *testing.T) {
 			},
 		},
 	}
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		updates := make(chan config.ConfigUpdate, len(testCases))
 		service, server := OpenNewSerivce(testConfig, updates)
 		defer server.Close()
 		defer service.Close()
 		basePath := server.Server.URL + httpd.BasePath + "/config"
-		// Apply all updates
-		for _, update := range tc.updates {
-			errC := make(chan error, 1)
-			go func() {
-				// Validate we got the update over the chan.
-				// This keeps the chan unblocked.
-				timer := time.NewTimer(100 * time.Millisecond)
-				defer timer.Stop()
-				select {
-				case cu := <-updates:
-					cu.ErrC <- nil
-					errC <- nil
-				case <-timer.C:
-					errC <- errors.New("expected to get config update")
+		if tc.expName == "" {
+			tc.expName = fmt.Sprintf("test_%d", i)
+		}
+		t.Run(tc.expName, func(t *testing.T) {
+
+			// Apply all updates
+			for _, update := range tc.updates {
+				errC := make(chan error, 1)
+				go func() {
+					// Validate we got the update over the chan.
+					// This keeps the chan unblocked.
+					timer := time.NewTimer(100 * time.Millisecond)
+					defer timer.Stop()
+					select {
+					case cu := <-updates:
+						cu.ErrC <- nil
+						errC <- nil
+					case <-timer.C:
+						errC <- errors.New("expected to get config update")
+					}
+				}()
+				resp, err := http.Post(basePath+update.Path, "application/json", strings.NewReader(update.Body))
+				if err != nil {
+					t.Fatal(err)
 				}
-			}()
-			resp, err := http.Post(basePath+update.Path, "application/json", strings.NewReader(update.Body))
+				defer resp.Body.Close()
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got, exp := resp.StatusCode, http.StatusNoContent; got != exp {
+					t.Fatalf("update failed: got: %d exp: %d\nBody:\n%s", got, exp, string(body))
+				}
+				timeOut := time.NewTimer(5 * time.Second)
+				select {
+				case err := <-errC:
+					timeOut.Stop()
+					if err != nil {
+						t.Fatal(err)
+					}
+				case <-timeOut.C:
+					t.Fatal("expected to get an response on errC")
+				}
+			}
+
+			// Get config
+			resp, err := http.Get(basePath)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("update failed: %d", resp.StatusCode)
+			}
+
+			var got client.ConfigSections
+			if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 				t.Fatal(err)
 			}
-			if got, exp := resp.StatusCode, http.StatusNoContent; got != exp {
-				t.Fatalf("update failed: got: %d exp: %d\nBody:\n%s", got, exp, string(body))
+
+			if !reflect.DeepEqual(got, tc.exp) {
+				t.Errorf("unexpected config:\ngot\n%v\nexp\n%v\n", got, tc.exp)
 			}
-			select {
-			case err := <-errC:
-				if err != nil {
-					t.Fatal(err)
-				}
-			default:
-				t.Fatal("expected to get an response on errC")
-			}
-		}
-
-		// Get config
-		resp, err := http.Get(basePath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("update failed: %d", resp.StatusCode)
-		}
-
-		var got client.ConfigSections
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(got, tc.exp) {
-			t.Errorf("unexpected config:\ngot\n%v\nexp\n%v\n", got, tc.exp)
-		}
+		})
 	}
+
 }
