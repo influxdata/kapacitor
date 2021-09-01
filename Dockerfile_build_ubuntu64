@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-latest
+FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-326be487b2cd7a2df71767dab51395feec33911e
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
@@ -33,13 +33,8 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 RUN gem install fpm
 
-# Install protobuf3 protoc binary
-ENV PROTO_VERSION 3.11.1
-RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
-    && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
-    rm protoc-${PROTO_VERSION}-linux-x86_64.zip
-
 # Install protobuf3 python library
+# NOTE: PROTO_VERSION env var is inherited from the cross-builder image.
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
     && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
     && cd protobuf-${PROTO_VERSION}/python \
