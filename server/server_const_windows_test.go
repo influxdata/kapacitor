@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 //Platform dependent constants for tests on windows
