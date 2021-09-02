@@ -191,6 +191,24 @@ def check_nochanges():
 def run_tests(race, parallel, timeout, no_vet):
     """Run the Go test suite on binary output.
     """
+    # NOTE: We download deps here because go fmt on go1.17 first downloads missing deps, printing their names and
+    # giving the appearance of files that need reformatted.
+    logging.info("Downloading dependencies...")
+    try:
+        subprocess.check_output(["go", "mod", "download"])
+    except subprocess.CalledProcessError as exc:
+        logging.error("Downloading dependencies failed, see logs for details")
+        logging.error("{}".format(exc.output))
+    # NOTE: We vendor deps here because TestPipelineImplemented in pipeline/tick/tick_test.go uses `importer.For` to
+    # load a few packages from source, and it recursively descends through dependencies. It's apparently not module-
+    # aware and only looks under $GOPATH/src and vendor/.
+    logging.info("Vendoring dependencies...")
+    try:
+        subprocess.check_output(["go", "mod", "vendor"])
+    except subprocess.CalledProcessError as exc:
+        logging.error("Vendoring dependencies failed, see logs for details")
+        logging.error("{}".format(exc.output))
+
     logging.info("Starting tests...")
     if race:
         logging.info("Race is enabled.")
