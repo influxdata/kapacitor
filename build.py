@@ -422,18 +422,6 @@ def check_path_for(b):
         if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
             return full_path
 
-def check_environ(build_dir = None):
-    """Check environment for common Go variables.
-    """
-    logging.info("Checking environment...")
-    for v in [ "GOPATH", "GOBIN", "GOROOT" ]:
-        logging.debug("Using '{}' for {}".format(os.environ.get(v), v))
-
-    cwd = os.getcwd()
-    if build_dir is None and os.environ.get("GOPATH") and os.environ.get("GOPATH") not in cwd:
-        logging.warn("Your current directory is not under your GOPATH. This may lead to build failures.")
-    return True
-
 def check_prereqs():
     """Check user path for required dependencies.
     """
@@ -770,7 +758,6 @@ def main(args):
         return 1
 
     # Pre-build checks
-    check_environ()
     if not check_prereqs():
         return 1
     if args.build_tags is None:
@@ -782,7 +769,7 @@ def main(args):
     orig_branch = get_current_branch()
 
     if args.platform not in supported_builds and args.platform != 'all':
-        logging.error("Invalid build platform: {}".format(target_platform))
+        logging.error("Invalid build platform: {}".format(args.platform))
         return 1
 
     build_output = {}

@@ -43,17 +43,12 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
     && cd ../../ \
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
-ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
-#ENV PKG_CONFIG  $PROJECT_DIR/pkg-config.sh
-ENV PATH $GOPATH/bin:$PATH
+ENV PROJECT_DIR /kapacitor
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
-
-VOLUME $PROJECT_DIR
-VOLUME /go/src
 
 # Configure local git
 RUN git config --global user.email "support@influxdb.com"
 RUN git config --global user.Name "Docker Builder"
 
-ENTRYPOINT [ "/go/src/github.com/influxdata/kapacitor/build.py" ]
+ENTRYPOINT [ "/kapacitor/build.py" ]

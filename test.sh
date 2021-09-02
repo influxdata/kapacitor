@@ -67,24 +67,16 @@ function run_test_docker {
     local logfile="$OUTPUT_DIR/${name}.log"
 
     imagename="$imagename-$BUILD_NUM"
-    dataname="kapacitor-data-$BUILD_NUM"
 
     echo "Building docker image $imagename"
     docker build -f "$dockerfile" --build-arg GO_VERSION=$GO_VERSION -t "$imagename" .
 
     echo "Running test in docker $name with args $@"
 
-    # Create data volume with code
-    docker create \
-        --name $dataname \
-        -v "$GOPATH/src/github.com/influxdata/kapacitor" \
-        $imagename /bin/true
-    docker cp "$DIR/" "$dataname:$GOPATH/src/github.com/influxdata/"
-
     # Run tests in docker
     docker run \
          --rm \
-         --volumes-from $dataname \
+         -v "$DIR:/kapacitor" \
          -e "GORACE=$GORACE" \
          -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
          -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
@@ -93,14 +85,6 @@ function run_test_docker {
          "--timeout=$TIMEOUT" \
          "$@" \
          2>&1 | tee "$logfile"
-
-    # Copy results back out
-    docker cp \
-        "$dataname:$GOPATH/src/github.com/influxdata/kapacitor/build" \
-        ./
-
-    # Remove the data and builder containers
-    docker rm -v $dataname
 }
 
 if [ ! -d "$OUTPUT_DIR" ]
