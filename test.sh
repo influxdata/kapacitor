@@ -35,7 +35,7 @@ NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 # Home dir of the docker user
 HOME_DIR=/root
 # Go version
-GO_VERSION=1.15.10
+GO_VERSION=1.17
 # GOPATH
 GOPATH=/go
 
@@ -67,40 +67,27 @@ function run_test_docker {
     local logfile="$OUTPUT_DIR/${name}.log"
 
     imagename="$imagename-$BUILD_NUM"
-    dataname="kapacitor-data-$BUILD_NUM"
 
     echo "Building docker image $imagename"
     docker build -f "$dockerfile" --build-arg GO_VERSION=$GO_VERSION -t "$imagename" .
 
     echo "Running test in docker $name with args $@"
 
-    # Create data volume with code
-    docker create \
-        --name $dataname \
-        -v "$GOPATH/src/github.com/influxdata/kapacitor" \
-        $imagename /bin/true
-    docker cp "$DIR/" "$dataname:$GOPATH/src/github.com/influxdata/"
-
     # Run tests in docker
     docker run \
          --rm \
-         --volumes-from $dataname \
+         -v "$DIR:/kapacitor" \
          -e "GORACE=$GORACE" \
          -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
          -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
          "$imagename" \
+         "--test" \
+         "--generate" \
          "--parallel=$PARALLELISM" \
          "--timeout=$TIMEOUT" \
+         "--verbose" \
          "$@" \
          2>&1 | tee "$logfile"
-
-    # Copy results back out
-    docker cp \
-        "$dataname:$GOPATH/src/github.com/influxdata/kapacitor/build" \
-        ./
-
-    # Remove the data and builder containers
-    docker rm -v $dataname
 }
 
 if [ ! -d "$OUTPUT_DIR" ]
@@ -112,13 +99,13 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --generate $no_uncommitted_arg
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit $no_uncommitted_arg
         rc=$?
         ;;
     1)
         # 64 bit race tests
         GORACE="halt_on_error=1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --generate $no_uncommitted_arg --race
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race $no_uncommitted_arg --race
         rc=$?
         ;;
     "count")

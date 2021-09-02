@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-latest
+FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-23321b2fc172da7a9730893d885056353c9b11ac
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
@@ -8,38 +8,28 @@ MAINTAINER support@influxdb.com
 
 RUN apt-get -qq update && apt-get -qq install -y \
     software-properties-common \
-    wget \
     unzip \
-    git \
     mercurial \
     make \
     ruby \
     ruby-dev \
     rpm \
     zip \
-    pkg-config \
     python \
     python-setuptools \
     python3 \
     python3-setuptools \
     python3-boto \
-    build-essential \
     autoconf \
     automake \
-    libtool \
-    curl
+    libtool
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 RUN gem install fpm
 
-# Install protobuf3 protoc binary
-ENV PROTO_VERSION 3.11.1
-RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
-    && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
-    rm protoc-${PROTO_VERSION}-linux-x86_64.zip
-
 # Install protobuf3 python library
+# NOTE: PROTO_VERSION env var is inherited from the cross-builder image.
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
     && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
     && cd protobuf-${PROTO_VERSION}/python \
@@ -48,17 +38,12 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
     && cd ../../ \
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
-ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
-#ENV PKG_CONFIG  $PROJECT_DIR/pkg-config.sh
-ENV PATH $GOPATH/bin:$PATH
+ENV PROJECT_DIR /kapacitor
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
-
-VOLUME $PROJECT_DIR
-VOLUME /go/src
 
 # Configure local git
 RUN git config --global user.email "support@influxdb.com"
 RUN git config --global user.Name "Docker Builder"
 
-ENTRYPOINT [ "/go/src/github.com/influxdata/kapacitor/build.py" ]
+ENTRYPOINT [ "/kapacitor/build.py" ]

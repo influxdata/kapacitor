@@ -20,6 +20,10 @@ import (
 // If you get a test error here, then you need to implement
 // a conversion node from pipeline node to the ast node.
 func TestPipelineImplemented(t *testing.T) {
+	// FIXME: Make this test module-aware by updating it to:
+	//  1. Use importer.ForCompiler instead of importer.For
+	//  2. Use "gc" or "gccgo" instead of "source" as the type argument
+	//  3. Pass a module-aware lookup function instead of the nil required when type == "source"
 	tickPkg, err := importer.For("source", nil).Import("github.com/influxdata/kapacitor/pipeline/tick")
 	if err != nil {
 		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v", err)

@@ -188,9 +188,37 @@ def check_nochanges():
     return True
 
 
-def run_tests(race, parallel, timeout, no_vet):
+def run_tests(race, parallel, timeout, no_vet, verbose):
     """Run the Go test suite on binary output.
     """
+    # NOTE: We download deps here because go fmt on go1.17 first downloads missing deps, printing their names and
+    # giving the appearance of files that need reformatted.
+    logging.info("Downloading dependencies...")
+    try:
+        download_cmd = ["go", "mod", "download"]
+        if verbose:
+            download_cmd.append("-x")
+        subprocess.check_output(download_cmd)
+    except subprocess.CalledProcessError as exc:
+        logging.error("Downloading dependencies failed, see logs for details")
+        logging.error("{}".format(exc.output))
+    # NOTE: We vendor deps here because TestPipelineImplemented in pipeline/tick/tick_test.go uses `importer.For`
+    # with compiler type "source" to load a few packages from source, and it recursively descends through dependencies.
+    # The "source" type isn't module-aware and only looks under $GOPATH/src and vendor/. We can remove the need for
+    # this by updating the test to:
+    #   1. Use `importer.ForCompiler`
+    #   2. Use type "gc" or "gccgo" instead of "source"
+    #   3. Use a module-aware lookup function instead of the `nil` arg required when type == "source"
+    logging.info("Vendoring dependencies...")
+    try:
+        vendor_cmd = ["go", "mod", "vendor"]
+        if verbose:
+            vendor_cmd.append("-v")
+        subprocess.check_output(vendor_cmd)
+    except subprocess.CalledProcessError as exc:
+        logging.error("Vendoring dependencies failed, see logs for details")
+        logging.error("{}".format(exc.output))
+
     logging.info("Starting tests...")
     if race:
         logging.info("Race is enabled.")
@@ -213,7 +241,9 @@ def run_tests(race, parallel, timeout, no_vet):
             return False
     else:
         logging.info("Skipping 'go vet' call...")
-    test_command = "go test -v"
+    test_command = "go test"
+    if verbose:
+        test_command += " -v"
     if race:
         test_command += " -race"
     if parallel is not None:
@@ -422,18 +452,6 @@ def check_path_for(b):
         if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
             return full_path
 
-def check_environ(build_dir = None):
-    """Check environment for common Go variables.
-    """
-    logging.info("Checking environment...")
-    for v in [ "GOPATH", "GOBIN", "GOROOT" ]:
-        logging.debug("Using '{}' for {}".format(os.environ.get(v), v))
-
-    cwd = os.getcwd()
-    if build_dir is None and os.environ.get("GOPATH") and os.environ.get("GOPATH") not in cwd:
-        logging.warn("Your current directory is not under your GOPATH. This may lead to build failures.")
-    return True
-
 def check_prereqs():
     """Check user path for required dependencies.
     """
@@ -523,7 +541,7 @@ def build(version=None,
     tmp_build_dir = create_temp_dir()
     for target, path in targets.items():
         logging.info("Building target: {}".format(target))
-        build_command = ""
+        build_command = ". /root/.cargo/env && "
 
         build_command += "CGO_ENABLED=1 "
 
@@ -539,7 +557,7 @@ def build(version=None,
                 cc = "aarch64-unknown-linux-musl-cc"
                 tags += ["netgo", "osusergo", "static_build", "noasm"]
         elif platform == "darwin" and arch == "amd64":
-            cc = "x86_64-apple-darwin15-clang"
+            cc = "x86_64-apple-darwin16-clang"
             tags += [ "netgo", "osusergo"]
         elif  platform == "windows" and arch == "amd64":
             cc = "x86_64-w64-mingw32-gcc"
@@ -770,7 +788,6 @@ def main(args):
         return 1
 
     # Pre-build checks
-    check_environ()
     if not check_prereqs():
         return 1
     if args.build_tags is None:
@@ -782,7 +799,7 @@ def main(args):
     orig_branch = get_current_branch()
 
     if args.platform not in supported_builds and args.platform != 'all':
-        logging.error("Invalid build platform: {}".format(target_platform))
+        logging.error("Invalid build platform: {}".format(args.platform))
         return 1
 
     build_output = {}
@@ -810,7 +827,7 @@ def main(args):
             return 1
 
     if args.test:
-        if not run_tests(args.race, args.parallel, args.timeout, args.no_vet):
+        if not run_tests(args.race, args.parallel, args.timeout, args.no_vet, args.verbose):
             return 1
 
     platforms = []

@@ -1,92 +1,90 @@
 # CircleCI 2.0 configuration
 version:  "2.1"
 
-commands:
-      deploy_release_packages:
-            description:  >
-                  This will build and publish release packages for tag "$CIRCLE_TAG"
-            steps:
-                  - run:
-                        name: Deploy Release Packages
-                        command:  |
-                              ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
+executors:
+  linux-amd64:
+    machine:
+      image: ubuntu-2004:202107-02
+      docker_layer_caching: true
+      resource_class: large
 
-      run_tests:
-            description:  >
-                  This will run Kapacitor Tests
-            steps:
-                  - run:
-                        name: Running Kapacitor Tests
-                        no_output_timeout: 30m
-                        command:  |
-                              ./circle-test.sh
-      deploy_nightly:
-            description:  >
-                    This will build and publish nightly releases
-            steps:
-                  - run:
-                        name: Deploy Nightly Build
-                        command:  |
-                                ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
+commands:
+  deploy_release_packages:
+    description:  >
+      This will build and publish release packages for tag "$CIRCLE_TAG"
+    steps:
+      - run:
+          name: Deploy Release Packages
+          command:  |
+            ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
+
+  run_tests:
+    description:  >
+      This will run Kapacitor Tests
+    steps:
+      - run:
+          name: Running Kapacitor Tests
+          no_output_timeout: 30m
+          command:  |
+            ./circle-test.sh
+  deploy_nightly:
+    description:  >
+      This will build and publish nightly releases
+    steps:
+      - run:
+          name: Deploy Nightly Build
+          command:  |
+            ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
 
 jobs:
-      build:
-            docker:
-                  - image: nathanielc/docker-client
-            parallelism: 2
-            working_directory: ~/kapacitor
-            steps:
-                  - checkout
-                  - setup_remote_docker:
-                        docker_layer_caching: true
-                  - run_tests
+  build:
+    executor: linux-amd64
+    parallelism: 2
+    working_directory: ~/kapacitor
+    steps:
+      - checkout
+      - run_tests
 
-      release:
-            docker:
-                  - image: nathanielc/docker-client
-            working_directory: ~/kapacitor
-            steps:
-                  - checkout
-                  - setup_remote_docker:
-                        docker_layer_caching: true
-                  - deploy_release_packages
+  release:
+    executor: linux-amd64
+    working_directory: ~/kapacitor
+    steps:
+      - checkout
+      - deploy_release_packages
 
-      nightly-build:
-            docker:
-                  - image: nathanielc/docker-client
-            working_directory: ~/kapacitor
-            steps:
-                  - checkout
-                  - setup_remote_docker:
-                          docker_layer_caching: true
-                  - run_tests
-                  - deploy_nightly
+  nightly-build:
+    executor: linux-amd64
+    working_directory: ~/kapacitor
+    steps:
+      - checkout
+      - run_tests
+      - deploy_nightly
 
 
 workflows:
-      version:  2
-      build-and-deploy:
-            jobs:
-                  - build:
-                        filters:
-                              tags:
-                                    only: /.*/
-                  - release:
-                        requires:
-                              - build
-                        filters:
-                              tags:
-                                    only:  /^v[0-9]+(\.[0-9]+){2}(-(rc|beta)[0-9]+)?/
-                              branches:
-                                    ignore:  /.*/
+  version:  2
+  build-and-deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+      - release:
+          requires:
+            - build
+          filters:
+            tags:
+              only:  /^v[0-9]+(\.[0-9]+){2}(-(rc|beta)[0-9]+)?/
+            branches:
+              ignore:  /.*/
 
-      nightly:
-            triggers:
-                  - schedule:
-                          cron: "0 3 * * *" #3AM UTC daily
-                          filters:
-                                branches:
-                                      only:
-                                            - master
-            jobs:
-                  - nightly-build
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 3 * * *" #3AM UTC daily
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - nightly-build

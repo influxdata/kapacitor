@@ -74,7 +74,7 @@ func (s *Server) StopOnSignals(signals ...os.Signal) {
 	s.wg.Add(1)
 	s.mu.Unlock()
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, signals...)
 	go func() {
 		defer s.wg.Done()
