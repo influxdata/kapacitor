@@ -8,26 +8,21 @@ MAINTAINER support@influxdb.com
 
 RUN apt-get -qq update && apt-get -qq install -y \
     software-properties-common \
-    wget \
     unzip \
-    git \
     mercurial \
     make \
     ruby \
     ruby-dev \
     rpm \
     zip \
-    pkg-config \
     python \
     python-setuptools \
     python3 \
     python3-setuptools \
     python3-boto \
-    build-essential \
     autoconf \
     automake \
-    libtool \
-    curl
+    libtool
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
