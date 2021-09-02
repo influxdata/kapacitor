@@ -4,36 +4,11 @@ version:  "2.1"
 executors:
   linux-amd64:
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:202107-02
       docker_layer_caching: true
       resource_class: large
 
 commands:
-  upgrade_docker:
-    steps:
-      - run:
-          name: Upgrade Docker to the latest available release
-          command: |
-            export BUILDKIT_PROGRESS=plain
-            export DOCKER_BUILDKIT=1
-            export DOCKER_CLI_EXPERIMENTAL=enabled
-            echo 'export BUILDKIT_PROGRESS=plain' >> $BASH_ENV
-            echo 'export DOCKER_BUILDKIT=1' >> $BASH_ENV
-            echo 'export DOCKER_CLI_EXPERIMENTAL=enabled' >> $BASH_ENV
-
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-            sudo add-apt-repository \
-              "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-              $(lsb_release -cs) \
-              stable"
-
-            sudo apt-get update
-            sudo apt-get install -y \
-              containerd.io \
-              docker-ce \
-              docker-ce-cli
-            sudo service docker restart
-
   deploy_release_packages:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
@@ -68,7 +43,6 @@ jobs:
     working_directory: ~/kapacitor
     steps:
       - checkout
-      - upgrade_docker
       - run_tests
 
   release:
@@ -76,7 +50,6 @@ jobs:
     working_directory: ~/kapacitor
     steps:
       - checkout
-      - upgrade_docker
       - deploy_release_packages
 
   nightly-build:
@@ -84,7 +57,6 @@ jobs:
     working_directory: ~/kapacitor
     steps:
       - checkout
-      - upgrade_docker
       - run_tests
       - deploy_nightly
 
