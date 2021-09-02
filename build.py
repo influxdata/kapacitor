@@ -188,14 +188,17 @@ def check_nochanges():
     return True
 
 
-def run_tests(race, parallel, timeout, no_vet):
+def run_tests(race, parallel, timeout, no_vet, verbose):
     """Run the Go test suite on binary output.
     """
     # NOTE: We download deps here because go fmt on go1.17 first downloads missing deps, printing their names and
     # giving the appearance of files that need reformatted.
     logging.info("Downloading dependencies...")
     try:
-        subprocess.check_output(["go", "mod", "download"])
+        download_cmd = ["go", "mod", "download"]
+        if verbose:
+            download_cmd.append("-x")
+        subprocess.check_output(download_cmd)
     except subprocess.CalledProcessError as exc:
         logging.error("Downloading dependencies failed, see logs for details")
         logging.error("{}".format(exc.output))
@@ -204,7 +207,10 @@ def run_tests(race, parallel, timeout, no_vet):
     # aware and only looks under $GOPATH/src and vendor/.
     logging.info("Vendoring dependencies...")
     try:
-        subprocess.check_output(["go", "mod", "vendor"])
+        vendor_cmd = ["go", "mod", "vendor"]
+        if verbose:
+            vendor_cmd.append("-v")
+        subprocess.check_output(vendor_cmd)
     except subprocess.CalledProcessError as exc:
         logging.error("Vendoring dependencies failed, see logs for details")
         logging.error("{}".format(exc.output))
@@ -232,6 +238,8 @@ def run_tests(race, parallel, timeout, no_vet):
     else:
         logging.info("Skipping 'go vet' call...")
     test_command = "go test"
+    if verbose:
+        test_command += " -v"
     if race:
         test_command += " -race"
     if parallel is not None:
@@ -815,7 +823,7 @@ def main(args):
             return 1
 
     if args.test:
-        if not run_tests(args.race, args.parallel, args.timeout, args.no_vet):
+        if not run_tests(args.race, args.parallel, args.timeout, args.no_vet, args.verbose):
             return 1
 
     platforms = []

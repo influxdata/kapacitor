@@ -81,8 +81,11 @@ function run_test_docker {
          -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
          -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
          "$imagename" \
+         "--test" \
+         "--generate" \
          "--parallel=$PARALLELISM" \
          "--timeout=$TIMEOUT" \
+         "--verbose" \
          "$@" \
          2>&1 | tee "$logfile"
 }
@@ -96,13 +99,13 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --generate $no_uncommitted_arg
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit $no_uncommitted_arg
         rc=$?
         ;;
     1)
         # 64 bit race tests
         GORACE="halt_on_error=1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --generate $no_uncommitted_arg --race
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race $no_uncommitted_arg --race
         rc=$?
         ;;
     "count")
