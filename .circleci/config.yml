@@ -37,8 +37,7 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
-                  - setup_remote_docker:
-                        docker_layer_caching: true
+                  - setup_remote_docker
                   - run_tests
 
       release:
@@ -47,8 +46,7 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
-                  - setup_remote_docker:
-                        docker_layer_caching: true
+                  - setup_remote_docker
                   - deploy_release_packages
 
       nightly-build:
@@ -57,8 +55,7 @@ jobs:
             working_directory: ~/kapacitor
             steps:
                   - checkout
-                  - setup_remote_docker:
-                          docker_layer_caching: true
+                  - setup_remote_docker
                   - run_tests
                   - deploy_nightly
 
