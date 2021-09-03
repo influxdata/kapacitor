@@ -45,7 +45,7 @@ type Duration struct {
 }
 
 func (a Duration) String() string {
-	return ast.Format(&a.Node)
+	return parser.FormatDuration(&a.Node)
 }
 
 // Parse parses a string into a Duration.
