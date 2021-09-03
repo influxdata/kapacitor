@@ -7,7 +7,9 @@ require (
 	cloud.google.com/go/bigquery v1.8.0 // indirect
 	cloud.google.com/go/bigtable v1.3.0 // indirect
 	github.com/AlecAivazis/survey/v2 v2.2.9 // indirect
+	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v52.5.0+incompatible // indirect
+	github.com/Azure/azure-storage-blob-go v0.13.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.13 // indirect
@@ -30,6 +32,14 @@ require (
 	github.com/apache/arrow/go/arrow v0.0.0-20200923215132-ac86123a3f01 // indirect
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.38.3
+	github.com/aws/aws-sdk-go-v2 v1.3.2 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.1.5 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.1.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.0.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.0.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.2.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.5.0 // indirect
+	github.com/aws/smithy-go v1.3.1 // indirect
 	github.com/benbjohnson/clock v1.1.0
 	github.com/benbjohnson/immutable v0.2.1 // indirect
 	github.com/benbjohnson/tmpl v1.0.0
@@ -114,6 +124,7 @@ require (
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
@@ -199,20 +210,6 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.0 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
-)
-
-require (
-	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
-	github.com/Azure/azure-storage-blob-go v0.13.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.3.2 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.1.5 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.1.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.0.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.0.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.2.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.5.0 // indirect
-	github.com/aws/smithy-go v1.3.1 // indirect
-	github.com/mattn/go-ieproxy v0.0.1 // indirect
 )
 
 replace gopkg.in/fsnotify.v1 => github.com/fsnotify/fsnotify v1.4.2
