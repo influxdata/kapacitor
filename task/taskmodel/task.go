@@ -10,6 +10,7 @@ import (
 
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/ast"
+	"github.com/influxdata/flux/ast/astutil"
 	"github.com/influxdata/flux/ast/edit"
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/kapacitor/task/options"
@@ -389,7 +390,10 @@ func (t *TaskUpdate) updateFlux(oldFlux string) error {
 		}
 
 		t.Options.Clear()
-		s := ast.Format(parsed)
+		s, err := astutil.Format(parsed)
+		if err != nil {
+			return err
+		}
 		t.Flux = &s
 	}
 	return nil

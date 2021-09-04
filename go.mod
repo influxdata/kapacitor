@@ -7,12 +7,14 @@ require (
 	cloud.google.com/go/bigquery v1.8.0 // indirect
 	cloud.google.com/go/bigtable v1.3.0 // indirect
 	github.com/AlecAivazis/survey/v2 v2.2.9 // indirect
+	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v52.5.0+incompatible // indirect
+	github.com/Azure/azure-storage-blob-go v0.13.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.13 // indirect
-	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2 // indirect
-	github.com/Azure/go-autorest/autorest/azure/cli v0.3.1 // indirect
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.3 // indirect
+	github.com/Azure/go-autorest/autorest/azure/cli v0.4.2 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
 	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
@@ -30,6 +32,14 @@ require (
 	github.com/apache/arrow/go/arrow v0.0.0-20200923215132-ac86123a3f01 // indirect
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.38.3
+	github.com/aws/aws-sdk-go-v2 v1.3.2 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.1.5 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.1.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.0.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.0.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.2.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.5.0 // indirect
+	github.com/aws/smithy-go v1.3.1 // indirect
 	github.com/benbjohnson/clock v1.1.0
 	github.com/benbjohnson/immutable v0.2.1 // indirect
 	github.com/benbjohnson/tmpl v1.0.0
@@ -43,7 +53,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deepmap/oapi-codegen v1.6.0 // indirect
 	github.com/denisenkom/go-mssqldb v0.10.0 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/dgryski/go-bits v0.0.0-20180113010104-bd8a69a71dc2 // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
 	github.com/docker/docker v20.10.5+incompatible
@@ -69,11 +78,10 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang/geo v0.0.0-20190916061304-5b978397cfec // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.3
 	github.com/google/btree v1.0.0
-	github.com/google/flatbuffers v1.11.0 // indirect
+	github.com/google/flatbuffers v2.0.0+incompatible // indirect
 	github.com/google/go-cmp v0.5.5
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.1.2
@@ -93,14 +101,14 @@ require (
 	github.com/huandu/xstrings v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/influxdata/cron v0.0.0-20201006132531-4bb0a200dcbe
-	github.com/influxdata/flux v0.116.1-0.20210519190248-4347b978c91a
+	github.com/influxdata/flux v0.127.3
 	github.com/influxdata/httprouter v1.3.1-0.20191122104820-ee83e2772f69
 	github.com/influxdata/influx-cli/v2 v2.0.0-20210526124422-63da8eccbdb7
 	github.com/influxdata/influxdb v1.8.4
 	github.com/influxdata/influxdb-client-go/v2 v2.3.1-0.20210518120617-5d1fff431040 // indirect
 	github.com/influxdata/influxdb/v2 v2.0.1-alpha.10.0.20210507184756-dc72dc3f0c07
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 // indirect
-	github.com/influxdata/pkg-config v0.2.7
+	github.com/influxdata/pkg-config v0.2.8
 	github.com/influxdata/tdigest v0.0.2-0.20210216194612-fc98d27c9e8b // indirect
 	github.com/influxdata/usage-client v0.0.0-20160829180054-6d3895376368
 	github.com/influxdata/wlog v0.0.0-20160411224016-7c63b0a71ef8
@@ -113,10 +121,10 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kevinburke/go-bindata v3.11.0+incompatible // indirect
 	github.com/kimor79/gollectd v1.0.0 // indirect
-	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
@@ -155,8 +163,8 @@ require (
 	github.com/shurcooL/go v0.0.0-20170331015642-20b4b0a35211 // indirect
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
-	github.com/sirupsen/logrus v1.6.0 // indirect
-	github.com/snowflakedb/gosnowflake v1.3.4 // indirect
+	github.com/sirupsen/logrus v1.7.0 // indirect
+	github.com/snowflakedb/gosnowflake v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/uber-go/tally v3.3.15+incompatible // indirect
