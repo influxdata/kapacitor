@@ -523,7 +523,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	if len(fields) == 0 {
 		fields = allTaskFields
 	} else {
-		// Always return ID andf link
+		// Always return ID and link
 		fields = append(fields, "id", "link")
 	}
 
