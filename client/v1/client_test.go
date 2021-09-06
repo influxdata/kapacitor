@@ -833,7 +833,8 @@ func Test_ListTasks(t *testing.T) {
 		"type":"stream",
 		"dbrps":[{"db":"db","rp":"rp"}],
 		"status" : "disabled",
-		"executing" : false
+		"executing" : false,
+		"template-id": "myTemplate"
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t2"},
@@ -881,6 +882,7 @@ func Test_ListTasks(t *testing.T) {
 			Status:         client.Disabled,
 			Executing:      false,
 			ExecutionStats: client.ExecutionStats{},
+			TemplateID:     "myTemplate",
 		},
 		{
 			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t2"},
