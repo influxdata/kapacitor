@@ -899,7 +899,7 @@ func Test_ListTasks(t *testing.T) {
 					"throughput": 5.6,
 				},
 				NodeStats: map[string]map[string]interface{}{
-					"stream1": map[string]interface{}{
+					"stream1": {
 						"processed":        1500.0,
 						"avg_exec_time_ns": 2345.83,
 					},
@@ -1737,7 +1737,7 @@ func Test_Replay(t *testing.T) {
 				"throughput": 5.6,
 			},
 			NodeStats: map[string]map[string]interface{}{
-				"stream1": map[string]interface{}{
+				"stream1": {
 					"processed":        1500.0,
 					"avg_exec_time_ns": 2345.83,
 				},
@@ -2022,7 +2022,7 @@ func Test_ListReplays(t *testing.T) {
 					"throughput": 5.6,
 				},
 				NodeStats: map[string]map[string]interface{}{
-					"stream1": map[string]interface{}{
+					"stream1": {
 						"processed":        1500.0,
 						"avg_exec_time_ns": 2345.83,
 					},
@@ -2234,7 +2234,7 @@ func Test_ConfigSections(t *testing.T) {
 	exp := client.ConfigSections{
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config"},
 		Sections: map[string]client.ConfigSection{
-			"sectionA": client.ConfigSection{
+			"sectionA": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionA"},
 				Elements: []client.ConfigElement{
 					{
@@ -2259,7 +2259,7 @@ func Test_ConfigSections(t *testing.T) {
 					},
 				},
 			},
-			"sectionB": client.ConfigSection{
+			"sectionB": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionB"},
 				Elements: []client.ConfigElement{
 					{
@@ -2284,7 +2284,7 @@ func Test_ConfigSections(t *testing.T) {
 					},
 				},
 			},
-			"sectionC": client.ConfigSection{
+			"sectionC": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionC"},
 				Elements: []client.ConfigElement{
 					{
