@@ -735,6 +735,10 @@ definitions:
         format: dateTime
         description: Date task was last enabled
         readOnly: true
+      template-id:
+        type: string
+        description: Template ID
+        readOnly: true
       vars:
         type: object
         description: Set of vars to overwrite any TICKscript vars.

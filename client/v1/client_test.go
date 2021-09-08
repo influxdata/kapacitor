@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/client/v1"
@@ -469,7 +469,7 @@ func Test_Task(t *testing.T) {
 		Error:          "",
 		ExecutionStats: client.ExecutionStats{},
 	}
-	if !reflect.DeepEqual(exp, task) {
+	if !cmp.Equal(exp, task) {
 		t.Errorf("unexpected task:\ngot:\n%v\nexp:\n%v", task, exp)
 	}
 }
@@ -520,7 +520,7 @@ func Test_Task_Labels(t *testing.T) {
 		Error:          "",
 		ExecutionStats: client.ExecutionStats{},
 	}
-	if !reflect.DeepEqual(exp, task) {
+	if !cmp.Equal(exp, task) {
 		t.Errorf("unexpected task:\ngot:\n%v\nexp:\n%v", task, exp)
 	}
 }
@@ -571,7 +571,7 @@ func Test_Task_RawFormat(t *testing.T) {
 		Error:          "",
 		ExecutionStats: client.ExecutionStats{},
 	}
-	if !reflect.DeepEqual(exp, task) {
+	if !cmp.Equal(exp, task) {
 		t.Errorf("unexpected task:\ngot:\n%v\nexp:\n%v", task, exp)
 	}
 }
@@ -600,7 +600,7 @@ func Test_CreateTask(t *testing.T) {
 					},
 				},
 			}
-			if !reflect.DeepEqual(exp, task) {
+			if !cmp.Equal(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected CreateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
@@ -666,7 +666,7 @@ func Test_UpdateTask(t *testing.T) {
 					},
 				},
 			}
-			if !reflect.DeepEqual(exp, task) {
+			if !cmp.Equal(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
@@ -717,7 +717,7 @@ func Test_UpdateTask_Enable(t *testing.T) {
 			exp := client.UpdateTaskOptions{
 				Status: client.Enabled,
 			}
-			if !reflect.DeepEqual(exp, task) {
+			if !cmp.Equal(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
@@ -762,7 +762,7 @@ func Test_UpdateTask_Disable(t *testing.T) {
 			exp := client.UpdateTaskOptions{
 				Status: client.Disabled,
 			}
-			if !reflect.DeepEqual(exp, task) {
+			if !cmp.Equal(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
@@ -833,7 +833,8 @@ func Test_ListTasks(t *testing.T) {
 		"type":"stream",
 		"dbrps":[{"db":"db","rp":"rp"}],
 		"status" : "disabled",
-		"executing" : false
+		"executing" : false,
+		"template-id": "myTemplate"
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t2"},
@@ -881,6 +882,7 @@ func Test_ListTasks(t *testing.T) {
 			Status:         client.Disabled,
 			Executing:      false,
 			ExecutionStats: client.ExecutionStats{},
+			TemplateID:     "myTemplate",
 		},
 		{
 			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t2"},
@@ -897,7 +899,7 @@ func Test_ListTasks(t *testing.T) {
 					"throughput": 5.6,
 				},
 				NodeStats: map[string]map[string]interface{}{
-					"stream1": map[string]interface{}{
+					"stream1": {
 						"processed":        1500.0,
 						"avg_exec_time_ns": 2345.83,
 					},
@@ -905,7 +907,7 @@ func Test_ListTasks(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected task list: got:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -974,7 +976,7 @@ func Test_ListTasks_Options(t *testing.T) {
 			Error:     "",
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected task list: got:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -1034,7 +1036,7 @@ func Test_TaskOutput(t *testing.T) {
 			},
 		}},
 	}
-	if !reflect.DeepEqual(exp, r) {
+	if !cmp.Equal(exp, r) {
 		t.Errorf("unexpected task output: \ngot\n%v\nexp\n%v\n", r, exp)
 		t.Errorf("unexpected task output: \ngot.Series\n%v\nexp.Series\n%v\n", r.Series[0], exp.Series[0])
 	}
@@ -1080,7 +1082,7 @@ func Test_Template(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, template) {
+	if !cmp.Equal(exp, template) {
 		t.Errorf("unexpected template:\ngot:\n%v\nexp:\n%v", template, exp)
 	}
 }
@@ -1118,7 +1120,7 @@ func Test_Template_RawFormat(t *testing.T) {
 		Dot:        "digraph t1 {\n}",
 		Error:      "",
 	}
-	if !reflect.DeepEqual(exp, template) {
+	if !cmp.Equal(exp, template) {
 		t.Errorf("unexpected template:\ngot:\n%v\nexp:\n%v", template, exp)
 	}
 }
@@ -1136,7 +1138,7 @@ func Test_CreateTemplate(t *testing.T) {
 				Type:       client.StreamTask,
 				TICKscript: tickScript,
 			}
-			if !reflect.DeepEqual(exp, template) {
+			if !cmp.Equal(exp, template) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected CreateTemplate body: got:\n%v\nexp:\n%v\n", template, exp)
 			} else {
@@ -1179,7 +1181,7 @@ func Test_UpdateTemplate(t *testing.T) {
 			exp := client.UpdateTemplateOptions{
 				Type: client.BatchTask,
 			}
-			if !reflect.DeepEqual(exp, template) {
+			if !cmp.Equal(exp, template) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTemplate body: got:\n%v\nexp:\n%v\n", template, exp)
 			} else {
@@ -1285,7 +1287,7 @@ func Test_ListTemplates(t *testing.T) {
 			TICKscript: "batch|query()",
 		},
 	}
-	if !reflect.DeepEqual(exp, templates) {
+	if !cmp.Equal(exp, templates) {
 		t.Errorf("unexpected template list: got:\n%v\nexp:\n%v", templates, exp)
 	}
 }
@@ -1343,7 +1345,7 @@ func Test_ListTemplates_Options(t *testing.T) {
 			Type: client.BatchTask,
 		},
 	}
-	if !reflect.DeepEqual(exp, templates) {
+	if !cmp.Equal(exp, templates) {
 		t.Errorf("unexpected template list: got:\n%v\nexp:\n%v", templates, exp)
 	}
 }
@@ -1493,7 +1495,7 @@ func Test_Recording(t *testing.T) {
 		Status:   client.Finished,
 		Progress: 1.0,
 	}
-	if !reflect.DeepEqual(exp, recordings) {
+	if !cmp.Equal(exp, recordings) {
 		t.Errorf("unexpected recording list:\ngot:\n%v\nexp:\n%v", recordings, exp)
 	}
 }
@@ -1535,7 +1537,7 @@ func Test_RecordingRunning(t *testing.T) {
 		Status:   client.Running,
 		Progress: 0.42,
 	}
-	if !reflect.DeepEqual(exp, recordings) {
+	if !cmp.Equal(exp, recordings) {
 		t.Errorf("unexpected recording list:\ngot:\n%v\nexp:\n%v", recordings, exp)
 	}
 }
@@ -1604,7 +1606,7 @@ func Test_ListRecordings(t *testing.T) {
 			Progress: 1.0,
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected recording list:\ngot:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -1656,7 +1658,7 @@ func Test_ListRecordings_Filter(t *testing.T) {
 			Progress: 0.67,
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected recording list:\ngot:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -1735,14 +1737,14 @@ func Test_Replay(t *testing.T) {
 				"throughput": 5.6,
 			},
 			NodeStats: map[string]map[string]interface{}{
-				"stream1": map[string]interface{}{
+				"stream1": {
 					"processed":        1500.0,
 					"avg_exec_time_ns": 2345.83,
 				},
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, replay) {
+	if !cmp.Equal(exp, replay) {
 		t.Errorf("unexpected replay got: %v exp %v", replay, exp)
 	}
 }
@@ -1789,7 +1791,7 @@ func Test_ReplayRunning(t *testing.T) {
 		Progress:       0.67,
 		ExecutionStats: client.ExecutionStats{},
 	}
-	if !reflect.DeepEqual(exp, replay) {
+	if !cmp.Equal(exp, replay) {
 		t.Errorf("unexpected replay got: %v exp %v", replay, exp)
 	}
 }
@@ -2020,7 +2022,7 @@ func Test_ListReplays(t *testing.T) {
 					"throughput": 5.6,
 				},
 				NodeStats: map[string]map[string]interface{}{
-					"stream1": map[string]interface{}{
+					"stream1": {
 						"processed":        1500.0,
 						"avg_exec_time_ns": 2345.83,
 					},
@@ -2028,7 +2030,7 @@ func Test_ListReplays(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected replay list:\ngot:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -2082,7 +2084,7 @@ func Test_ListReplays_Filter(t *testing.T) {
 			ExecutionStats: client.ExecutionStats{},
 		},
 	}
-	if !reflect.DeepEqual(exp, tasks) {
+	if !cmp.Equal(exp, tasks) {
 		t.Errorf("unexpected replay list:\ngot:\n%v\nexp:\n%v", tasks, exp)
 	}
 }
@@ -2098,7 +2100,7 @@ func Test_ConfigUpdate(t *testing.T) {
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &update)
 		if r.URL.Path == "/kapacitor/v1/config/section" && r.Method == "POST" &&
-			reflect.DeepEqual(update, expUpdate) {
+			cmp.Equal(update, expUpdate) {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -2126,7 +2128,7 @@ func Test_ConfigUpdate_Element(t *testing.T) {
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &update)
 		if r.URL.Path == "/kapacitor/v1/config/section/element" && r.Method == "POST" &&
-			reflect.DeepEqual(update, expUpdate) {
+			cmp.Equal(update, expUpdate) {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -2232,7 +2234,7 @@ func Test_ConfigSections(t *testing.T) {
 	exp := client.ConfigSections{
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config"},
 		Sections: map[string]client.ConfigSection{
-			"sectionA": client.ConfigSection{
+			"sectionA": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionA"},
 				Elements: []client.ConfigElement{
 					{
@@ -2257,7 +2259,7 @@ func Test_ConfigSections(t *testing.T) {
 					},
 				},
 			},
-			"sectionB": client.ConfigSection{
+			"sectionB": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionB"},
 				Elements: []client.ConfigElement{
 					{
@@ -2282,7 +2284,7 @@ func Test_ConfigSections(t *testing.T) {
 					},
 				},
 			},
-			"sectionC": client.ConfigSection{
+			"sectionC": {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionC"},
 				Elements: []client.ConfigElement{
 					{
@@ -2301,7 +2303,7 @@ func Test_ConfigSections(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, sections) {
+	if !cmp.Equal(exp, sections) {
 		t.Errorf("unexpected config section:\ngot:\n%v\nexp:\n%v", sections, exp)
 	}
 }
@@ -2374,7 +2376,7 @@ func Test_ConfigSection(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, section) {
+	if !cmp.Equal(exp, section) {
 		t.Errorf("unexpected config section:\ngot:\n%v\nexp:\n%v", section, exp)
 	}
 }
@@ -2456,7 +2458,7 @@ func Test_ServiceTests(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, serviceTests) {
+	if !cmp.Equal(exp, serviceTests) {
 		t.Errorf("unexpected service tests:\ngot:\n%v\nexp:\n%v", serviceTests, exp)
 	}
 }
@@ -2496,7 +2498,7 @@ func Test_ServiceTest(t *testing.T) {
 			"level":   "CRITICAL",
 		},
 	}
-	if !reflect.DeepEqual(exp, serviceTest) {
+	if !cmp.Equal(exp, serviceTest) {
 		t.Errorf("unexpected service test:\ngot:\n%v\nexp:\n%v", serviceTest, exp)
 	}
 }
@@ -2511,7 +2513,7 @@ func Test_DoServiceTest(t *testing.T) {
 
 		if r.URL.Path == "/kapacitor/v1/service-tests/slack" &&
 			r.Method == "POST" &&
-			reflect.DeepEqual(expOptions, options) {
+			cmp.Equal(expOptions, options) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"success": true,
@@ -2538,7 +2540,7 @@ func Test_DoServiceTest(t *testing.T) {
 		Success: true,
 		Message: "",
 	}
-	if !reflect.DeepEqual(exp, tr) {
+	if !cmp.Equal(exp, tr) {
 		t.Errorf("unexpected service test result:\ngot:\n%v\nexp:\n%v", tr, exp)
 	}
 }
@@ -2578,7 +2580,7 @@ func Test_Topic(t *testing.T) {
 		Level:        "CRITICAL",
 		Collected:    5,
 	}
-	if !reflect.DeepEqual(exp, topic) {
+	if !cmp.Equal(exp, topic) {
 		t.Errorf("unexpected topic result:\ngot:\n%v\nexp:\n%v", topic, exp)
 	}
 }
@@ -2643,7 +2645,7 @@ func Test_ListTopics(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, topics) {
+	if !cmp.Equal(exp, topics) {
 		t.Errorf("unexpected  topics result:\ngot:\n%v\nexp:\n%v", topics, exp)
 	}
 }
@@ -2708,7 +2710,7 @@ func Test_TopicEvent(t *testing.T) {
 			Level:    "WARNING",
 		},
 	}
-	if !reflect.DeepEqual(exp, topicEvent) {
+	if !cmp.Equal(exp, topicEvent) {
 		t.Errorf("unexpected  topic event result:\ngot:\n%v\nexp:\n%v", topicEvent, exp)
 	}
 }
@@ -2784,7 +2786,7 @@ func Test_ListTopicEvents(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, topicEvents) {
+	if !cmp.Equal(exp, topicEvents) {
 		t.Errorf("unexpected  topic events result:\ngot:\n%v\nexp:\n%v", topicEvents, exp)
 	}
 }
@@ -2845,7 +2847,7 @@ func Test_ListTopicHandlers(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, topicHandlers) {
+	if !cmp.Equal(exp, topicHandlers) {
 		t.Errorf("unexpected topic handlers result:\ngot:\n%v\nexp:\n%v", topicHandlers, exp)
 	}
 }
@@ -2885,7 +2887,7 @@ func Test_TopicHandler(t *testing.T) {
 			"channel": "#alerts",
 		},
 	}
-	if !reflect.DeepEqual(exp, h) {
+	if !cmp.Equal(exp, h) {
 		t.Errorf("unexpected handler result:\ngot:\n%v\nexp:\n%v", h, exp)
 	}
 }
@@ -2902,7 +2904,7 @@ func Test_CreateTopicHandler(t *testing.T) {
 		}
 		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers" &&
 			r.Method == "POST" &&
-			reflect.DeepEqual(expOptions, options) {
+			cmp.Equal(expOptions, options) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
@@ -2940,7 +2942,7 @@ func Test_CreateTopicHandler(t *testing.T) {
 			"channel": "#alerts",
 		},
 	}
-	if !reflect.DeepEqual(exp, h) {
+	if !cmp.Equal(exp, h) {
 		t.Errorf("unexpected create handler result:\ngot:\n%v\nexp:\n%v", h, exp)
 	}
 }
@@ -2962,7 +2964,7 @@ func Test_PatchTopicHandler(t *testing.T) {
 		}
 		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "PATCH" &&
-			reflect.DeepEqual(expPatch, patch) {
+			cmp.Equal(expPatch, patch) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
@@ -3005,7 +3007,7 @@ func Test_PatchTopicHandler(t *testing.T) {
 			"channel": "#testing_alerts",
 		},
 	}
-	if !reflect.DeepEqual(exp, h) {
+	if !cmp.Equal(exp, h) {
 		t.Errorf("unexpected replace handler result:\ngot:\n%v\nexp:\n%v", h, exp)
 	}
 }
@@ -3022,7 +3024,7 @@ func Test_ReplaceTopicHandler(t *testing.T) {
 		}
 		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "PUT" &&
-			reflect.DeepEqual(expOptions, options) {
+			cmp.Equal(expOptions, options) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
@@ -3060,7 +3062,7 @@ func Test_ReplaceTopicHandler(t *testing.T) {
 			"channel": "#testing_alerts",
 		},
 	}
-	if !reflect.DeepEqual(exp, h) {
+	if !cmp.Equal(exp, h) {
 		t.Errorf("unexpected replace handler result:\ngot:\n%v\nexp:\n%v", h, exp)
 	}
 }
@@ -3127,7 +3129,7 @@ func Test_CreateUser(t *testing.T) {
 					client.AllPermissions,
 				},
 			}
-			if !reflect.DeepEqual(exp, user) {
+			if !cmp.Equal(exp, user) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected CreateUser body: got:\n%v\nexp:\n%v\n", user, exp)
 			} else {
@@ -3193,7 +3195,7 @@ func Test_User(t *testing.T) {
 			client.WritePointsPermission,
 		},
 	}
-	if !reflect.DeepEqual(exp, user) {
+	if !cmp.Equal(exp, user) {
 		t.Errorf("unexpected user:\ngot:\n%v\nexp:\n%v", user, exp)
 	}
 }
@@ -3373,7 +3375,7 @@ func Test_ListUsers(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(exp, users) {
+	if !cmp.Equal(exp, users) {
 		t.Errorf("unexpected user list: got:\n%v\nexp:\n%v", users, exp)
 	}
 }
@@ -3428,7 +3430,7 @@ func Test_ListUsers_Fields(t *testing.T) {
 			Type: client.NormalUser,
 		},
 	}
-	if !reflect.DeepEqual(exp, users) {
+	if !cmp.Equal(exp, users) {
 		t.Errorf("unexpected user list: got:\n%v\nexp:\n%v", users, exp)
 	}
 }

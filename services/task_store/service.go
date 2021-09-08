@@ -499,6 +499,7 @@ var allTaskFields = []string{
 	"modified",
 	"last-enabled",
 	"vars",
+	"template-id",
 }
 
 const tasksBasePathAnchored = httpd.BasePath + tasksPathAnchored
@@ -522,7 +523,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	if len(fields) == 0 {
 		fields = allTaskFields
 	} else {
-		// Always return ID field
+		// Always return ID and link
 		fields = append(fields, "id", "link")
 	}
 
@@ -653,6 +654,11 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				value = task.Modified
 			case "last-enabled":
 				value = task.LastEnabled
+			case "template-id":
+				if len(task.TemplateID) == 0 {
+					continue
+				}
+				value = task.TemplateID
 			case "vars":
 				vars, err := ts.convertToClientVars(task.Vars)
 				if err != nil {
