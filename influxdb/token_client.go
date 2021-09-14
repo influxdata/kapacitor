@@ -121,6 +121,10 @@ func (tc *tokenClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
 	return tc.client.QueryFluxResponse(q)
 }
 
+func (tc *tokenClient) CreateBucketV2(bucket, org, orgID string) error {
+	return tc.client.CreateBucketV2(bucket, org, orgID)
+}
+
 func (tc *tokenClient) Open() error {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()

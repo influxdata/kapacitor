@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
-
 	"github.com/influxdata/kapacitor/client/v1"
 	kexpvar "github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/server/vars"

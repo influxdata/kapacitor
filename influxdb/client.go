@@ -52,6 +52,10 @@ type Client interface {
 	// if it exists.  Unlike QueryFlux, this returns a *Response
 	// object.
 	QueryFluxResponse(q FluxQuery) (*Response, error)
+
+	// CreateBucketV2 uses the 2.x /api/v2/bucket api to create a bucket.
+	// Note that 1.x does not support this API
+	CreateBucketV2(bucket string, org string, orgID string) error
 }
 
 type ClientUpdater interface {
@@ -145,6 +149,69 @@ type HTTPClient struct {
 	client      *http.Client
 	index       int32
 	compression string
+}
+
+func (c *HTTPClient) getOrgID(org string) (string, error) {
+	u := c.url()
+	u.Path = "/api/v2/orgs"
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	reader, err := c.doHttpV2(req, 200)
+	if err != nil {
+		return "", err
+	}
+	var val struct {
+		Orgs []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"orgs"`
+	}
+	err = json.NewDecoder(reader).Decode(&val)
+	if err != nil {
+		return "", fmt.Errorf("decoding json from org request: %w", err)
+	}
+	// Check for "org" matching id to account for odd flux query API that will accept an org ID as an org name
+	for _, o := range val.Orgs {
+		if o.ID == org {
+			return o.ID, nil
+		}
+	}
+	for _, o := range val.Orgs {
+		if o.Name == org {
+			return o.ID, nil
+		}
+	}
+	return "", fmt.Errorf("unknown organization name %s", org)
+}
+
+func (c *HTTPClient) CreateBucketV2(bucket, org, orgID string) error {
+	u := c.url()
+	u.Path = "/api/v2/buckets"
+
+	var err error
+	if orgID == "" {
+		orgID, err = c.getOrgID(org)
+		if err != nil {
+			return fmt.Errorf("attempting to get org id for org: %w", err)
+		}
+	}
+
+	body := fmt.Sprintf(`{"orgID": %q, "name": %q, "retentionRules": [] }`, orgID, bucket)
+
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBufferString(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Encoding", "gzip")
+	reader, err := c.doHttpV2(req, 201)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(io.Discard, reader)
+	return err
 }
 
 // NewHTTPClient returns a new Client from the provided config.
@@ -367,7 +434,7 @@ func (r readClose) Close() error {
 
 var _ io.ReadCloser = readClose{}
 
-func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (io.ReadCloser, error) {
+func (c *HTTPClient) doHttpV2(req *http.Request, codes ...int) (io.ReadCloser, error) {
 	// Get current config
 	config := c.loadConfig()
 	// Set auth credentials
@@ -422,7 +489,7 @@ func (c *HTTPClient) doFlux(req *http.Request, codes ...int) (io.ReadCloser, err
 			Error   string `json:"error"`
 		}{}
 		if err := d.Decode(&rp); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error attempting to decode http response, status %d: %w", resp.StatusCode, err)
 		}
 		if rp.Error != "" {
 			return nil, errors.New(rp.Error)
@@ -593,9 +660,7 @@ type Result struct {
 
 func (c *HTTPClient) buildFluxRequest(q FluxQuery) (*http.Request, error) {
 	u := c.url()
-	if c.url().Path == "" || c.url().Path == "/" {
-		u.Path = "/api/v2/query"
-	}
+	u.Path = "/api/v2/query"
 
 	v := url.Values{}
 	if q.Org != "" {
@@ -645,7 +710,7 @@ func (c *HTTPClient) QueryFluxResponse(q FluxQuery) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	reader, err := c.doFlux(req, http.StatusOK)
+	reader, err := c.doHttpV2(req, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +728,7 @@ func (c *HTTPClient) QueryFlux(q FluxQuery) (flux.ResultIterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	reader, err := c.doFlux(req, http.StatusOK)
+	reader, err := c.doHttpV2(req, http.StatusOK)
 	if err != nil {
 		return nil, err
 	}

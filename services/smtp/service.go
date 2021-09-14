@@ -10,7 +10,6 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
-
 	"gopkg.in/gomail.v2"
 )
 

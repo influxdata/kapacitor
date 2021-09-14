@@ -2,10 +2,9 @@ package kapacitor
 
 import (
 	"errors"
-	"time"
-
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"

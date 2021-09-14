@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClient_Flux(t *testing.T) {
@@ -449,5 +451,120 @@ func TestBatchPoints_SettersGetters(t *testing.T) {
 	}
 	if bp.WriteConsistency() != "wc2" {
 		t.Errorf("Expected: %s, got %s", bp.WriteConsistency(), "wc2")
+	}
+}
+
+const cannedOrgResponse = `{
+        "links": {
+                "self": "/api/v2/orgs"
+        },
+        "orgs": [
+                {
+                        "links": {
+                                "buckets": "/api/v2/buckets?org=myorg",
+                                "dashboards": "/api/v2/dashboards?org=myorg",
+                                "labels": "/api/v2/orgs/e89732d2ac84d94a/labels",
+                                "logs": "/api/v2/orgs/e89732d2ac84d94a/logs",
+                                "members": "/api/v2/orgs/e89732d2ac84d94a/members",
+                                "owners": "/api/v2/orgs/e89732d2ac84d94a/owners",
+                                "secrets": "/api/v2/orgs/e89732d2ac84d94a/secrets",
+                                "self": "/api/v2/orgs/e89732d2ac84d94a",
+                                "tasks": "/api/v2/tasks?org=myorg"
+                        },
+                        "id": "e89732d2ac84d94a",
+                        "name": "org1",
+                        "description": "",
+                        "createdAt": "2021-09-13T18:57:23.816229Z",
+                        "updatedAt": "2021-09-13T18:57:23.816239Z"
+                },
+                {
+                        "links": {
+                                "buckets": "/api/v2/buckets?org=myorg",
+                                "dashboards": "/api/v2/dashboards?org=myorg",
+                                "labels": "/api/v2/orgs/0x0x0x0xac84d94a/labels",
+                                "logs": "/api/v2/orgs/0x0x0x0xac84d94a/logs",
+                                "members": "/api/v2/orgs/0x0x0x0xac84d94a/members",
+                                "owners": "/api/v2/orgs/0x0x0x0xac84d94a/owners",
+                                "secrets": "/api/v2/orgs/0x0x0x0xac84d94a/secrets",
+                                "self": "/api/v2/orgs/0x0x0x0xac84d94a",
+                                "tasks": "/api/v2/tasks?org=myorg"
+                        },
+                        "id": "0x0x0x0xac84d94a",
+                        "name": "org2",
+                        "description": "",
+                        "createdAt": "2021-09-13T18:57:23.816229Z",
+                        "updatedAt": "2021-09-13T18:57:23.816239Z"
+                }
+        ]
+}`
+
+func TestHTTPClient_CreateBucketV2(t *testing.T) {
+
+	tests := []struct {
+		name             string
+		org              string
+		orgId            string
+		bucket           string
+		expectBucketBody string
+		wantErr          string
+	}{
+		{
+			name:             "basic",
+			orgId:            "x0x0x0",
+			bucket:           "mybucket",
+			expectBucketBody: `{"orgID": "x0x0x0", "name": "mybucket", "retentionRules": [] }`,
+			wantErr:          "",
+		},
+		{
+			name:             "with-unknown-org",
+			org:              "some-other-org",
+			bucket:           "mybucket",
+			expectBucketBody: "",
+			wantErr:          "unknown organization name",
+		},
+		{
+			name:             "with-org",
+			org:              "org2",
+			bucket:           "mybucket",
+			expectBucketBody: `{"orgID": "0x0x0x0xac84d94a", "name": "mybucket", "retentionRules": [] }`,
+			wantErr:          "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotBucketBody := false
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "Token mytoken", r.Header.Get("Authorization"))
+				body, err := ioutil.ReadAll(r.Body)
+				require.NoError(t, err)
+				switch r.URL.Path {
+				case "/api/v2/buckets":
+					assert.Equal(t, tt.expectBucketBody, string(body))
+					gotBucketBody = true
+					w.WriteHeader(201)
+				case "/api/v2/orgs":
+					w.WriteHeader(200)
+					w.Write([]byte(cannedOrgResponse))
+				default:
+					w.WriteHeader(404)
+				}
+			}))
+			c, err := NewHTTPClient(Config{
+				URLs: []string{ts.URL},
+				Credentials: Credentials{
+					Method: TokenAuthentication,
+					Token:  "mytoken",
+				},
+			})
+			require.NoError(t, err)
+			err = c.CreateBucketV2(tt.bucket, tt.org, tt.orgId)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Contains(t, err.Error(), tt.wantErr)
+			}
+			assert.Equal(t, tt.expectBucketBody != "", gotBucketBody)
+		})
 	}
 }

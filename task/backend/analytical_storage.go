@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/influxdata/flux"
@@ -29,6 +30,71 @@ const (
 	statusTag = "status"
 )
 
+func CreateDestination(log *zap.Logger, cli influxdb.Client, dest DataDestination) error {
+	const numTries = 5
+	for try := 0; try < numTries; try++ {
+		// poll for influxdb to come up - usually it should be already up by the time we get here.
+		if try > 0 {
+			time.Sleep(1 * time.Second)
+		}
+		queryForError := func(q string) error {
+			// This query is only successful if the bucket exists
+			result, err := cli.QueryFlux(influxdb.FluxQuery{
+				Org:   dest.Org,
+				OrgID: dest.OrgID,
+				Query: q,
+			})
+			if err != nil {
+				return err
+			}
+			for result.More() {
+				if err := result.Next().Tables().Do(func(table flux.Table) error {
+					return table.Do(func(col flux.ColReader) error {
+						return nil
+					})
+				}); err != nil {
+					return err
+				}
+			}
+			return result.Err()
+		}
+		err := queryForError("buckets()")
+		if err != nil {
+			log.Warn("InfluxDB instance for analytic store not processing flux queries", zap.Error(err))
+			continue
+		}
+		// We do this instead of interpreting the response from `buckets()` because
+		// for 1.x `from(bucket: "mydb")` is valid and means to use the default retention
+		// policy, but `buckets()` will return the fully qualified retention policy.
+		err = queryForError(fmt.Sprintf(`from(bucket: %q) |> range(start: -1s) |> filter(fn: (r) => r._measurement == %q)`, dest.Bucket, dest.Measurement))
+		if err == nil {
+			log.Info("Successfully read from bucket for task analytic store")
+			return nil
+		}
+		log.Info("Error reading from bucket for task analytic storage, attempting to create it", zap.Error(err), zap.String("name", dest.Bucket))
+		if strings.Contains(dest.Bucket, "/") {
+			log.Info("Bucket contains /, creating a 1.x database with non-default retention policy is not supported, skipping 1.x database creation", zap.String("name", dest.Bucket))
+		} else {
+			_, err := cli.Query(influxdb.Query{
+				Command: fmt.Sprintf("CREATE DATABASE %q", dest.Bucket),
+			})
+			if err != nil {
+				log.Warn("Error attempting to create 1.x database", zap.Error(err))
+			} else {
+				// we successfully tried to create a database
+				continue
+			}
+		}
+
+		log.Info("Could not create using 1.x CREATE DATABASE api, try 2.x /api/v2/bucket instead")
+		err = cli.CreateBucketV2(dest.Bucket, dest.Org, dest.OrgID)
+		if err != nil {
+			log.Warn("Error attempting to create 2.x bucket", zap.Error(err))
+		}
+	}
+	return fmt.Errorf("could not create database for analytic store, tried %d times", numTries)
+}
+
 // RunRecorder is a type which records runs into an influxdb
 // backed storage mechanism
 type RunRecorder interface {
@@ -41,20 +107,8 @@ type PointsWriter interface {
 
 type NoOpPointsWriter struct{}
 
-func (*NoOpPointsWriter) WritePoints(ctx context.Context, bucket string, points models.Points) error {
+func (*NoOpPointsWriter) WritePoints(_ context.Context, _ string, _ models.Points) error {
 	return nil
-}
-
-// NewAnalyticalStorage creates a new analytical store with access to the necessary systems for storing data and to act as a middleware (deprecated)
-func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskControlService, cli influxdb.Client, dest DataDestination) *AnalyticalStorage {
-	return &AnalyticalStorage{
-		log:                log,
-		TaskService:        ts,
-		TaskControlService: tcs,
-		destination:        dest,
-		rr:                 NewStoragePointsWriterRecorder(log, cli, dest),
-		cli:                cli,
-	}
 }
 
 type DataDestination struct {
@@ -74,6 +128,21 @@ type AnalyticalStorage struct {
 	log         *zap.Logger
 }
 
+// NewAnalyticalStorage creates a new analytical store with access to the necessary systems for storing data and to act as a middleware (deprecated)
+func NewAnalyticalStorage(log *zap.Logger, ts taskmodel.TaskService, tcs TaskControlService, cli influxdb.Client, dest DataDestination) (*AnalyticalStorage, error) {
+	if err := CreateDestination(log, cli, dest); err != nil {
+		return nil, err
+	}
+	return &AnalyticalStorage{
+		log:                log,
+		TaskService:        ts,
+		TaskControlService: tcs,
+		destination:        dest,
+		rr:                 NewStoragePointsWriterRecorder(log, cli, dest),
+		cli:                cli,
+	}, nil
+}
+
 func (as *AnalyticalStorage) FinishRun(ctx context.Context, taskID, runID platform.ID) (*taskmodel.Run, error) {
 	run, err := as.TaskControlService.FinishRun(ctx, taskID, runID)
 	if err != nil {
@@ -83,7 +152,7 @@ func (as *AnalyticalStorage) FinishRun(ctx context.Context, taskID, runID platfo
 }
 
 // FindLogs returns logs for a run.
-// First attempt to use the TaskService, then append additional analytical's logs to the list
+// First attempt to use the TaskService, then append additional analytical logs to the list
 func (as *AnalyticalStorage) FindLogs(ctx context.Context, filter taskmodel.LogFilter) ([]*taskmodel.Log, int, error) {
 	var logs []*taskmodel.Log
 	if filter.Run != nil {
@@ -113,7 +182,7 @@ func (as *AnalyticalStorage) FindLogs(ctx context.Context, filter taskmodel.LogF
 }
 
 // FindRuns returns a list of runs that match a filter and the total count of returned runs.
-// First attempt to use the TaskService, then append additional analytical's runs to the list
+// First attempt to use the TaskService, then append additional analytical runs to the list
 func (as *AnalyticalStorage) FindRuns(ctx context.Context, filter taskmodel.RunFilter) ([]*taskmodel.Run, int, error) {
 	if filter.Limit == 0 {
 		filter.Limit = taskmodel.TaskDefaultPageSize

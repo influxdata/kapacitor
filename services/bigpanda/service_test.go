@@ -2,10 +2,11 @@ package bigpanda
 
 import (
 	"bytes"
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/models"
 	"testing"
 	"time"
+
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/models"
 )
 
 func TestService_SerializeEventData(t *testing.T) {

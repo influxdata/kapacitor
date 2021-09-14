@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"sync/atomic"
-
-	"math"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"

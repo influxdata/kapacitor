@@ -7,6 +7,7 @@
 - [#2605](https://github.com/influxdata/kapacitor/pull/2605): Updated jwt dependencies of libraries because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
 - [#2601](https://github.com/influxdata/kapacitor/pull/2601): Switched to github.com/golang-jwt/jwt for kapacitor's use because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
 - [#2618](https://github.com/influxdata/kapacitor/pull/2618): Switch task service to use Flux formatter that preserves comments
+- [#2622](https://github.com/influxdata/kapacitor/pull/2622): auto-create 1.x DB or 2.x bucket for flux task logs
 
 ### Features
 
