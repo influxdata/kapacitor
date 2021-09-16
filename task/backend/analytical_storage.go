@@ -32,7 +32,7 @@ const (
 
 func CreateDestination(log *zap.Logger, cli influxdb.Client, dest DataDestination) error {
 	const numTries = 5
-	for try := 0; try < numTries; try++ {
+	for try := 0; ; try++ {
 		// poll for influxdb to come up - usually it should be already up by the time we get here.
 		if try > 0 {
 			time.Sleep(1 * time.Second)
@@ -58,20 +58,28 @@ func CreateDestination(log *zap.Logger, cli influxdb.Client, dest DataDestinatio
 			}
 			return result.Err()
 		}
-		err := queryForError("buckets()")
-		if err != nil {
-			log.Warn("InfluxDB instance for analytic store not processing flux queries", zap.Error(err))
-			continue
-		}
+
 		// We do this instead of interpreting the response from `buckets()` because
 		// for 1.x `from(bucket: "mydb")` is valid and means to use the default retention
 		// policy, but `buckets()` will return the fully qualified retention policy.
-		err = queryForError(fmt.Sprintf(`from(bucket: %q) |> range(start: -1s) |> filter(fn: (r) => r._measurement == %q)`, dest.Bucket, dest.Measurement))
+		err := queryForError(fmt.Sprintf(`from(bucket: %q) |> range(start: -1s) |> filter(fn: (r) => r._measurement == %q)`, dest.Bucket, dest.Measurement))
 		if err == nil {
 			log.Info("Successfully read from bucket for task analytic store")
 			return nil
 		}
 		log.Info("Error reading from bucket for task analytic storage, attempting to create it", zap.Error(err), zap.String("name", dest.Bucket))
+
+		if try > numTries {
+			break
+		}
+
+		// First check if we're reading any flux queries at all
+		err = queryForError("buckets()")
+		if err != nil {
+			log.Warn("InfluxDB instance for analytic store not processing flux queries", zap.Error(err))
+			continue
+		}
+
 		if strings.Contains(dest.Bucket, "/") {
 			log.Info("Bucket contains /, creating a 1.x database with non-default retention policy is not supported, skipping 1.x database creation", zap.String("name", dest.Bucket))
 		} else {
