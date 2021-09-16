@@ -22,7 +22,6 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
-
 	"golang.org/x/crypto/bcrypt"
 )
 

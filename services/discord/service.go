@@ -7,10 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	text "text/template"
 	"time"
-
-	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
 	khttp "github.com/influxdata/kapacitor/http"

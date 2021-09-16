@@ -38,9 +38,12 @@ type Config struct {
 	Secrets map[string]string `toml:"secrets"`
 }
 
+const DefaultTaskRunBucket = "kapacitor_fluxtask_logs"
+
 func NewConfig() Config {
 	return Config{
 		TaskRunMeasurement: "runs",
+		TaskRunBucket:      DefaultTaskRunBucket,
 	}
 }
 
@@ -53,9 +56,6 @@ func (c Config) Validate() error {
 	}
 	if len(c.TaskRunOrgID) > 0 && len(c.TaskRunOrg) > 0 {
 		return fmt.Errorf("only one of task-run-org and task-run-orgid should be set")
-	}
-	if len(c.TaskRunBucket) == 0 {
-		return fmt.Errorf("task-run-bucket is required")
 	}
 	return nil
 }

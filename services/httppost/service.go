@@ -2,6 +2,7 @@ package httppost
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -12,10 +13,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
-
 	"time"
-
-	"context"
 
 	"github.com/influxdata/kapacitor/alert"
 	khttp "github.com/influxdata/kapacitor/http"

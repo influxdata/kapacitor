@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,9 +10,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	"bytes"
-	"context"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"

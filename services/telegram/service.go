@@ -9,9 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"sync/atomic"
-
 	"strings"
+	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"

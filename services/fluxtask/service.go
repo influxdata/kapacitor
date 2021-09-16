@@ -2,6 +2,7 @@ package fluxtask
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/influxdb/v2/kit/platform"
@@ -42,9 +43,16 @@ func (s *Service) Open() error {
 	if s.config.Enabled {
 		// create the task stack
 		s.kvService = kv.New(s.StorageService)
-		s.kvService.Open()
+		if err := s.kvService.Open(); err != nil {
+			return err
+		}
+		bucket := s.config.TaskRunBucket
+		if bucket == "" {
+			// Deal with previous default of empty string
+			bucket = task.DefaultTaskRunBucket
+		}
 		dataDestination := backend.DataDestination{
-			Bucket:      s.config.TaskRunBucket,
+			Bucket:      bucket,
 			Org:         s.config.TaskRunOrg,
 			OrgID:       s.config.TaskRunOrgID,
 			Measurement: s.config.TaskRunMeasurement,
@@ -60,13 +68,16 @@ func (s *Service) Open() error {
 			if err != nil {
 				return err
 			}
-			combinedTaskService := backend.NewAnalyticalStorage(
+			combinedTaskService, err := backend.NewAnalyticalStorage(
 				s.logger.With(zap.String("service", "fluxtask-analytical-store")),
 				taskService,
 				taskControlService,
 				cli,
 				dataDestination,
 			)
+			if err != nil {
+				return fmt.Errorf("creating analytical store: %w", err)
+			}
 			taskService = combinedTaskService
 			taskControlService = combinedTaskService
 		}

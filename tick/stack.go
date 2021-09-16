@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	//"log"
 )
 
 var ErrEmptyStack = errors.New("stack is empty")

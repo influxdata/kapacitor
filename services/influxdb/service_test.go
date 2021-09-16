@@ -1303,6 +1303,10 @@ func (c influxDBClient) Update(config influxcli.Config) error {
 	return nil
 }
 
+func (c influxDBClient) CreateBucketV2(bucket string, org string, orgID string) error {
+	return nil
+}
+
 type logSerivce struct {
 }
 

@@ -563,6 +563,11 @@ func (c *influxdbCluster) Open() error {
 
 	c.watchSubs()
 
+	// Even if we're not linking subscriptions, validate the client to ensure influxdb is actually up
+	if err := c.validateClientWithBackoff(ctx); err != nil {
+		return errors.Wrap(err, "failed to validate influxdb client on startup")
+	}
+
 	if err := c.linkSubscriptions(ctx, c.subName); err != nil {
 		return errors.Wrap(err, "failed to link subscription on startup")
 	}
