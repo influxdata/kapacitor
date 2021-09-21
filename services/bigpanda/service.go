@@ -242,7 +242,7 @@ func (s *Service) preparePost(id string, message string, details string, level a
 			if err != nil {
 				return nil, err
 			}
-			bpData[k] = b
+			bpData[k] = string(b)
 		}
 	}
 

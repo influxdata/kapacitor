@@ -119,7 +119,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	}
 
 	an.detailsTmpl, err = html.New("details").Funcs(html.FuncMap{
-		"json": func(v interface{}) html.JS {
+		"jsonCompact": func(v interface{}) html.JS {
 			tmpBuffer := an.bufPool.Get().(*bytes.Buffer)
 			tmpBuffer2 := an.bufPool.Get().(*bytes.Buffer)
 
@@ -137,6 +137,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			_ = json.NewEncoder(tmpBuffer).Encode(v)
 			_ = json.Compact(tmpBuffer2, tmpBuffer.Bytes())
 			return html.JS(tmpBuffer2.String())
+		},
+		"json": func(v interface{}) html.JS {
+			tmpBuffer := an.bufPool.Get().(*bytes.Buffer)
+
+			defer func() {
+				if tmpBuffer.Cap() < (2 << 19) { // only reuse the buffer if it is less than 500kb
+					tmpBuffer.Reset()
+					an.bufPool.Put(tmpBuffer)
+				}
+			}()
+
+			_ = json.NewEncoder(tmpBuffer).Encode(v)
+			return html.JS(tmpBuffer.String())
 		},
 	}).Parse(n.Details)
 	if err != nil {
