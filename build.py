@@ -879,6 +879,16 @@ def main(args):
         if args.package_udfs:
             packages += package_udfs(args.version, args.outdir)
 
+        if args.checksum:
+            logging.debug("Generating checksums for packages: {}".format(packages))
+            checksums = []
+            for p in packages:
+                if generate_sha256_from_file(p):
+                    checksums.append(p + '.sha256')
+                else:
+                    logging.error('Creation of checkusm for package [{}] failed!.'.format(p))
+                    return 1
+            packages += checksums
         if args.sign:
             logging.debug("Generating GPG signatures for packages: {}".format(packages))
             sigs = [] # retain signatures so they can be uploaded with packages
@@ -895,10 +905,9 @@ def main(args):
                 args.upload_overwrite = True
             if not upload_packages(packages, bucket_name=args.bucket, overwrite=args.upload_overwrite):
                 return 1
-        logging.info("Packages created:")
+        logging.info("Packages and files created:")
         for p in packages:
-            logging.info("{} (sha256={})".format(p.split('/')[-1:][0],
-                                              generate_sha256_from_file(p)))
+            logging.info("{}".format(p.split('/')[-1:][0]))
 
 
     if orig_branch != get_current_branch():
@@ -1017,6 +1026,9 @@ if __name__ == '__main__':
     parser.add_argument('--sign',
                         action='store_true',
                         help='Create GPG detached signatures for packages (when package is specified)')
+    parser.add_argument('--checksum',
+                        action='store_true',
+                        help='Create md5 and sha256 checksums for packages (when package is specified)')
     parser.add_argument('--test',
                         action='store_true',
                         help='Run tests (does not produce build output)')

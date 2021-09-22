@@ -13,10 +13,31 @@ commands:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
-      - run:
-          name: Deploy Release Packages
-          command:  |
-            ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
+      - when:
+          condition:
+            and:
+              - ${CIRCLE_TAG}
+              - not:
+                  matches:
+                    pattern: ".*rc[0-9]+$"
+                    value: ${CIRCLE_TAG}
+          steps:
+            - run:
+                name: Deploy Release Packages
+                command:  |
+                  ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum --sign
+      - when:
+          condition:
+            or:
+              - not: ${CIRCLE_TAG}
+              - matches:
+                  pattern: ".*rc[0-9]+$"
+                  value: ${CIRCLE_TAG}
+          steps:
+            - run:
+                name: Deploy Release Packages
+                command:  |
+                  ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum
 
   run_tests:
     description:  >
