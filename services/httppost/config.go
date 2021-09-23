@@ -111,6 +111,13 @@ func GetTemplate(tmpl, tpath string) (*template.Template, error) {
 				_ = json.NewEncoder(&buf).Encode(v)
 				return buf.String()
 			},
+			"jsonCompact": func(v interface{}) string {
+				tmpBuffer := bytes.Buffer{}
+				tmpBuffer2 := bytes.Buffer{}
+				_ = json.NewEncoder(&tmpBuffer).Encode(v)
+				_ = json.Compact(&tmpBuffer2, tmpBuffer.Bytes())
+				return tmpBuffer2.String()
+			},
 		}).Parse(tmpl)
 		return t, errors.Wrap(err, "failed to parse template")
 	}
