@@ -246,9 +246,13 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		}
 	}
 
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
+	var postTemp bytes.Buffer
+	enc := json.NewEncoder(&postTemp)
 	if err := enc.Encode(bpData); err != nil {
+		return nil, err
+	}
+	var post bytes.Buffer
+	if err := json.Compact(&post, postTemp.Bytes()); err != nil {
 		return nil, err
 	}
 
