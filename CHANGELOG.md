@@ -1,17 +1,18 @@
 # Changelog
 
-## v1.6.2 [2021-08-04]
+## v1.6.2 [2021-09-24]
 
 ### Bugfixes
 - [#2582](https://github.com/influxdata/kapacitor/pull/2582): expvar string json encoding to handle special chars, thanks @prashanthjbabu! 
 - [#2605](https://github.com/influxdata/kapacitor/pull/2605): Updated jwt dependencies of libraries because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
 - [#2601](https://github.com/influxdata/kapacitor/pull/2601): Switched to github.com/golang-jwt/jwt for kapacitor's use because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
 - [#2618](https://github.com/influxdata/kapacitor/pull/2618): Switch task service to use Flux formatter that preserves comments
-- [#2622](https://github.com/influxdata/kapacitor/pull/2622): auto-create 1.x DB or 2.x bucket for flux task logs
 
 ### Features
 
 - [#2621](https://github.com/influxdata/kapacitor/pull/2621): Add template-id to task list.
+- [#2622](https://github.com/influxdata/kapacitor/pull/2622): auto-create 1.x DB or 2.x bucket for flux task logs
+- [#2608](https://github.com/influxdata/kapacitor/pull/2608): Allow for compact json in templates and BP
 
 ## v1.6.1 [2021-07-22]
 
