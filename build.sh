@@ -24,6 +24,7 @@ echo "Running build.py"
 docker run \
     --rm \
     -v "$DIR:/kapacitor" \
+    -u $(id -u):$(id -g) \
     -v ${HOME}/.gnupg/:/.gnupg/:ro \
     -v /run/user/$(id -u)/:/run/user/$(id -u)/:ro \
     -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
