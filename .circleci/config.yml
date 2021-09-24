@@ -23,6 +23,10 @@ commands:
                     value: ${CIRCLE_TAG}
           steps:
             - run:
+                name: Import GPG key
+                command: |
+                  echo -e "$GPG_1X_PRIVATE_KEY" | gpg --import --
+            - run:
                 name: Deploy Release Packages
                 command:  |
                   ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum --sign
