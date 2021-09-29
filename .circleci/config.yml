@@ -2,6 +2,13 @@
 version:  "2.1"
 
 executors:
+  cross-builder:
+    docker:
+      # NOTE: To upgrade the Go version, first push the upgrade to the cross-builder Dockerfile in the edge repo,
+      # then update the version here to match. Until we finish the migration to using the cross-builder image,
+      # you'll also need to update references to `cimg/go` and `GO_VERSION` in this file.
+      - image: quay.io/influxdb/cross-builder:go1.17.1-41d944d749b2c130119eff7efaaa9883ccffe5a7
+    resource_class: large
   linux-amd64:
     machine:
       image: ubuntu-2004:202107-02
@@ -13,14 +20,51 @@ commands:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
+      - run:
+          name: Install additional dependencies
+          command: |
+            set -x
+            # APT packages
+            apt-get -qq update && apt-get -qq install -y \
+                software-properties-common \
+                unzip \
+                mercurial \
+                make \
+                ruby \
+                ruby-dev \
+                rpm \
+                zip \
+                python \
+                python-setuptools \
+                python3 \
+                python3-setuptools \
+                python3-boto \
+                autoconf \
+                automake \
+                libtool
+
+            # Ruby dependencies
+            gem install fpm
+
+            # Protobuf
+            wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
+            tar -xf protobuf-python-${PROTO_VERSION}.tar.gz --no-same-owner
+            cd protobuf-${PROTO_VERSION}/python
+            python3 setup.py install
+            cd ../../
+            rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
+      - run:
+          name: Import GPG key
+          command: |
+            echo -e "$GPG_1X_PRIVATE_KEY" | gpg --batch --import --
       - when:
           condition:
             and:
-              - ${CIRCLE_TAG}
+              - << pipeline.git.tag >>
               - not:
                   matches:
-                    pattern: ".*rc[0-9]+$"
-                    value: ${CIRCLE_TAG}
+                    pattern: "(.*rc[0-9]+)|(.*test)$"
+                    value: << pipeline.git.tag >>
           steps:
             - run:
                 name: Import GPG key
@@ -29,19 +73,31 @@ commands:
             - run:
                 name: Deploy Release Packages
                 command:  |
-                  ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum --sign
+                  ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum --sign
       - when:
           condition:
             or:
-              - not: ${CIRCLE_TAG}
+              - not: << pipeline.git.tag >>
               - matches:
                   pattern: ".*rc[0-9]+$"
-                  value: ${CIRCLE_TAG}
+                  value: << pipeline.git.tag >>
           steps:
             - run:
                 name: Deploy Release Packages
                 command:  |
-                  ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum
+                  ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum
+      - when:
+          condition:
+            matches:
+              pattern: "^.*test$"
+              value: << pipeline.git.tag >>
+          steps:
+            - run:
+                name: Deploy Non-Release Packages
+                command:  |
+                  ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --sign
+      - store_artifacts:
+          path: ./build
 
   run_tests:
     description:  >
@@ -59,7 +115,7 @@ commands:
       - run:
           name: Deploy Nightly Build
           command:  |
-            ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
+            ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
 
 jobs:
   build:
@@ -71,14 +127,14 @@ jobs:
       - run_tests
 
   release:
-    executor: linux-amd64
+    executor: cross-builder
     working_directory: ~/kapacitor
     steps:
       - checkout
       - deploy_release_packages
 
   nightly-build:
-    executor: linux-amd64
+    executor: cross-builder
     working_directory: ~/kapacitor
     steps:
       - checkout
@@ -99,7 +155,9 @@ workflows:
             - build
           filters:
             tags:
-              only:  /^v[0-9]+(\.[0-9]+){2}(-(rc|beta)[0-9]+)?/
+              only:
+                - /^v[0-9]+(\.[0-9]+){2}(-(rc|beta)[0-9]+)?/
+                - /^.*test$/
             branches:
               ignore:  /.*/
 

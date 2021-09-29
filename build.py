@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import argparse
 import hashlib
@@ -883,11 +883,12 @@ def main(args):
             logging.debug("Generating checksums for packages: {}".format(packages))
             checksums = []
             for p in packages:
-                if generate_sha256_from_file(p):
-                    checksums.append(p + '.sha256')
-                else:
-                    logging.error('Creation of checkusm for package [{}] failed!.'.format(p))
-                    return 1
+                checksum = generate_sha256_from_file(p)
+                sha_filename = p + '.sha256'
+                with open(sha_filename, 'w+') as fp:
+                    fp.write(checksum)
+                checksums.append(sha_filename)
+
             packages += checksums
         if args.sign:
             logging.debug("Generating GPG signatures for packages: {}".format(packages))
