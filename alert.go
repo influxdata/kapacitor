@@ -387,6 +387,23 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		if a.Environment != "" {
 			c.Environment = a.Environment
 		}
+		if len(a.RenameSeverities) != 0 {
+			c.RenameSeverities = a.RenameSeverities
+		}
+		if len(a.ExtraSeverities) != 0 {
+			c.ExtraSeverityExpressions = make([]stateful.Expression, len(a.ExtraSeverities))
+			c.ExtraSeverityNames = make([]string, len(a.ExtraSeverities))
+			c.ExtraSeverityScopePools = make([]stateful.ScopePool, len(a.ExtraSeverities))
+			for i, severity := range a.ExtraSeverities {
+				statefulExpression, expressionCompileError := stateful.NewExpression(severity.Condition.Expression)
+				if expressionCompileError != nil {
+					return nil, fmt.Errorf("Failed to compile stateful expression for Alerta extra severity %s: %s", severity.Name, expressionCompileError)
+				}
+				c.ExtraSeverityExpressions[i] = statefulExpression
+				c.ExtraSeverityNames[i] = severity.Name
+				c.ExtraSeverityScopePools[i] = stateful.NewScopePool(ast.FindReferenceVariables(severity.Condition.Expression))
+			}
+		}
 		if a.Group != "" {
 			c.Group = a.Group
 		}

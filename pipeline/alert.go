@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -1219,6 +1220,12 @@ func (n *AlertNodeData) Alerta() *AlertaHandler {
 	return alerta
 }
 
+type AlertaCustomSeverity struct {
+	Name      string          `json:"name"`
+	Code      int64           `json:"code"`
+	Condition *ast.LambdaNode `json:"condition"`
+}
+
 // tick:embedded:AlertNode.Alerta
 type AlertaHandler struct {
 	*AlertNodeData `json:"-"`
@@ -1241,6 +1248,13 @@ type AlertaHandler struct {
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Defaut is set from the configuration.
 	Environment string `json:"environment"`
+
+	// Alerta supports many different severity levels. And it allows you to add even more.
+	// To benefit from this model we can use two ways:
+	// Rename kapacitor built-in severities to match some of alerta's severities
+	RenameSeverities map[string]string `tick:"RenameSeverity" json:"rename-severities"`
+	// Add post-processing to kapacitor alerts to fine tune severity levels
+	ExtraSeverities []*AlertaCustomSeverity `tick:"AddSeverity" json:"add-severities"`
 
 	// Alerta group.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
@@ -1266,6 +1280,24 @@ type AlertaHandler struct {
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `json:"timeout"`
+}
+
+func (a *AlertaHandler) RenameSeverity(kapacitorName string, alertaName string) *AlertaHandler {
+	if a.RenameSeverities == nil {
+		a.RenameSeverities = make(map[string]string)
+	}
+	a.RenameSeverities[kapacitorName] = alertaName
+	return a
+}
+func (a *AlertaHandler) AddSeverity(name string, code int64, condition *ast.LambdaNode) *AlertaHandler {
+	a.ExtraSeverities = append(a.ExtraSeverities, &AlertaCustomSeverity{
+		Name:      name,
+		Code:      code,
+		Condition: condition,
+	})
+	// Alerta severities have descending order: higher severity has lower code (1 for critical, 9 for ok)
+	sort.SliceStable(a.ExtraSeverities, func(i, j int) bool { return a.ExtraSeverities[i].Code < a.ExtraSeverities[j].Code })
+	return a
 }
 
 // List of effected services.

@@ -38,6 +38,7 @@
 - [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
 - [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
 - [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
+- [#2584](https://github.com/influxdata/kapacitor/pull/2584): Add custom severities to Alerta handler
 
 ### Bugfixes
 - [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
