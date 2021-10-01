@@ -63,6 +63,10 @@ type Route struct {
 	BypassAuth  bool
 }
 
+type Registered struct {
+	Database string
+}
+
 // Handler represents an HTTP handler for the Kapacitor API server.
 type Handler struct {
 	methodMux map[string]*ServeMux
@@ -447,7 +451,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 	b, err := ioutil.ReadAll(body)
 	if err != nil {
 		if h.writeTrace {
-			h.diag.Error("write handler unabled to read bytes from request body", err)
+			h.diag.Error("write handler unable to read bytes from request body", err)
 		}
 		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
 		return
