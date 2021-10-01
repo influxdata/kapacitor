@@ -9127,6 +9127,11 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"testServiceX",
 						"testServiceY",
 					},
+					"attributes": map[string]interface{}{
+						"testAttributeA": "A",
+						"testAttributeB": true,
+						"testAttributeC": float64(9001.0),
+					},
 					"timeout": "24h0m0s",
 				},
 			},

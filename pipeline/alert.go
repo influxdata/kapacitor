@@ -1263,6 +1263,9 @@ type AlertaHandler struct {
 	// List of Correlated
 	Correlate []string `tick:"Correlated" json:"correlate"`
 
+	// Map of alert Attributes
+	Attributes map[string]interface{} `tick:"Attribute" json:"attributes"`
+
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `json:"timeout"`
@@ -1278,6 +1281,14 @@ func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 
 func (a *AlertaHandler) Correlated(correlate ...string) *AlertaHandler {
 	a.Correlate = correlate
+	return a
+}
+
+func (a *AlertaHandler) Attribute(k string, v interface{}) *AlertaHandler {
+	if a.Attributes == nil {
+		a.Attributes = make(map[string]interface{})
+	}
+	a.Attributes[k] = v
 	return a
 }
 
