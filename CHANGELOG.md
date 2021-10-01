@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- [#2575](https://github.com/influxdata/kapacitor/pull/2575): Support the "attributes" attribute in Alerta node
+
 ## v1.6.2 [2021-09-24]
 
 ### Bugfixes
@@ -37,7 +42,6 @@
 - [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
 - [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
 - [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
-- [#2575](https://github.com/influxdata/kapacitor/pull/2575): Support the "attributes" attribute in Alerta node
 - [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
 
 ### Bugfixes
