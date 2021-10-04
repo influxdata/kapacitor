@@ -202,22 +202,6 @@ def run_tests(race, parallel, timeout, no_vet, verbose):
     except subprocess.CalledProcessError as exc:
         logging.error("Downloading dependencies failed, see logs for details")
         logging.error("{}".format(exc.output))
-    # NOTE: We vendor deps here because TestPipelineImplemented in pipeline/tick/tick_test.go uses `importer.For`
-    # with compiler type "source" to load a few packages from source, and it recursively descends through dependencies.
-    # The "source" type isn't module-aware and only looks under $GOPATH/src and vendor/. We can remove the need for
-    # this by updating the test to:
-    #   1. Use `importer.ForCompiler`
-    #   2. Use type "gc" or "gccgo" instead of "source"
-    #   3. Use a module-aware lookup function instead of the `nil` arg required when type == "source"
-    logging.info("Vendoring dependencies...")
-    try:
-        vendor_cmd = ["go", "mod", "vendor"]
-        if verbose:
-            vendor_cmd.append("-v")
-        subprocess.check_output(vendor_cmd)
-    except subprocess.CalledProcessError as exc:
-        logging.error("Vendoring dependencies failed, see logs for details")
-        logging.error("{}".format(exc.output))
 
     logging.info("Starting tests...")
     if race:
