@@ -462,7 +462,8 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 
 // serveWriteLine receives incoming series data in line protocol format and writes it to the database.
 func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []byte, user auth.User) {
-	precision := r.FormValue("precision")
+	qp := r.URL.Query()
+	precision := qp.Get("precision")
 	if precision == "" {
 		precision = "n"
 	}
@@ -477,7 +478,7 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		return
 	}
 
-	database := r.FormValue("db")
+	database := qp.Get("db")
 	if database == "" {
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
 		return
@@ -495,7 +496,7 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 	// Write points.
 	if err := h.PointsWriter.WritePoints(
 		database,
-		r.FormValue("rp"),
+		qp.Get("rp"),
 		models.ConsistencyLevelAll,
 		points,
 	); influxdb.IsClientError(err) {
