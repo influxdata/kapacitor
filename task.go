@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/httpd"
+
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -55,10 +57,7 @@ func (t *TaskType) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type DBRP struct {
-	Database        string `json:"db"`
-	RetentionPolicy string `json:"rp"`
-}
+type DBRP = httpd.Registration
 
 func CreateDBRPMap(dbrps []DBRP) map[DBRP]bool {
 	dbMap := make(map[DBRP]bool, len(dbrps))
@@ -66,10 +65,6 @@ func CreateDBRPMap(dbrps []DBRP) map[DBRP]bool {
 		dbMap[dbrp] = true
 	}
 	return dbMap
-}
-
-func (d DBRP) String() string {
-	return fmt.Sprintf("%q.%q", d.Database, d.RetentionPolicy)
 }
 
 // The complete definition of a task, its id, pipeline and type.

@@ -105,6 +105,8 @@ type TaskMaster struct {
 		HasSnapshot(id string) bool
 		LoadSnapshot(id string) (*TaskSnapshot, error)
 	}
+
+	Registrar      registrar
 	DeadmanService pipeline.DeadmanService
 
 	UDFService UDFService
@@ -273,6 +275,11 @@ type forkKey struct {
 	Measurement     string
 }
 
+type registrar interface {
+	Register(registration ...httpd.Registration)
+	UnRegister(registration ...httpd.Registration)
+}
+
 // Create a new Executor with a given clock.
 func NewTaskMaster(id string, info vars.Infoer, d Diagnostic) *TaskMaster {
 	return &TaskMaster{
@@ -296,6 +303,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n := NewTaskMaster(id, tm.ServerInfo, tm.diag)
 	n.DefaultRetentionPolicy = tm.DefaultRetentionPolicy
 	n.HTTPDService = tm.HTTPDService
+	n.Registrar = tm.Registrar
 	n.TaskStore = tm.TaskStore
 	n.DeadmanService = tm.DeadmanService
 	n.UDFService = tm.UDFService
@@ -773,7 +781,7 @@ func (tm *TaskMaster) forkPoint(p edge.PointMessage) {
 	c.Add(1)
 }
 
-func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
+func (tm *TaskMaster) WritePoints(database, retentionPolicy string, _ imodels.ConsistencyLevel, points []imodels.Point) error {
 	tm.writesMu.RLock()
 	defer tm.writesMu.RUnlock()
 	if tm.writesClosed {
@@ -843,6 +851,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 
 	d := tm.diag.WithEdgeContext(taskName, "stream", "stream0")
 	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, d)
+	tm.Registrar.Register(dbrps...)
 
 	for _, key := range forkKeys(dbrps, measurements) {
 		tm.taskToForkKeys[taskName] = append(tm.taskToForkKeys[taskName], key)
@@ -876,9 +885,11 @@ func (tm *TaskMaster) delFork(id string) {
 	// by it's fork keys (db,rp,measurement)
 	isEdgeClosed := false
 
+	reg := make([]httpd.Registration, len(tm.taskToForkKeys[id]))
 	// Find the fork keys
-	for _, key := range tm.taskToForkKeys[id] {
-
+	for i, key := range tm.taskToForkKeys[id] {
+		reg[i].RetentionPolicy = key.RetentionPolicy
+		reg[i].Database = key.Database
 		// check if the edge exists
 		edge, ok := tm.forks[key][id]
 		if ok {
@@ -893,6 +904,7 @@ func (tm *TaskMaster) delFork(id string) {
 			delete(tm.forks[key], id)
 		}
 	}
+	tm.Registrar.UnRegister(reg...)
 
 	// remove mapping from task id to it's keys
 	delete(tm.taskToForkKeys, id)

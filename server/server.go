@@ -230,14 +230,18 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service, disabl
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMaster.Commander = s.Commander
 	s.TaskMasterLookup.Set(s.TaskMaster)
+
+	// Append Kapacitor services.
+	s.initHTTPDService()
+	// set up the registrar on the TaskMaster.  We have to do this after the HTTPDService
+	s.TaskMaster.Registrar = s.TaskMaster.HTTPDService.(*httpd.Service)
+
+	// we need to hold off opening the TaskMaster till after HTTPD is initiated
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
 	}
 
-	// Append Kapacitor services.
-	s.initHTTPDService()
 	s.appendStorageService()
-
 	if c.Auth.Enabled {
 		if err := s.appendEnabledAuthService(); err != nil {
 			return nil, err
@@ -517,7 +521,7 @@ func (s *Server) appendInfluxDBService() error {
 
 func (s *Server) initHTTPDService() {
 	d := s.DiagService.NewHTTPDHandler()
-	srv := httpd.NewService(s.config.HTTP, s.hostname, s.tlsConfig, d)
+	srv := httpd.NewService(s.config.HTTP, s.hostname, s.tlsConfig, d, s.TaskMaster.DefaultRetentionPolicy)
 
 	srv.LocalHandler.PointsWriter = s.TaskMaster
 	srv.Handler.PointsWriter = s.TaskMaster
@@ -530,6 +534,7 @@ func (s *Server) initHTTPDService() {
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
+	s.TaskMaster.Registrar = srv
 }
 
 func (s *Server) appendHTTPDService() {

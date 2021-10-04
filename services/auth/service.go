@@ -107,10 +107,15 @@ func NewService(c Config, d Diagnostic) (*Service, error) {
 const userNamespace = "user_store"
 
 func (s *Service) Open() error {
-	if s.StorageService == nil {
+	if s.StorageService == nil || s.StorageService == interface {
+		Store(namespace string) storage.Interface
+	}((*storage.Service)(nil)) {
 		return errors.New("missing storage service")
 	}
-	if s.HTTPDService == nil {
+	if s.HTTPDService == nil || s.HTTPDService == interface {
+		AddRoutes([]httpd.Route) error
+		DelRoutes([]httpd.Route)
+	}((*httpd.Service)(nil)) {
 		return errors.New("missing httpd service")
 	}
 	store := s.StorageService.Store(userNamespace)

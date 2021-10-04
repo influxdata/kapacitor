@@ -33,7 +33,7 @@ func newHTTPDService() *httpd.Service {
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
 	config.LogEnabled = testing.Verbose()
-	httpService := httpd.NewService(config, "localhost", new(tls.Config), diagService.NewHTTPDHandler())
+	httpService := httpd.NewService(config, "localhost", new(tls.Config), diagService.NewHTTPDHandler(), "")
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
