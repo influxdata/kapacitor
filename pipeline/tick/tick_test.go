@@ -2,11 +2,13 @@ package tick_test
 
 import (
 	"bytes"
-	"go/importer"
+	"go/token"
 	"go/types"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -20,22 +22,20 @@ import (
 // If you get a test error here, then you need to implement
 // a conversion node from pipeline node to the ast node.
 func TestPipelineImplemented(t *testing.T) {
-	// FIXME: Make this test module-aware by updating it to:
-	//  1. Use importer.ForCompiler instead of importer.For
-	//  2. Use "gc" or "gccgo" instead of "source" as the type argument
-	//  3. Pass a module-aware lookup function instead of the nil required when type == "source"
-	tickPkg, err := importer.For("source", nil).Import("github.com/influxdata/kapacitor/pipeline/tick")
-	if err != nil {
-		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v", err)
+	loadConf := &packages.Config{
+		Mode: packages.LoadMode(-1), // load all stuff
+		Fset: token.NewFileSet(),
 	}
-	// tickScope lists all the types in the tick package
+
+	pkgs, err := packages.Load(loadConf,
+		"github.com/influxdata/kapacitor/pipeline/tick",
+		"github.com/influxdata/kapacitor/pipeline")
+	if err != nil {
+		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline/tick or github.com/influxdata/kapacitor/pipeline: %v", err)
+	}
+	tickPkg := pkgs[1].Types
 	tickScope := tickPkg.Scope()
-
-	pipelinePkg, err := importer.For("source", nil).Import("github.com/influxdata/kapacitor/pipeline")
-	if err != nil {
-		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v; perhaps kapacitor is not in $GOPATH/src/influxdata/kapacitor?", err)
-	}
-
+	pipelinePkg := pkgs[0].Types
 	pipelineScope := pipelinePkg.Scope()
 	node := pipelineScope.Lookup("Node")
 	if node == nil {
