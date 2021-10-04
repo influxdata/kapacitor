@@ -817,7 +817,6 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, "must specify dbrp", true, http.StatusBadRequest)
 		return
 	}
-
 	if len(dbrps) > 0 && len(newTask.DBRPs) > 0 {
 		httpd.HttpError(w, "cannot specify dbrp in both implicitly and explicitly", true, http.StatusBadRequest)
 		return

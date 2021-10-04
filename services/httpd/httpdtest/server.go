@@ -29,6 +29,7 @@ func NewServer(verbose bool) *Server {
 			statMap,
 			ds.NewHTTPDHandler(),
 			"",
+			"",
 		),
 	}
 

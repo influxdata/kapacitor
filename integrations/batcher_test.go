@@ -66,7 +66,9 @@ func TestBatch_InvalidQuery(t *testing.T) {
 	// Create a new execution env
 	d := diagService.NewKapacitorHandler()
 	tm := kapacitor.NewTaskMaster("invalidQuery", newServerInfo(), d)
-	tm.HTTPDService = newHTTPDService()
+	httpdSrvs := newHTTPDService()
+	tm.HTTPDService = httpdSrvs
+	tm.Registrar = httpdSrvs
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
 	tm.Open()

@@ -88,7 +88,7 @@ type Service struct {
 	httpServerErrorLogger *log.Logger
 }
 
-func NewService(c Config, hostname string, t *tls.Config, d Diagnostic) *Service {
+func NewService(c Config, hostname string, t *tls.Config, d Diagnostic, defaultRP string) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 
@@ -120,6 +120,7 @@ func NewService(c Config, hostname string, t *tls.Config, d Diagnostic) *Service
 			statMap,
 			d,
 			c.SharedSecret,
+			defaultRP,
 		),
 		LocalHandler: NewHandler(
 			false,
@@ -130,6 +131,7 @@ func NewService(c Config, hostname string, t *tls.Config, d Diagnostic) *Service
 			localStatMap,
 			d,
 			"",
+			defaultRP,
 		),
 		diag:                  d,
 		httpServerErrorLogger: d.NewHTTPServerErrorLogger(),
@@ -353,4 +355,15 @@ func (s *Service) AddPreviewRoutes(routes []Route) error {
 func (s *Service) DelRoutes(routes []Route) {
 	s.LocalHandler.DelRoutes(routes)
 	s.Handler.DelRoutes(routes)
+}
+
+func (s *Service) Register(r ...Registration) {
+	s.LocalHandler.Register(r...)
+	s.Handler.Register(r...)
+
+}
+
+func (s *Service) UnRegister(r ...Registration) {
+	s.LocalHandler.UnRegister(r...)
+	s.Handler.UnRegister(r...)
 }

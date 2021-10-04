@@ -7,10 +7,10 @@ import (
 	"expvar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/pprof"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -31,6 +31,7 @@ const (
 	statPointsWrittenOK           = "points_written_ok"   // Number of points written OK
 	statPointsWrittenFail         = "points_written_fail" // Number of points that failed to be written
 	statAuthFail                  = "auth_fail"           // Number of requests that failed to authenticate
+	statWriteRequestIgnore        = "write_ignored"       // Number of requests that are ignored because no script is streaming them
 )
 
 const (
@@ -41,6 +42,7 @@ const (
 	// Name of the special user for subscriptions
 	SubscriptionUser = "~subscriber"
 )
+const defaultPayloadMaxSize = 1 << 17
 
 // AuthenticationMethod defines the type of authentication used.
 type AuthenticationMethod int
@@ -63,8 +65,13 @@ type Route struct {
 	BypassAuth  bool
 }
 
-type Registered struct {
-	Database string
+type Registration struct {
+	Database        string `json:"db"`
+	RetentionPolicy string `json:"rp"`
+}
+
+func (d Registration) String() string {
+	return fmt.Sprintf("%q.%q", d.Database, d.RetentionPolicy)
 }
 
 // Handler represents an HTTP handler for the Kapacitor API server.
@@ -74,6 +81,8 @@ type Handler struct {
 	requireAuthentication bool
 	exposePprof           bool
 	sharedSecret          string
+
+	maxPayload int64 // size of the max payload in bytes, defaults to 64 megs
 
 	allowGzip bool
 
@@ -98,6 +107,10 @@ type Handler struct {
 	loggingEnabled bool
 
 	statMap *expvar.Map
+
+	registrationsLock sync.Mutex
+	registrations     map[Registration]int
+	defaultRP         string
 }
 
 // NewHandler returns a new instance of handler with routes.
@@ -110,6 +123,7 @@ func NewHandler(
 	statMap *expvar.Map,
 	d Diagnostic,
 	sharedSecret string,
+	defaultRP string,
 ) *Handler {
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
@@ -121,6 +135,8 @@ func NewHandler(
 		writeTrace:            writeTrace,
 		loggingEnabled:        loggingEnabled,
 		statMap:               statMap,
+		registrations:         make(map[Registration]int),
+		defaultRP:             defaultRP,
 	}
 
 	allowedMethods := []string{
@@ -242,6 +258,9 @@ func NewHandler(
 			BypassAuth:  true,
 		},
 	})
+	if h.maxPayload == 0 {
+		h.maxPayload = defaultPayloadMaxSize
+	}
 
 	return h
 }
@@ -355,6 +374,29 @@ func (h *Handler) delRawRoute(r Route) {
 	}
 }
 
+func (h *Handler) Register(r ...Registration) {
+	h.registrationsLock.Lock()
+	for i := range r {
+		h.registrations[Registration{Database: r[i].Database, RetentionPolicy: r[i].RetentionPolicy}]++
+	}
+	h.registrationsLock.Unlock()
+}
+
+func (h *Handler) UnRegister(r ...Registration) {
+	h.registrationsLock.Lock()
+	for i := range r {
+		count, ok := h.registrations[Registration{Database: r[i].Database, RetentionPolicy: r[i].RetentionPolicy}]
+		if ok {
+			h.registrations[Registration{Database: r[i].Database, RetentionPolicy: r[i].RetentionPolicy}]--
+			count--
+		}
+		if count == 0 {
+			delete(h.registrations, Registration{Database: r[i].Database, RetentionPolicy: r[i].RetentionPolicy})
+		}
+	}
+	h.registrationsLock.Unlock()
+}
+
 // RewritePreview rewrites the URL path from BasePreviewPath to BasePath,
 // thus allowing any URI that exist on BasePath to be auto promotted to the BasePreviewPath.
 func (h *Handler) rewritePreview(w http.ResponseWriter, r *http.Request) {
@@ -419,7 +461,7 @@ func (h *Handler) serve404(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeError(w http.ResponseWriter, result influxql.Result, statusCode int) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(result.Err.Error()))
-	w.Write([]byte("\n"))
+	w.Write([]byte{'\n'})
 }
 
 // ServeOptions returns an empty response to comply with OPTIONS pre-flight requests
@@ -433,11 +475,45 @@ func (h *Handler) servePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) isRegistered(w http.ResponseWriter, r *http.Request) (ok bool) {
+
+	dbrp := r.URL.Query().Get("db")
+	if dbrp == "" {
+		h.writeError(w, influxql.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
+		return
+	}
+	var db, rp string
+	splitDbrp := strings.Split(dbrp, "/")
+	switch {
+	case len(splitDbrp) > 2:
+		h.writeError(w, influxql.Result{Err: fmt.Errorf("bad format for database/retention_policy")}, http.StatusBadRequest)
+		return
+	case len(splitDbrp) == 2:
+		db = splitDbrp[0]
+		rp = splitDbrp[1]
+	case len(splitDbrp) == 1:
+		db = dbrp
+		rp = r.URL.Query().Get("rp")
+	}
+	if rp == "" {
+		rp = h.defaultRP
+	}
+	h.registrationsLock.Lock()
+	_, ok = h.registrations[Registration{Database: db, RetentionPolicy: rp}]
+	h.registrationsLock.Unlock()
+	return
+}
+
 func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.User) {
+	if !h.isRegistered(w, r) {
+		h.statMap.Add(statWriteRequestIgnore, 1)
+		return
+	}
 	h.statMap.Add(statWriteRequest, 1)
 
 	// Handle gzip decoding of the body
-	body := r.Body
+	body := http.MaxBytesReader(w, r.Body, h.maxPayload)
+	defer body.Close() // it is in a function call so it closes the correct body var
 	if r.Header.Get("Content-encoding") == "gzip" {
 		b, err := gzip.NewReader(r.Body)
 		if err != nil {
@@ -445,10 +521,21 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 			return
 		}
 		body = b
+		defer b.Close()
 	}
-	defer body.Close()
-
-	b, err := ioutil.ReadAll(body)
+	if r.ContentLength > h.maxPayload {
+		err := errors.New("write payload too large")
+		if h.writeTrace {
+			h.diag.Error("write payload too large", err)
+		}
+		h.writeError(w, influxql.Result{Err: err}, http.StatusRequestEntityTooLarge)
+		return
+	}
+	// this is to prevent accidental gzip explosion from ooming the server.
+	// it won't prevent a dedicated attacker from doing it, as they can just launch a lot of concurrent
+	// requests each trying to explode
+	body = http.MaxBytesReader(w, body, h.maxPayload)
+	b, err := io.ReadAll(body)
 	if err != nil {
 		if h.writeTrace {
 			h.diag.Error("write handler unable to read bytes from request body", err)
@@ -461,11 +548,11 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 		h.diag.WriteBodyReceived(string(b))
 	}
 
-	h.serveWriteLine(w, r, b, user)
+	h.serveWriteLP(w, r, b, user)
 }
 
 // serveWriteLine receives incoming series data in line protocol format and writes it to the database.
-func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []byte, user auth.User) {
+func (h *Handler) serveWriteLP(w http.ResponseWriter, r *http.Request, body []byte, user auth.User) {
 	qp := r.URL.Query()
 	precision := qp.Get("precision")
 	if precision == "" {

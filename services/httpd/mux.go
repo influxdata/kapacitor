@@ -176,7 +176,7 @@ func (mux *ServeMux) Handle(pattern string, handler http.Handler) error {
 		return errors.New("http: nil handler")
 	}
 	if mux.m[pattern].explicit {
-		return errors.New("http: multiple registrations for " + pattern)
+		return errors.New("http: multiple Registration for " + pattern)
 	}
 
 	mux.m[pattern] = muxEntry{explicit: true, h: handler, pattern: pattern}
