@@ -5,6 +5,7 @@
 ### Features
 - [#2575](https://github.com/influxdata/kapacitor/pull/2575): Support the "attributes" attribute in Alerta node
 - [#2630](https://github.com/influxdata/kapacitor/pull/2630): Upgrade to the new `google.golang` Protobuf library
+- [#2643](https://github.com/influxdata/kapacitor/pull/2643): Add "host" and "attribute" options to BigPanda node
 
 ## v1.6.2 [2021-09-24]
 
