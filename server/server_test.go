@@ -7889,6 +7889,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"insecure-skip-verify": false,
 						"token":                false,
 						"app-key":              "",
+						"auto-attributes":      "",
 					},
 					Redacted: []string{
 						"token",
@@ -7905,6 +7906,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"insecure-skip-verify": false,
 					"token":                false,
 					"app-key":              "",
+					"auto-attributes":      "",
 				},
 				Redacted: []string{
 					"token",
@@ -7931,6 +7933,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
 								"token":                true,
 								"app-key":              "appkey-123",
+								"auto-attributes":      "",
 								"insecure-skip-verify": false,
 							},
 							Redacted: []string{
@@ -7946,6 +7949,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"state-changes-only":   false,
 							"url":                  "https://dev123456.bigpanda.io/data/v2/alerts",
 							"app-key":              "appkey-123",
+							"auto-attributes":      "",
 							"token":                true,
 							"insecure-skip-verify": false,
 						},
@@ -9146,7 +9150,8 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/bigpanda"},
 				Name: "bigpanda",
 				Options: client.ServiceTestOptions{
-					"app_key":            "",
+					"app_key":            "012345",
+					"host":               "serverA",
 					"level":              "CRITICAL",
 					"message":            "test bigpanda message",
 					"timestamp":          "1970-01-01T00:00:01Z",

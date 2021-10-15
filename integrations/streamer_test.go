@@ -9379,16 +9379,24 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.bigPanda()
-			.AppKey('111111')
+			.appKey('111111')
+			.host('{{.Tags.host}}')
+			.primaryProperty('host')
 		.bigPanda()
-			.AppKey('222222')
+			.appKey('222222')
+			.host('serverA-1')
+			.secondaryProperty('application')
 		.bigPanda()
+			.attribute('x_host', '{{.Tags.host}}')
+			.attribute('x_duration', '{{.Duration}}')
+			.attribute('x_detail', '{{.Details}}')
+			.attribute('x_value', '{{.Fields.count}}')
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 
 		c := bigpanda.NewConfig()
 		c.Enabled = true
-		c.AppKey = "XXXXXXX"
+		c.AppKey = "012345"
 		c.Token = "testtoken1231234"
 		c.URL = ts.URL + "/test/bigpanda/url"
 
@@ -9415,6 +9423,7 @@ stream
 				Timestamp:   31536010,
 				Task:        "TestStream_Alert:cpu",
 				Details:     "https://example.org/link",
+				PrimaryProperty: "host",
 			},
 		},
 		bigpandatest.Request{
@@ -9424,10 +9433,11 @@ stream
 				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
 				AppKey:      "222222",
 				Status:      "critical",
-				Host:        "serverA",
+				Host:        "serverA-1",
 				Timestamp:   31536010,
 				Task:        "TestStream_Alert:cpu",
 				Details:     "https://example.org/link",
+				SecondaryProperty: "application",
 			},
 		},
 		bigpandatest.Request{
@@ -9435,12 +9445,18 @@ stream
 			PostData: bigpandatest.PostData{
 				Check:       "kapacitor/cpu/serverA",
 				Description: "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
-				AppKey:      "XXXXXXX",
+				AppKey:      "012345",
 				Status:      "critical",
-				Host:        "serverA",
+				Host:        "",
 				Timestamp:   31536010,
 				Task:        "TestStream_Alert:cpu",
 				Details:     "https://example.org/link",
+				Attributes:  map[string]string{
+					"x_detail": "https://example.org/link",
+					"x_duration": "0s",
+					"x_host": "serverA",
+					"x_value": "10",
+				},
 			},
 		},
 	}
