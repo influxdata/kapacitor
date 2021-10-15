@@ -55,7 +55,7 @@ func TestService_SerializeEventData(t *testing.T) {
 		},
 		{
 			name:    "tags",
-			tags:     map[string]string{"host": "localhost", "link": "http://localhost/bp"},
+			tags:    map[string]string{"host": "localhost", "link": "http://localhost/bp"},
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"host\":\"localhost\",\"link\":\"http://localhost/bp\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 	}
