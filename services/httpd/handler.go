@@ -108,7 +108,7 @@ type Handler struct {
 
 	statMap *expvar.Map
 
-	registrationsLock sync.Mutex
+	registrationsLock sync.RWMutex
 	registrations     map[Registration]int
 	defaultRP         string
 }
@@ -397,6 +397,23 @@ func (h *Handler) UnRegister(r ...Registration) {
 	h.registrationsLock.Unlock()
 }
 
+func (h *Handler) IsRegistered(r Registration) (ok bool) {
+	h.registrationsLock.RLock()
+	_, ok = h.registrations[r]
+	h.registrationsLock.RUnlock()
+	return
+}
+
+func (h *Handler) Registrations() map[Registration]struct{} {
+	h.registrationsLock.RLock()
+	defer h.registrationsLock.RUnlock()
+	out := make(map[Registration]struct{}, len(h.registrations))
+	for x := range h.registrations {
+		out[x] = struct{}{}
+	}
+	return out
+}
+
 // RewritePreview rewrites the URL path from BasePreviewPath to BasePath,
 // thus allowing any URI that exist on BasePath to be auto promotted to the BasePreviewPath.
 func (h *Handler) rewritePreview(w http.ResponseWriter, r *http.Request) {
@@ -475,19 +492,19 @@ func (h *Handler) servePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) isRegistered(w http.ResponseWriter, r *http.Request) (ok bool) {
+func (h *Handler) isRequestRegistered(w http.ResponseWriter, r *http.Request) bool {
 
 	dbrp := r.URL.Query().Get("db")
 	if dbrp == "" {
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
-		return
+		return false
 	}
 	var db, rp string
 	splitDbrp := strings.Split(dbrp, "/")
 	switch {
 	case len(splitDbrp) > 2:
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("bad format for database/retention_policy")}, http.StatusBadRequest)
-		return
+		return false
 	case len(splitDbrp) == 2:
 		db = splitDbrp[0]
 		rp = splitDbrp[1]
@@ -498,14 +515,11 @@ func (h *Handler) isRegistered(w http.ResponseWriter, r *http.Request) (ok bool)
 	if rp == "" {
 		rp = h.defaultRP
 	}
-	h.registrationsLock.Lock()
-	_, ok = h.registrations[Registration{Database: db, RetentionPolicy: rp}]
-	h.registrationsLock.Unlock()
-	return
+	return h.IsRegistered(Registration{Database: db, RetentionPolicy: rp})
 }
 
 func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.User) {
-	if !h.isRegistered(w, r) {
+	if !h.isRequestRegistered(w, r) {
 		h.statMap.Add(statWriteRequestIgnore, 1)
 		return
 	}

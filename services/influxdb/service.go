@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,12 +86,13 @@ type Service struct {
 		Stop()
 	}
 
+	HTTPDService HTTPDService
+
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
-	HTTPDService interface {
-		AddRoutes([]httpd.Route) error
-		DelRoutes([]httpd.Route)
+	Registereder interface {
+		Registered() map[httpd.Registration]struct{}
 	}
 	ClientCreator interface {
 		Create(influxdb.Config) (influxdb.ClientUpdater, error)
@@ -104,15 +106,22 @@ type Service struct {
 	diag       Diagnostic
 }
 
-func NewService(configs []Config, httpPort int, hostname string, ider IDer, useTokens bool, d Diagnostic) (*Service, error) {
+type HTTPDService interface {
+	AddRoutes([]httpd.Route) error
+	DelRoutes([]httpd.Route)
+	Registrations() map[httpd.Registration]struct{}
+}
+
+func NewService(configs []Config, httpPort int, hostname string, ider IDer, useTokens bool, d Diagnostic, httpdService HTTPDService) (*Service, error) {
 	s := &Service{
-		clusters:   make(map[string]*influxdbCluster),
-		hostname:   hostname,
-		ider:       ider,
-		httpPort:   httpPort,
-		useTokens:  useTokens,
-		diag:       d,
-		RandReader: rand.Reader,
+		clusters:     make(map[string]*influxdbCluster),
+		hostname:     hostname,
+		ider:         ider,
+		httpPort:     httpPort,
+		useTokens:    useTokens,
+		diag:         d,
+		RandReader:   rand.Reader,
+		HTTPDService: httpdService,
 	}
 	if err := s.updateConfigs(configs); err != nil {
 		return nil, err
@@ -234,7 +243,10 @@ func (s *Service) updateConfigs(configs []Config) error {
 			}
 		} else {
 			var err error
-			cluster, err = newInfluxDBCluster(c, s.hostname, s.ider, s.httpPort, s.useTokens, s.diag.WithClusterContext(c.Name))
+			if s.HTTPDService == nil {
+				panic("ack")
+			}
+			cluster, err = newInfluxDBCluster(c, s.hostname, s.ider, s.httpPort, s.useTokens, s.diag.WithClusterContext(c.Name), s.HTTPDService)
 			if err != nil {
 				return err
 			}
@@ -427,6 +439,15 @@ type influxdbCluster struct {
 		ListSubscriptionTokens() ([]string, error)
 		RevokeSubscriptionAccess(token string) error
 	}
+
+	IsRegistereder interface {
+		IsRegistered(httpd.Registration)
+	}
+
+	Registrations interface {
+		Registrations() map[httpd.Registration]struct{}
+	}
+
 	ctxMu     sync.Mutex
 	ctx       context.Context
 	cancelCtx context.CancelFunc
@@ -451,7 +472,9 @@ type subInfo struct {
 	Destinations []string
 }
 
-func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useTokens bool, d Diagnostic) (*influxdbCluster, error) {
+func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useTokens bool, d Diagnostic, registrations interface {
+	Registrations() map[httpd.Registration]struct{}
+}) (*influxdbCluster, error) {
 	if c.InsecureSkipVerify {
 		d.InsecureSkipVerify(c.URLs)
 	}
@@ -463,7 +486,8 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 	if err != nil {
 		return nil, err
 	}
-	subs := subsFromConfig(subName, c.Subscriptions)
+
+	//  getting subs from config is depreciated, but excluding subs is not
 	exSubs := subsFromConfig(subName, c.ExcludedSubscriptions)
 	port := httpPort
 	if c.HTTPPort != 0 {
@@ -476,7 +500,6 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 	return &influxdbCluster{
 		clusterName:              c.Name,
 		influxdbConfig:           config,
-		configSubs:               subs,
 		exConfigSubs:             exSubs,
 		hostname:                 host,
 		httpPort:                 port,
@@ -493,6 +516,7 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 		protocol:                 c.SubscriptionProtocol,
 		runningSubs:              make(map[subEntry]bool, len(c.Subscriptions)),
 		services:                 make(map[subEntry]openCloser, len(c.Subscriptions)),
+		Registrations:            registrations,
 		// Do not use tokens for non http protocols
 		useTokens: useTokens && (c.SubscriptionProtocol == "http" || c.SubscriptionProtocol == "https"),
 		diag:      d,
@@ -849,6 +873,12 @@ func (c *influxdbCluster) LinkSubscriptions() error {
 	return c.linkSubscriptions(ctx, newSubName)
 }
 
+func (c *influxdbCluster) shouldSubExist(registrations map[httpd.Registration]struct{}, se subEntry) bool {
+	_, shouldExist := registrations[httpd.Registration{Database: se.db, RetentionPolicy: se.rp}]
+	shouldExist = shouldExist && (len(c.configSubs) == 0 || c.configSubs[se]) && !c.exConfigSubs[se]
+	return shouldExist
+}
+
 // linkSubscriptions you must have the lock to call this method.
 func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string) error {
 	if c.disableSubs {
@@ -964,11 +994,11 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 			}
 		}
 	}
-
 	// start any missing subscriptions
 	// and drop any extra subs
+	registrations := c.Registrations.Registrations()
 	for se, si := range existingSubs {
-		shouldExist := c.shouldSubExist(se)
+		shouldExist := c.shouldSubExist(registrations, se)
 		if shouldExist && !c.runningSubs[se] {
 			// Check if this kapacitor instance is in the list of hosts
 			for _, dest := range si.Destinations {
@@ -1004,8 +1034,10 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 	// create and start any new subscriptions
 	for _, se := range allSubs {
 		_, exists := existingSubs[se]
+		shouldSubExist := c.shouldSubExist(registrations, se)
+
 		// If we have been configured to subscribe and the subscription is not created/started yet.
-		if c.shouldSubExist(se) && !(c.runningSubs[se] && exists) {
+		if shouldSubExist && !(c.runningSubs[se] && exists) {
 			var destination string
 			switch c.protocol {
 			case "http", "https":
@@ -1109,8 +1141,33 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 	return nil
 }
 
-func (c *influxdbCluster) shouldSubExist(se subEntry) bool {
-	return (len(c.configSubs) == 0 || c.configSubs[se]) && !c.exConfigSubs[se]
+func (c *influxdbCluster) filterSubs(s ...subEntry) []subEntry {
+	reg := c.Registrations.Registrations()
+	sort.Slice(s, func(i, j int) bool {
+		switch strings.Compare(s[i].db, s[j].db) {
+		case -1:
+			return true
+		case 1:
+			return false
+		}
+		switch strings.Compare(s[i].rp, s[j].rp) {
+		case -1:
+			return true
+		case 1:
+			return false
+		}
+		return false
+	})
+	oldR := httpd.Registration{}
+	filtered := make([]subEntry, 0, len(s))
+	for i := range s {
+		r := httpd.Registration{Database: s[i].db, RetentionPolicy: s[i].rp}
+		if _, ok := reg[r]; ok && r != oldR {
+			filtered = append(filtered, s[i])
+		}
+		oldR = r
+	}
+	return filtered
 }
 
 // Determine whether a subscription has differing values from the config.

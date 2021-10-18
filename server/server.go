@@ -497,7 +497,12 @@ func (s *Server) appendInfluxDBService() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
 	}
-	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, d)
+
+	if s.HTTPDService == nil {
+		panic("s.HTTPDService==nil")
+	}
+
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, d, s.HTTPDService)
 	if err != nil {
 		return err
 	}

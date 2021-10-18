@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,6 +106,8 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		revokedTokens []string
 		subChanged    subChanged
 
+		registrations []httpd.Registration
+
 		// apply new config between rounds
 		partialConfigs map[string]partialConfig
 
@@ -137,6 +140,11 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 						"db2": []string{"rpC"},
 					},
 				}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestinationWithTokenForCluster(testClusterName) + `'`,
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpB DESTINATIONS ANY '` + testDestinationWithTokenForCluster(testClusterName) + `'`,
@@ -180,6 +188,11 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 						"db2": []string{"rpC"},
 					},
 				}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpB DESTINATIONS ANY '` + testDestination + `'`,
@@ -211,6 +224,11 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				}},
 			tokens: []string{
 				randomToken,
+			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
 			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpB DESTINATIONS ANY '` + testDestinationWithTokenForCluster(testClusterName) + `'`,
@@ -253,6 +271,11 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 						"db2": []string{"rpC"},
 					},
 				}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+			},
 			tokens: []string{
 				randomToken,
 			},
@@ -278,6 +301,12 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 						"db10": []string{"rpZ"},
 					},
 				}},
+			registrations: []httpd.Registration{
+				{Database: "db10", RetentionPolicy: "rpZ"},
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+			},
 			secondClusters: map[string]clusterInfo{
 				testClusterName: {
 					dbrps: map[string][]string{
@@ -350,6 +379,12 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 					},
 				},
 			},
+			registrations: []httpd.Registration{
+				{Database: "db10", RetentionPolicy: "rpZ"},
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+			},
 			tokens: []string{
 				randomToken,
 				"invalidtoken",
@@ -387,6 +422,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			secondRevokedTokens: []string{
 				randomToken,
 			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SecondNewDB": {
 			useTokens: true,
@@ -423,6 +461,11 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db2",
 				rp:    "rpB",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpB"},
+			},
 		},
 		"SC_NoDests": {
 			useTokens:  false,
@@ -450,6 +493,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
+			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
 			},
 		},
 		"SC_InvalidURL": {
@@ -490,6 +536,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db1",
 				rp:    "rpA",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_WrongProtocol": {
 			useTokens:  false,
@@ -517,6 +566,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
+			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
 			},
 		},
 		"SC_Host": {
@@ -546,6 +598,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
 			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_Port": {
 			useTokens:  false,
@@ -574,6 +629,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
 			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_ExtraUser": {
 			useTokens:  false,
@@ -601,6 +659,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			},
 			createSubs: []string{
 				`CREATE SUBSCRIPTION "` + testSubName + `" ON db1.rpA DESTINATIONS ANY '` + testDestination + `'`,
+			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
 			},
 		},
 		"SC_NoUser": {
@@ -641,6 +702,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db1",
 				rp:    "rpA",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_WrongUser": {
 			useTokens:  true,
@@ -680,6 +744,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db1",
 				rp:    "rpA",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_NoPassword": {
 			useTokens:  true,
@@ -719,6 +786,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db1",
 				rp:    "rpA",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"SC_WrongCluster": {
 			useTokens:  true,
@@ -758,6 +828,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				db:    "db1",
 				rp:    "rpA",
 			}},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+			},
 		},
 		"ConfigChange_NewSubs": {
 			clusters: map[string]clusterInfo{
@@ -796,6 +869,12 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				`DROP SUBSCRIPTION "` + testSubName + `" ON db2.rpC`,
 				`DROP SUBSCRIPTION "` + testSubName + `" ON db2.rpD`,
 			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+				{Database: "db2", RetentionPolicy: "rpD"},
+			},
 		},
 		"ConfigChange_NewExcludes": {
 			clusters: map[string]clusterInfo{
@@ -830,224 +909,232 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 			secondDropSubs: []string{
 				`DROP SUBSCRIPTION "` + testSubName + `" ON db1.rpA`,
 			},
+			registrations: []httpd.Registration{
+				{Database: "db1", RetentionPolicy: "rpA"},
+				{Database: "db1", RetentionPolicy: "rpB"},
+				{Database: "db2", RetentionPolicy: "rpC"},
+				{Database: "db2", RetentionPolicy: "rpD"},
+			},
 		},
 	}
 	for testName, tc := range testCases {
-		t.Log("starting test:", testName)
-		log.Println("starting test:", testName)
-		clusterNames := make([]string, 0, len(tc.clusters))
-		clusterNameLookup := make(map[string]int, len(tc.clusters))
-		i := 0
-		for clusterName := range tc.clusters {
-			clusterNames = append(clusterNames, clusterName)
-			clusterNameLookup[clusterName] = i
-			i++
-		}
-		defaultConfigs := NewDefaultTestConfigs(clusterNames)
-		s, as, cs := NewTestService(defaultConfigs, "localhost", tc.useTokens)
+		t.Run(testName, func(t *testing.T) {
+			clusterNames := make([]string, 0, len(tc.clusters))
+			clusterNameLookup := make(map[string]int, len(tc.clusters))
+			i := 0
+			for clusterName := range tc.clusters {
+				clusterNames = append(clusterNames, clusterName)
+				clusterNameLookup[clusterName] = i
+				i++
+			}
+			defaultConfigs := NewDefaultTestConfigs(clusterNames)
+			s, as, cs := NewTestService(defaultConfigs, "localhost", tc.useTokens)
 
-		// Define the active vars
-		var activeClusters map[string]clusterInfo
-		var tokens []string
-		var subChanges subChanged
-		var createSubs map[string]bool
-		var dropSubs map[string]bool
-		var grantedTokens map[tokenGrant]bool
-		var revokedTokens map[string]bool
+			s.HTTPDService.(*httpdService).Set(tc.registrations...)
+			// Define the active vars
+			var activeClusters map[string]clusterInfo
+			var tokens []string
+			var subChanges subChanged
+			var createSubs map[string]bool
+			var dropSubs map[string]bool
+			var grantedTokens map[tokenGrant]bool
+			var revokedTokens map[string]bool
 
-		// Setup functions
-		cs.QueryFunc = func(clusterName string, q influxcli.Query) (*influxcli.Response, error) {
-			log.Println("query:", q.Command)
-			switch {
-			case q.Command == "SHOW DATABASES":
-				dbs := make([][]interface{}, 0, len(activeClusters[clusterName].dbrps))
-				for db := range activeClusters[clusterName].dbrps {
-					dbs = append(dbs, []interface{}{db})
-				}
-				return &influxcli.Response{
-					Results: []influxcli.Result{{
-						Series: []models.Row{
-							{
-								Values: dbs,
-							},
-						},
-					}},
-				}, nil
-			case strings.HasPrefix(q.Command, "SHOW RETENTION POLICIES ON"):
-				stmt, _ := influxql.ParseStatement(q.Command)
-				if show, ok := stmt.(*influxql.ShowRetentionPoliciesStatement); ok {
-					var rps [][]interface{}
-					for _, rp := range activeClusters[clusterName].dbrps[show.Database] {
-						rps = append(rps, []interface{}{rp})
+			// Setup functions
+			cs.QueryFunc = func(clusterName string, q influxcli.Query) (*influxcli.Response, error) {
+				log.Println("query:", q.Command)
+				switch {
+				case q.Command == "SHOW DATABASES":
+					dbs := make([][]interface{}, 0, len(activeClusters[clusterName].dbrps))
+					for db := range activeClusters[clusterName].dbrps {
+						dbs = append(dbs, []interface{}{db})
 					}
 					return &influxcli.Response{
 						Results: []influxcli.Result{{
 							Series: []models.Row{
 								{
-									Values: rps,
+									Values: dbs,
 								},
 							},
 						}},
 					}, nil
-				}
-				return nil, fmt.Errorf("invalid show rp query: %s", q.Command)
-			case q.Command == "SHOW SUBSCRIPTIONS":
-				result := influxcli.Result{}
-				for db, subs := range activeClusters[clusterName].subs {
-					series := models.Row{
-						Name: db,
-						Columns: []string{
-							"name",
-							"retention_policy",
-							"mode",
-							"destinations",
-						},
-					}
-					for _, rp := range subs {
-						var destinations []interface{}
-						switch {
-						case subChanges.NoDests:
-							destinations = nil
-						case subChanges.InvalidURL:
-							destinations = []interface{}{"://broken url"}
-						case subChanges.WrongProtocol:
-							destinations = []interface{}{"unknown://localhost:9092"}
-						case subChanges.Host:
-							destinations = []interface{}{"http://example.com:9092"}
-						case subChanges.Port:
-							destinations = []interface{}{"http://localhost:666"}
-						case subChanges.NoUser:
-							destinations = []interface{}{"http://localhost:9092"}
-						case subChanges.ExtraUser:
-							destinations = []interface{}{"http://bob@localhost:9092"}
-						case subChanges.WrongUser:
-							destinations = []interface{}{"http://bob:tokendata@localhost:9092"}
-						case subChanges.NoPassword:
-							destinations = []interface{}{"http://~subscriber@localhost:9092"}
-						case subChanges.WrongCluster:
-							destinations = testDestinationsWithTokensForCluster("wrong")
-						default:
-							if tc.useTokens {
-								destinations = testDestinationsWithTokensForCluster(clusterName)
-							} else {
-								destinations = []interface{}{testDestination}
-							}
+				case strings.HasPrefix(q.Command, "SHOW RETENTION POLICIES ON"):
+					stmt, _ := influxql.ParseStatement(q.Command)
+					if show, ok := stmt.(*influxql.ShowRetentionPoliciesStatement); ok {
+						var rps [][]interface{}
+						for _, rp := range activeClusters[clusterName].dbrps[show.Database] {
+							rps = append(rps, []interface{}{rp})
 						}
-						series.Values = append(series.Values, []interface{}{
-							testSubName,
-							rp,
-							subMode,
-							destinations,
-						})
+						return &influxcli.Response{
+							Results: []influxcli.Result{{
+								Series: []models.Row{
+									{
+										Values: rps,
+									},
+								},
+							}},
+						}, nil
 					}
-					result.Series = append(result.Series, series)
+					return nil, fmt.Errorf("invalid show rp query: %s", q.Command)
+				case q.Command == "SHOW SUBSCRIPTIONS":
+					result := influxcli.Result{}
+					for db, subs := range activeClusters[clusterName].subs {
+						series := models.Row{
+							Name: db,
+							Columns: []string{
+								"name",
+								"retention_policy",
+								"mode",
+								"destinations",
+							},
+						}
+						for _, rp := range subs {
+							var destinations []interface{}
+							switch {
+							case subChanges.NoDests:
+								destinations = nil
+							case subChanges.InvalidURL:
+								destinations = []interface{}{"://broken url"}
+							case subChanges.WrongProtocol:
+								destinations = []interface{}{"unknown://localhost:9092"}
+							case subChanges.Host:
+								destinations = []interface{}{"http://example.com:9092"}
+							case subChanges.Port:
+								destinations = []interface{}{"http://localhost:666"}
+							case subChanges.NoUser:
+								destinations = []interface{}{"http://localhost:9092"}
+							case subChanges.ExtraUser:
+								destinations = []interface{}{"http://bob@localhost:9092"}
+							case subChanges.WrongUser:
+								destinations = []interface{}{"http://bob:tokendata@localhost:9092"}
+							case subChanges.NoPassword:
+								destinations = []interface{}{"http://~subscriber@localhost:9092"}
+							case subChanges.WrongCluster:
+								destinations = testDestinationsWithTokensForCluster("wrong")
+							default:
+								if tc.useTokens {
+									destinations = testDestinationsWithTokensForCluster(clusterName)
+								} else {
+									destinations = []interface{}{testDestination}
+								}
+							}
+							series.Values = append(series.Values, []interface{}{
+								testSubName,
+								rp,
+								subMode,
+								destinations,
+							})
+						}
+						result.Series = append(result.Series, series)
+					}
+					return &influxcli.Response{Results: []influxcli.Result{result}}, nil
+				case strings.HasPrefix(q.Command, "CREATE SUBSCRIPTION"):
+					createSubs[q.Command] = true
+					return &influxcli.Response{}, nil
+				case strings.HasPrefix(q.Command, "DROP SUBSCRIPTION"):
+					dropSubs[q.Command] = true
+					return &influxcli.Response{}, nil
+				default:
+					msg := fmt.Sprintf("unexpected query: %s", q.Command)
+					t.Error(msg)
+					return nil, errors.New(msg)
 				}
-				return &influxcli.Response{Results: []influxcli.Result{result}}, nil
-			case strings.HasPrefix(q.Command, "CREATE SUBSCRIPTION"):
-				createSubs[q.Command] = true
-				return &influxcli.Response{}, nil
-			case strings.HasPrefix(q.Command, "DROP SUBSCRIPTION"):
-				dropSubs[q.Command] = true
-				return &influxcli.Response{}, nil
-			default:
-				msg := fmt.Sprintf("unexpected query: %s", q.Command)
-				t.Error(msg)
-				return nil, errors.New(msg)
 			}
-		}
-		as.ListSubscriptionTokensFunc = func() ([]string, error) {
-			ts := make([]string, len(tokens))
-			for i, token := range tokens {
-				ts[i] = base64.RawURLEncoding.EncodeToString([]byte(token))
+			as.ListSubscriptionTokensFunc = func() ([]string, error) {
+				ts := make([]string, len(tokens))
+				for i, token := range tokens {
+					ts[i] = base64.RawURLEncoding.EncodeToString([]byte(token))
+				}
+				return ts, nil
 			}
-			return ts, nil
-		}
-		as.GrantSubscriptionAccessFunc = func(token, db, rp string) error {
-			raw, err := base64.RawURLEncoding.DecodeString(token)
-			if err != nil {
-				return err
+			as.GrantSubscriptionAccessFunc = func(token, db, rp string) error {
+				raw, err := base64.RawURLEncoding.DecodeString(token)
+				if err != nil {
+					return err
+				}
+				log.Println("granted token:", string(raw), db, rp)
+				grantedTokens[tokenGrant{
+					token: string(raw),
+					db:    db,
+					rp:    rp,
+				}] = true
+				return nil
 			}
-			log.Println("granted token:", string(raw), db, rp)
-			grantedTokens[tokenGrant{
-				token: string(raw),
-				db:    db,
-				rp:    rp,
-			}] = true
-			return nil
-		}
-		as.RevokeSubscriptionAccessFunc = func(token string) error {
-			raw, err := base64.RawURLEncoding.DecodeString(token)
-			if err != nil {
-				return err
+			as.RevokeSubscriptionAccessFunc = func(token string) error {
+				raw, err := base64.RawURLEncoding.DecodeString(token)
+				if err != nil {
+					return err
+				}
+				log.Println("revoked token:", string(raw))
+				revokedTokens[string(raw)] = true
+				return nil
 			}
-			log.Println("revoked token:", string(raw))
-			revokedTokens[string(raw)] = true
-			return nil
-		}
 
-		// Run first round
-		activeClusters = tc.clusters
-		tokens = tc.tokens
-		subChanges = tc.subChanged
-		createSubs = make(map[string]bool)
-		dropSubs = make(map[string]bool)
-		grantedTokens = make(map[tokenGrant]bool)
-		revokedTokens = make(map[string]bool)
+			// Run first round
+			activeClusters = tc.clusters
+			tokens = tc.tokens
+			subChanges = tc.subChanged
+			createSubs = make(map[string]bool)
+			dropSubs = make(map[string]bool)
+			grantedTokens = make(map[tokenGrant]bool)
+			revokedTokens = make(map[string]bool)
 
-		log.Println("D! first round")
-		if err := s.Open(); err != nil {
-			t.Fatal(err)
-		}
-		defer s.Close()
-		validate(
-			t,
-			testName+"-1",
-			tc.createSubs,
-			tc.dropSubs,
-			tc.grantedTokens,
-			tc.revokedTokens,
-			createSubs,
-			dropSubs,
-			grantedTokens,
-			revokedTokens,
-		)
-
-		// Run second round
-		activeClusters = tc.secondClusters
-		tokens = tc.secondTokens
-		subChanges = tc.secondSubChanged
-		createSubs = make(map[string]bool)
-		dropSubs = make(map[string]bool)
-		grantedTokens = make(map[tokenGrant]bool)
-		revokedTokens = make(map[string]bool)
-
-		log.Println("D! second round")
-		if len(tc.partialConfigs) > 0 {
-			configs := make([]interface{}, 0, len(tc.partialConfigs))
-			for name, pc := range tc.partialConfigs {
-				c := defaultConfigs[clusterNameLookup[name]]
-				c.Subscriptions = pc.configSubs
-				c.ExcludedSubscriptions = pc.configExSubs
-				configs = append(configs, c)
-			}
-			if err := s.Update(configs); err != nil {
+			log.Println("D! first round")
+			if err := s.Open(); err != nil {
 				t.Fatal(err)
 			}
-		}
-		s.LinkSubscriptions()
+			defer s.Close()
+			validate(
+				t,
+				testName+"-1",
+				tc.createSubs,
+				tc.dropSubs,
+				tc.grantedTokens,
+				tc.revokedTokens,
+				createSubs,
+				dropSubs,
+				grantedTokens,
+				revokedTokens,
+			)
 
-		validate(
-			t,
-			testName+"-2",
-			tc.secondCreateSubs,
-			tc.secondDropSubs,
-			tc.secondGrantedTokens,
-			tc.secondRevokedTokens,
-			createSubs,
-			dropSubs,
-			grantedTokens,
-			revokedTokens,
-		)
+			// Run second round
+			activeClusters = tc.secondClusters
+			tokens = tc.secondTokens
+			subChanges = tc.secondSubChanged
+			createSubs = make(map[string]bool)
+			dropSubs = make(map[string]bool)
+			grantedTokens = make(map[tokenGrant]bool)
+			revokedTokens = make(map[string]bool)
+
+			log.Println("D! second round")
+			if len(tc.partialConfigs) > 0 {
+				configs := make([]interface{}, 0, len(tc.partialConfigs))
+				for name, pc := range tc.partialConfigs {
+					c := defaultConfigs[clusterNameLookup[name]]
+					c.Subscriptions = pc.configSubs
+					c.ExcludedSubscriptions = pc.configExSubs
+					configs = append(configs, c)
+				}
+				if err := s.Update(configs); err != nil {
+					t.Fatal(err)
+				}
+			}
+			s.LinkSubscriptions()
+
+			validate(
+				t,
+				testName+"-2",
+				tc.secondCreateSubs,
+				tc.secondDropSubs,
+				tc.secondGrantedTokens,
+				tc.secondRevokedTokens,
+				createSubs,
+				dropSubs,
+				grantedTokens,
+				revokedTokens,
+			)
+
+		})
 	}
 }
 
@@ -1172,11 +1259,12 @@ func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) 
 		httpPort,
 		hostname,
 		ider{clusterID: testKapacitorClusterID, serverID: uuid.New()},
-		useTokens, d)
+		useTokens,
+		d,
+		&httpdService{})
 	if err != nil {
 		panic(err)
 	}
-	s.HTTPDService = httpdService{}
 	as := &authService{}
 	s.AuthService = as
 	cs := &clientCreator{}
@@ -1314,13 +1402,32 @@ func (logSerivce) NewLogger(p string, flags int) *log.Logger {
 	return log.New(os.Stderr, p, flags)
 }
 
+// httpdService is a mock for registrations
 type httpdService struct {
+	sync.Mutex
+	reg []httpd.Registration
 }
 
-func (httpdService) AddRoutes([]httpd.Route) error {
+func (*httpdService) AddRoutes([]httpd.Route) error {
 	return nil
 }
-func (httpdService) DelRoutes([]httpd.Route) {}
+func (*httpdService) DelRoutes([]httpd.Route) {}
+
+func (s *httpdService) Registrations() map[httpd.Registration]struct{} {
+	s.Lock()
+	defer s.Unlock()
+	res := map[httpd.Registration]struct{}{}
+	for i := range s.reg {
+		res[s.reg[i]] = struct{}{}
+	}
+	return res
+}
+
+func (s *httpdService) Set(reg ...httpd.Registration) {
+	s.Lock()
+	defer s.Unlock()
+	s.reg = append(s.reg[:0], reg...)
+}
 
 type randReader struct {
 }

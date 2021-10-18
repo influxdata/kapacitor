@@ -133,7 +133,7 @@ func NewService(c Config, hostname string, t *tls.Config, d Diagnostic, defaultR
 			"",
 			defaultRP,
 		),
-		diag:                  d,
+		diag: d,
 		httpServerErrorLogger: d.NewHTTPServerErrorLogger(),
 	}
 	if s.key == "" {
@@ -366,4 +366,8 @@ func (s *Service) Register(r ...Registration) {
 func (s *Service) UnRegister(r ...Registration) {
 	s.LocalHandler.UnRegister(r...)
 	s.Handler.UnRegister(r...)
+}
+
+func (s *Service) Registrations() map[Registration]struct{} {
+	return s.Handler.Registrations()
 }
