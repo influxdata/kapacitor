@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 //go:generate protoc --go_out=./ --python_out=./py/kapacitor/udf/ udf.proto

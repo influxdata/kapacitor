@@ -165,7 +165,7 @@ These dependencies are already vendored in the code and and can be installed fro
 * tmpl -- A utility used to generate code from templates. Install via `go install ./vendor/github.com/benbjohnson/tmpl`
 * protoc + protoc-gen-go -- A protobuf compiler plus the protoc-gen-go extension.
     You need version 3.0.0 of protoc.
-    To install the go plugin run `go install ./vendor/github.com/golang/protobuf/protoc-gen-go`
+    To install the go plugin run `go install ./vendor/google.golang.org/protobuf/cmd/protoc-gen-go`
 
 The Build Script
 ----------------
