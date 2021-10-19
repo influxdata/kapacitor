@@ -159,7 +159,7 @@ func TestWallClock(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Fatal("expected return from c.Until")
 	}
 }
