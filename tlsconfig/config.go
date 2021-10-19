@@ -67,9 +67,10 @@ func (c Config) Parse() (out *tls.Config, err error) {
 		}
 
 		for _, name := range c.Ciphers {
-			cipher, ok := ciphersMap[strings.ToUpper(name)]
+			strUpperName := strings.ToUpper(name)
+			cipher, ok := ciphers[strUpperName]
 			if !ok {
-				return nil, unknownCipher(name)
+				return nil, badCipher(name)
 			}
 			out.CipherSuites = append(out.CipherSuites, cipher)
 		}
@@ -82,7 +83,7 @@ func (c Config) Parse() (out *tls.Config, err error) {
 
 		version, ok := versionsMap[strings.ToUpper(c.MinVersion)]
 		if !ok {
-			return nil, unknownVersion(c.MinVersion)
+			return nil, badVersion(c.MinVersion)
 		}
 		out.MinVersion = version
 	}
@@ -94,7 +95,7 @@ func (c Config) Parse() (out *tls.Config, err error) {
 
 		version, ok := versionsMap[strings.ToUpper(c.MaxVersion)]
 		if !ok {
-			return nil, unknownVersion(c.MaxVersion)
+			return nil, badVersion(c.MaxVersion)
 		}
 		out.MaxVersion = version
 	}
@@ -102,9 +103,8 @@ func (c Config) Parse() (out *tls.Config, err error) {
 	return out, nil
 }
 
-var ciphersMap = map[string]uint16{
+var ciphers = map[string]uint16{
 	"TLS_RSA_WITH_RC4_128_SHA":                tls.TLS_RSA_WITH_RC4_128_SHA,
-	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
 	"TLS_RSA_WITH_AES_128_CBC_SHA":            tls.TLS_RSA_WITH_AES_128_CBC_SHA,
 	"TLS_RSA_WITH_AES_256_CBC_SHA":            tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 	"TLS_RSA_WITH_AES_128_CBC_SHA256":         tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
@@ -114,10 +114,8 @@ var ciphersMap = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
 	"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
 	"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
-	"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA":     tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA,
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
 	"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-	"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
 	"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 	"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
@@ -132,21 +130,32 @@ var ciphersMap = map[string]uint16{
 	"TLS_CHACHA20_POLY1305_SHA256": tls.TLS_CHACHA20_POLY1305_SHA256,
 }
 
-func unknownCipher(name string) error {
-	available := make([]string, 0, len(ciphersMap))
-	for name := range ciphersMap {
+var availableCiphers = func() string {
+	available := make([]string, 0, len(versionsMap))
+	for name := range ciphers {
+		if name[0] == '1' {
+			continue
+		}
 		available = append(available, name)
 	}
 	sort.Strings(available)
+	return strings.Join(available, ", ")
+}()
 
-	return fmt.Errorf("unknown cipher suite: %q. available ciphers: %s",
-		name, strings.Join(available, ", "))
+// we do not use these because they are insecure
+var deprecatedCiphers = map[string]struct{}{
+	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":       struct{}{}, // broken by sweet32 https://sweet32.info/
+	"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA": struct{}{}, // broken by sweet32 https://sweet32.info/
+}
+
+func badCipher(name string) error {
+	if _, ok := deprecatedCiphers[name]; ok {
+		return fmt.Errorf("deprecated cipher suite: %q. available versions: %s", name, availableCiphers)
+	}
+	return fmt.Errorf("unknown cipher suite: %q. available ciphers: %s", name, availableCiphers)
 }
 
 var versionsMap = map[string]uint16{
-	"SSL3.0": tls.VersionSSL30,
-	"TLS1.0": tls.VersionTLS10,
-	"1.0":    tls.VersionTLS10,
 	"TLS1.1": tls.VersionTLS11,
 	"1.1":    tls.VersionTLS11,
 	"TLS1.2": tls.VersionTLS12,
@@ -155,7 +164,7 @@ var versionsMap = map[string]uint16{
 	"1.3":    tls.VersionTLS13,
 }
 
-func unknownVersion(name string) error {
+var availableVersions = func() string {
 	available := make([]string, 0, len(versionsMap))
 	for name := range versionsMap {
 		// skip the ones that just begin with a number. they may be confusing
@@ -167,7 +176,18 @@ func unknownVersion(name string) error {
 		available = append(available, name)
 	}
 	sort.Strings(available)
+	return strings.Join(available, ", ")
+}()
 
-	return fmt.Errorf("unknown tls version: %q. available versions: %s",
-		name, strings.Join(available, ", "))
+var deprecatedVersions = map[string]struct{}{
+	"SSL3.0": struct{}{},
+	"TLS1.0": struct{}{},
+	"1.0":    struct{}{},
+}
+
+func badVersion(name string) error {
+	if _, ok := deprecatedVersions[name]; ok {
+		return fmt.Errorf("deprecated tls version: %q. available versions: %s", name, availableVersions)
+	}
+	return fmt.Errorf("unknown tls version: %q. available versions: %s", name, availableVersions)
 }
