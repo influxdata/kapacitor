@@ -130,26 +130,29 @@ var ciphers = map[string]uint16{
 	"TLS_CHACHA20_POLY1305_SHA256": tls.TLS_CHACHA20_POLY1305_SHA256,
 }
 
+var availableCiphers = func() string {
+	available := make([]string, 0, len(versionsMap))
+	for name := range ciphers {
+		if name[0] == '1' {
+			continue
+		}
+		available = append(available, name)
+	}
+	sort.Strings(available)
+	return strings.Join(available, ", ")
+}()
+
 // we do not use these because they are insecure
-var depreciatedCiphers = map[string]struct{}{
+var deprecatedCiphers = map[string]struct{}{
 	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":       struct{}{}, // broken by sweet32 https://sweet32.info/
 	"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA": struct{}{}, // broken by sweet32 https://sweet32.info/
 }
 
 func badCipher(name string) error {
-	fmtMessage := "unknown cipher suite: %q. available ciphers: %s"
-	if _, ok := depreciatedCiphers[name]; ok {
-		fmtMessage = "depreciated tls version: %q. available versions: %s"
+	if _, ok := deprecatedCiphers[name]; ok {
+		return fmt.Errorf("deprecated cipher suite: %q. available versions: %s", name, availableCiphers)
 	}
-
-	available := make([]string, 0, len(ciphers))
-	for name := range ciphers {
-		available = append(available, name)
-	}
-	sort.Strings(available)
-
-	return fmt.Errorf(fmtMessage,
-		name, strings.Join(available, ", "))
+	return fmt.Errorf("unknown cipher suite: %q. available ciphers: %s", name, availableCiphers)
 }
 
 var versionsMap = map[string]uint16{
@@ -161,17 +164,7 @@ var versionsMap = map[string]uint16{
 	"1.3":    tls.VersionTLS13,
 }
 
-var depreciatedVersions = map[string]struct{}{
-	"SSL3.0": struct{}{},
-	"TLS1.0": struct{}{},
-	"1.0":    struct{}{},
-}
-
-func badVersion(name string) error {
-	fmtMessage := "unknown tls version: %q. available versions: %s"
-	if _, ok := depreciatedVersions[name]; ok {
-		fmtMessage = "depreciated tls version: %q. available versions: %s"
-	}
+var availableVersions = func() string {
 	available := make([]string, 0, len(versionsMap))
 	for name := range versionsMap {
 		// skip the ones that just begin with a number. they may be confusing
@@ -183,6 +176,18 @@ func badVersion(name string) error {
 		available = append(available, name)
 	}
 	sort.Strings(available)
+	return strings.Join(available, ", ")
+}()
 
-	return fmt.Errorf(fmtMessage, name, strings.Join(available, ", "))
+var deprecatedVersions = map[string]struct{}{
+	"SSL3.0": struct{}{},
+	"TLS1.0": struct{}{},
+	"1.0":    struct{}{},
+}
+
+func badVersion(name string) error {
+	if _, ok := deprecatedVersions[name]; ok {
+		return fmt.Errorf("deprecated tls version: %q. available versions: %s", name, availableVersions)
+	}
+	return fmt.Errorf("unknown tls version: %q. available versions: %s", name, availableVersions)
 }
