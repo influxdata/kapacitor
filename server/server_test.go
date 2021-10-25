@@ -7916,10 +7916,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"enabled": true,
-							"url":     "https://dev123456.bigpanda.io/data/v2/alerts",
-							"app-key": "appkey-123",
-							"token":   "token-123",
+							"enabled":         true,
+							"url":             "https://dev123456.bigpanda.io/data/v2/alerts",
+							"app-key":         "appkey-123",
+							"token":           "token-123",
 							"auto-attributes": "",
 						},
 					},
