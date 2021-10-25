@@ -118,8 +118,8 @@ func (s *Service) Test(options interface{}) error {
 		PrimaryProperty:   o.PrimaryProperty,
 		SecondaryProperty: o.SecondaryProperty,
 	}
-	tags := make(map[string]string, 0)
-	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc, tags)
+	attrs := make(map[string]string, 0)
+	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc, attrs)
 }
 
 func (s *Service) Alert(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig, attrs map[string]string) error {

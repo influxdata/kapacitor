@@ -7889,7 +7889,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"insecure-skip-verify": false,
 						"token":                false,
 						"app-key":              "",
-						"auto-attributes":      "",
+						"auto-attributes":      "tags,fields",
 					},
 					Redacted: []string{
 						"token",
@@ -7906,7 +7906,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"insecure-skip-verify": false,
 					"token":                false,
 					"app-key":              "",
-					"auto-attributes":      "",
+					"auto-attributes":      "tags,fields",
 				},
 				Redacted: []string{
 					"token",
@@ -7920,6 +7920,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"url":     "https://dev123456.bigpanda.io/data/v2/alerts",
 							"app-key": "appkey-123",
 							"token":   "token-123",
+							"auto-attributes": "",
 						},
 					},
 					expSection: client.ConfigSection{
@@ -10533,6 +10534,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				c.BigPanda.Token = "my-token-123"
 				c.BigPanda.AppKey = "my-app-key"
 				c.BigPanda.URL = ts.URL + "/test/bigpanda/alert"
+				c.BigPanda.AutoAttributes = ""
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {

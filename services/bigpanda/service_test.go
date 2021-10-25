@@ -9,6 +9,21 @@ import (
 	"github.com/influxdata/kapacitor/models"
 )
 
+func (c Config) enable() Config {
+	c.Enabled = true
+	return c
+}
+
+func (c Config) appKey(appKey string) Config {
+	c.AppKey = appKey
+	return c
+}
+
+func (c Config) autoAttrs(auto string) Config {
+	c.AutoAttributes = auto
+	return c
+}
+
 func TestService_SerializeEventData(t *testing.T) {
 	config := Config{Enabled: true, AppKey: "key", AutoAttributes: "tags,fields"}
 	s, err := NewService(config, nil)
@@ -106,34 +121,39 @@ func TestService_Payload(t *testing.T) {
 		expBody string
 	}{
 		{
+			name:    "default config",
+			config:  NewConfig().enable(),
+			expBody: "{\"app_key\":\"\",\"check\":\"id\",\"count\":\"10\",\"description\":\"message\",\"details\":\"details\",\"host\":\"localhost\",\"link\":\"http://localhost/bp\",\"load\":\"0.5\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
+		},
+		{
 			name:    "no auto no attributes",
-			config:  Config{Enabled: true, AppKey: "key"},
+			config:  NewConfig().enable().appKey("key").autoAttrs(""),
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 		{
 			name:    "no auto with attributes",
-			config:  Config{Enabled: true, AppKey: "key"},
+			config:  NewConfig().enable().appKey("key").autoAttrs(""),
 			attrs:   map[string]string{"host": "example.com", "link": "http://example.com/bp"},
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"host\":\"example.com\",\"link\":\"http://example.com/bp\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 		{
 			name:    "auto tags",
-			config:  Config{Enabled: true, AppKey: "key", AutoAttributes: "tags"},
+			config:  NewConfig().enable().appKey("key").autoAttrs("tags"),
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"description\":\"message\",\"details\":\"details\",\"host\":\"localhost\",\"link\":\"http://localhost/bp\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 		{
 			name:    "auto fields",
-			config:  Config{Enabled: true, AppKey: "key", AutoAttributes: "fields"},
+			config:  NewConfig().enable().appKey("key").autoAttrs("fields"),
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"count\":\"10\",\"description\":\"message\",\"details\":\"details\",\"load\":\"0.5\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 		{
-			name:    "auto tags and fields",
-			config:  Config{Enabled: true, AppKey: "key", AutoAttributes: "tags,fields"},
+			name:    "auto tags and fields explicit",
+			config:  NewConfig().enable().appKey("key").autoAttrs("tags,fields"),
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"count\":\"10\",\"description\":\"message\",\"details\":\"details\",\"host\":\"localhost\",\"link\":\"http://localhost/bp\",\"load\":\"0.5\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},
 		{
 			name:    "auto tags and fields with attributes override",
-			config:  Config{Enabled: true, AppKey: "key", AutoAttributes: "tags,fields"},
+			config:  NewConfig().enable().appKey("key").autoAttrs("tags,fields"),
 			attrs:   map[string]string{"host": "example.com", "link": "http://example.com/bp"},
 			expBody: "{\"app_key\":\"key\",\"check\":\"id\",\"count\":\"10\",\"description\":\"message\",\"details\":\"details\",\"host\":\"example.com\",\"link\":\"http://example.com/bp\",\"load\":\"0.5\",\"status\":\"ok\",\"task\":\":test\",\"timestamp\":31536038}",
 		},

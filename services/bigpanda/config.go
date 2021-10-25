@@ -8,6 +8,7 @@ import (
 
 const (
 	defaultBigPandaAlertApi = "https://api.bigpanda.io/data/v2/alerts"
+	defaultAutoAttributes   = "tags,fields"
 )
 
 type Config struct {
@@ -34,13 +35,13 @@ type Config struct {
 	URL string `toml:"url" override:"url"`
 
 	// Option to control tags and fields serialization into payload (for backward compatibility).
-	// Possibly temporary and to be removed when confirmed it was unwanted (issue #2304).
 	AutoAttributes string `toml:"auto-attributes" override:"auto-attributes"`
 }
 
 func NewConfig() Config {
 	return Config{
-		URL: defaultBigPandaAlertApi,
+		URL:            defaultBigPandaAlertApi,
+		AutoAttributes: defaultAutoAttributes,
 	}
 }
 
@@ -48,7 +49,6 @@ func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
 		return errors.New("must specify the BigPanda webhook URL")
 	}
-
 	if c.Enabled && c.AppKey == "" {
 		return errors.New("must specify BigPanda app-key")
 	}
