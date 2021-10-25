@@ -8,7 +8,7 @@ package kapacitor
 
 import (
 	_ "github.com/benbjohnson/tmpl"
-	_ "github.com/golang/protobuf/protoc-gen-go"
+	_ "google.golang.org/protobuf/cmd/protoc-gen-go"
 
 	// so we can use the rust dependencies of flux
 	_ "github.com/influxdata/pkg-config"

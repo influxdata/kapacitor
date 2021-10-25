@@ -159,7 +159,7 @@ def run_generate():
     """
     logging.info("Running generate...")
     run("""go install -mod=mod 
-        github.com/golang/protobuf/protoc-gen-go \
+        google.golang.org/protobuf/cmd/protoc-gen-go \
         github.com/benbjohnson/tmpl \
         github.com/mailru/easyjson/easyjson \
         github.com/influxdata/pkg-config""")

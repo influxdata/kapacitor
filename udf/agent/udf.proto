@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package agent;
+option go_package = ".;agent";
 
 //------------------------------------------------------
 // RPC Messages for Kapacitor to communicate with
