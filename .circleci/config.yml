@@ -132,6 +132,21 @@ jobs:
       - install_dependencies
       - run_tests
 
+  static_code_checks:
+    executor: cross-builder
+    working_directory: ~/kapacitor
+    steps:
+      - checkout
+      - run:
+          name: checkfmt
+          command: ./checkfmt.sh
+      - run:
+          name: generate
+          command: ./build.py --generate --no_uncommitted
+      - run:
+          name: go vet
+          command: go vet ./...
+
   release:
     executor: cross-builder
     working_directory: ~/kapacitor
