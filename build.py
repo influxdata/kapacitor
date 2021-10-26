@@ -199,21 +199,7 @@ def run_tests(race, parallel, timeout, no_vet, verbose):
         logging.info("Using parallel: {}".format(parallel))
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
-    out = run("go fmt ./...")
-    if len(out) > 0:
-        logging.error("Code not formatted. Please use 'go fmt ./...' to fix formatting errors.")
-        logging.error("{}".format(out))
-        return False
-    if not no_vet:
-        try:
-            vet_cmd = ["go", "vet", "./..."]
-            subprocess.check_output(vet_cmd)
-        except subprocess.CalledProcessError as exc:
-            logging.error("Go vet failed. Please run '{}' and fix any errors.".format(' '.join(vet_cmd)))
-            logging.error("{}".format(exc.output))
-            return False
-    else:
-        logging.info("Skipping 'go vet' call...")
+
     test_command = "go test"
     if verbose:
         test_command += " -v"
@@ -999,9 +985,6 @@ if __name__ == '__main__':
     parser.add_argument('--test',
                         action='store_true',
                         help='Run tests (does not produce build output)')
-    parser.add_argument('--no-vet',
-                        action='store_true',
-                        help='Do not run "go vet" when running tests')
     parser.add_argument('--race',
                         action='store_true',
                         help='Enable race flag for build output')
