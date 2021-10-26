@@ -183,6 +183,10 @@ workflows:
                 - /^.*test$/
             branches:
               ignore:  /.*/
+      - static_code_checks:
+          filters:
+            tags:
+              only: /.*/
 
   nightly:
     triggers:
