@@ -183,7 +183,7 @@ def check_nochanges():
     changes = run("git status --porcelain").strip()
     if len(changes) > 0:
         logging.error("There are un-committed changes in your local branch, --no-uncommited was given, cannot continue")
-        logging.debug("Changes:\n{}".format(changes))
+        logging.error("Changes:\n{}".format(changes))
         return False
     return True
 
