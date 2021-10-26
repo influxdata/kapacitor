@@ -7,7 +7,7 @@ executors:
       # NOTE: To upgrade the Go version, first push the upgrade to the cross-builder Dockerfile in the edge repo,
       # then update the version here to match. Until we finish the migration to using the cross-builder image,
       # you'll also need to update references to `cimg/go` and `GO_VERSION` in this file.
-      - image: quay.io/influxdb/cross-builder:go1.17.1-41d944d749b2c130119eff7efaaa9883ccffe5a7
+      - image: quay.io/influxdb/cross-builder:go1.17.2-f7b4e805fa9588c1c2fa4562ea29e576557fb797
     resource_class: large
   linux-amd64:
     machine:
@@ -132,6 +132,21 @@ jobs:
       - install_dependencies
       - run_tests
 
+  static_code_checks:
+    executor: cross-builder
+    working_directory: ~/kapacitor
+    steps:
+      - checkout
+      - run:
+          name: checkfmt
+          command: ./checkfmt.sh
+      - run:
+          name: generate
+          command: ./generate.sh
+      - run:
+          name: go vet
+          command: go vet ./...
+
   release:
     executor: cross-builder
     working_directory: ~/kapacitor
@@ -168,6 +183,10 @@ workflows:
                 - /^.*test$/
             branches:
               ignore:  /.*/
+      - static_code_checks:
+          filters:
+            tags:
+              only: /.*/
 
   nightly:
     triggers:
