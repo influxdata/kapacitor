@@ -177,7 +177,7 @@ def go_get():
     return True
 
 
-def run_tests(race, parallel, timeout, no_vet, verbose):
+def run_tests(race, parallel, timeout, verbose):
     """Run the Go test suite on binary output.
     """
     # NOTE: We download deps here because go fmt on go1.17 first downloads missing deps, printing their names and
@@ -782,7 +782,7 @@ def main(args):
             return 1
 
     if args.test:
-        if not run_tests(args.race, args.parallel, args.timeout, args.no_vet, args.verbose):
+        if not run_tests(args.race, args.parallel, args.timeout, args.verbose):
             return 1
 
     platforms = []
