@@ -176,17 +176,6 @@ def go_get():
     """
     return True
 
-def check_nochanges():
-    """
-    Check that there are no changes
-    """
-    changes = run("git status --porcelain").strip()
-    if len(changes) > 0:
-        logging.error("There are un-committed changes in your local branch, --no-uncommited was given, cannot continue")
-        logging.error("Changes:\n{}".format(changes))
-        return False
-    return True
-
 
 def run_tests(race, parallel, timeout, no_vet, verbose):
     """Run the Go test suite on binary output.
@@ -806,10 +795,6 @@ def main(args):
         if not run_generate():
             return 1
 
-    if args.no_uncommitted:
-        if not check_nochanges():
-            return 1
-
     if args.test:
         if not run_tests(args.race, args.parallel, args.timeout, args.no_vet, args.verbose):
             return 1
@@ -985,9 +970,6 @@ if __name__ == '__main__':
     parser.add_argument('--no-get',
                         action='store_true',
                         help='Do not retrieve pinned dependencies when building')
-    parser.add_argument('--no-uncommitted',
-                        action='store_true',
-                        help='Fail if uncommitted changes exist in the working directory')
     parser.add_argument('--upload',
                         action='store_true',
                         help='Upload output packages to AWS S3')
