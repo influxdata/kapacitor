@@ -142,7 +142,7 @@ jobs:
           command: ./checkfmt.sh
       - run:
           name: generate
-          command: ./build.py --generate --no_uncommitted
+          command: ./build.py --generate --no-uncommitted
       - run:
           name: go vet
           command: go vet ./...
