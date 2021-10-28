@@ -107,13 +107,13 @@ func (cmd *Command) Run(args ...string) error {
 		config.Logging.Level = options.LogLevel
 	}
 
-	switch options.BlackListCIDRS {
+	switch options.DenyListCIDRS {
 	case "":
 		khttp.DefaultValidator = furl.PassValidator{}
 	case "private":
 		khttp.DefaultValidator = furl.PrivateIPValidator{}
 	default:
-		if khttp.DefaultValidator, err = khttp.ParseCIDRsString(options.BlackListCIDRS); err != nil {
+		if khttp.DefaultValidator, err = khttp.ParseCIDRsString(options.DenyListCIDRS); err != nil {
 			return fmt.Errorf("flag error: improper CIDRs: %s", err)
 		}
 	}
@@ -211,7 +211,7 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
 	fs.StringVar(&options.LogFile, "log-file", "", "")
 	fs.StringVar(&options.LogLevel, "log-level", "", "")
-	fs.StringVar(&options.BlackListCIDRS, "blacklist-cidrs", "", "")
+	fs.StringVar(&options.DenyListCIDRS, "denylist-cidrs", "", "")
 	fs.StringVar(&options.DisabledAlertHandlers, "disable-handlers", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
@@ -263,8 +263,8 @@ func (cmd *Command) ParseConfig(path string) (*server.Config, error) {
 var usage = `usage: run [flags]
 
 run starts the Kapacitor server.
-        -blacklist-cidrs <CIDR1,CIDR2,...>
-                           Comma seperated list of CIDRs to blacklist for
+        -denylist-cidrs <CIDR1,CIDR2,...>
+                           Comma seperated list of CIDRs to denylist for
                            most http get/post operations
 
         -config <path>
@@ -300,5 +300,5 @@ type Options struct {
 	LogFile               string
 	LogLevel              string
 	DisabledAlertHandlers string
-	BlackListCIDRS        string
+	DenyListCIDRS         string
 }

@@ -57,8 +57,8 @@ type Config struct {
 	// DiscoverService is the type of the discoverer that generates hosts for the scraper
 	DiscoverService string `toml:"discoverer-service" override:"discoverer-service"`
 
-	// Blacklist is a list of hosts to ignore and not scrape
-	Blacklist []string `toml:"blacklist" override:"blacklist"`
+	// Denylist is a list of hosts to ignore and not scrape
+	Denylist []string `toml:"denylist" override:"denylist"`
 }
 
 // Init adds default values to Config scraper

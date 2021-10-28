@@ -208,11 +208,11 @@ func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value 
 		tags[string(kv.Name)] = string(kv.Value)
 	}
 
-	// If instance is blacklisted then do not send to PointsWriter
+	// If instance is denylisted then do not send to PointsWriter
 	if instance, ok := tags["instance"]; ok {
 		for _, c := range s.loadConfigs() {
 			if c.Name == job {
-				for _, listed := range c.Blacklist {
+				for _, listed := range c.Denylist {
 					if instance == listed {
 						return 0, nil
 					}

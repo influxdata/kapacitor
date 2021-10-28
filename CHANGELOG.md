@@ -23,7 +23,7 @@
 ## v1.6.1 [2021-07-22]
 
 ### Features
-- [#2589](https://github.com/influxdata/kapacitor/pull/2589): Flag for blacklisting CIDR ranges for certain handlers, and nodes
+- [#2589](https://github.com/influxdata/kapacitor/pull/2589): Flag for denylisting CIDR ranges for certain handlers, and nodes
 - [#2591](https://github.com/influxdata/kapacitor/pull/2591): Flag for disabling alert handlers, this is useful for security (such as disabling exec on a shared machine)
 
 ### Bugfixes
