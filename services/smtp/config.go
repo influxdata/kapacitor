@@ -3,7 +3,7 @@ package smtp
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"net/mail"
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
@@ -26,6 +26,8 @@ type Config struct {
 	From string `toml:"from" override:"from"`
 	// Default To addresses
 	To []string `toml:"to" override:"to"`
+	//ToTemplates is the field or value to grab which address to send an email to
+	ToTemplates []string `toml:"toTemplates" override:"to-templates"`
 	// Close connection to SMTP server after idle timeout has elapsed
 	IdleTimeout toml.Duration `toml:"idle-timeout" override:"idle-timeout"`
 }
@@ -51,14 +53,15 @@ func (c Config) Validate() error {
 	if c.Enabled && c.From == "" {
 		return errors.New("must provide a 'from' address")
 	}
-	// Poor mans email validation, but since emails have a very large domain this is probably good enough
-	// to catch user error.
-	if c.From != "" && !strings.ContainsRune(c.From, '@') {
-		return fmt.Errorf("invalid from email address: %q", c.From)
+
+	if c.From != "" {
+		if _, err := mail.ParseAddress(c.From); err != nil {
+			return fmt.Errorf("invalid from email address: %q, %s", c.From, err.Error())
+		}
 	}
 	for _, t := range c.To {
-		if !strings.ContainsRune(t, '@') {
-			return fmt.Errorf("invalid to email address: %q", t)
+		if _, err := mail.ParseAddress(t); err != nil {
+			return fmt.Errorf("invalid to email address: %q, %s", t, err.Error())
 		}
 	}
 	return nil

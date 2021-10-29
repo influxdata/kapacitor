@@ -1,16 +1,19 @@
 package smtp
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	text "text/template"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
-	"gopkg.in/gomail.v2"
+	gomail "gopkg.in/gomail.v2"
 )
 
 var ErrNoRecipients = errors.New("not sending email, no recipients defined")
@@ -176,7 +179,7 @@ func (s *Service) runMailer() {
 }
 
 func (s *Service) SendMail(to []string, subject, body string) error {
-	m, err := s.prepareMessge(to, subject, body)
+	m, err := s.prepareMessage(to, subject, body)
 	if err != nil {
 		return err
 	}
@@ -184,7 +187,7 @@ func (s *Service) SendMail(to []string, subject, body string) error {
 	return nil
 }
 
-func (s *Service) prepareMessge(to []string, subject, body string) (*gomail.Message, error) {
+func (s *Service) prepareMessage(to []string, subject, body string) (*gomail.Message, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -233,25 +236,49 @@ func (s *Service) Test(options interface{}) error {
 type HandlerConfig struct {
 	// List of email recipients.
 	To []string `mapstructure:"to"`
+
+	// ToTemplate allows you to template out email addresses
+	ToTemplates []string `mapstructure:"to-field"`
 }
 
 type handler struct {
-	s    *Service
-	c    HandlerConfig
-	diag Diagnostic
+	s           *Service
+	c           HandlerConfig
+	diag        Diagnostic
+	toTemplates []*text.Template
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
-	return &handler{
+	h := &handler{
 		s:    s,
 		c:    c,
 		diag: s.diag.WithContext(ctx...),
 	}
+	for i := range c.ToTemplates {
+		tmpl, err := text.New(strconv.Itoa(i)).Parse(c.ToTemplates[i])
+		if err != nil {
+			h.diag.Error("bad template in email address template", err)
+			return h
+		}
+		h.toTemplates = append(h.toTemplates, tmpl)
+	}
+	return h
 }
 
 func (h *handler) Handle(event alert.Event) {
+	to := append([]string(nil), h.c.To...)
+	buf := &bytes.Buffer{}
+	for i := range h.toTemplates {
+		if err := h.toTemplates[i].ExecuteTemplate(buf, strconv.Itoa(i), event.Data); err != nil {
+			h.diag.Error("error in email template", err)
+		}
+		if buf.Len() != 0 {
+			to = append(to, buf.String())
+		}
+		buf.Reset()
+	}
 	if err := h.s.SendMail(
-		h.c.To,
+		to,
 		event.State.Message,
 		event.State.Details,
 	); err != nil {
