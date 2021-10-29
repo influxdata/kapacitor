@@ -110,7 +110,7 @@ func (v cidrValidator) Validate(u *url.URL) error {
 func (v cidrValidator) ValidateIP(ip net.IP) error {
 	for i := range v.cidrs {
 		if v.cidrs[i].Contains(ip) {
-			return fmt.Errorf("ip '%s' is denylisted", ip)
+			return fmt.Errorf("ip '%s' is on deny list", ip)
 		}
 	}
 	return nil
