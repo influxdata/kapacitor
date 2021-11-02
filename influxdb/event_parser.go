@@ -104,7 +104,7 @@ readRow:
 	switch q.row[0] {
 	case "":
 		if len(q.row) <= 5 {
-			return errors.New("Unexpectedly few columns")
+			return errors.New("Unexpectedly few columns -- Kapacitor cannot understand this data. We need at minimum a _time column, table number, and at least one column with data in")
 		}
 		if state == stateNameRow {
 			newNames := q.row[skipNonDataFluxCols:]
