@@ -164,6 +164,22 @@ jobs:
       - run_tests
       - deploy_nightly
 
+  nightly-changelog:
+    docker:
+      - image: quay.io/influxdb/changelogger:0dbf37ba8a912460358d322dcad414b80ce074f2
+    steps:
+      - checkout
+      - run:
+          name: Generate changelog
+          command: |
+            mkdir changelog_artifacts
+            echo "CHANGELOG for Kapacitor << pipeline.git.branch >> commit ${CIRCLE_SHA1}" > changelog_artifacts/CHANGELOG.md
+            build-simple-changelog.sh HEAD v1.5.9 >> changelog_artifacts/CHANGELOG.md
+            cat ./scripts/CHANGELOG_frozen.md >> changelog_artifacts/CHANGELOG.md
+            #TODO: delete contents of CHANGELOG.md in repo root and replace with link to changelog in S3
+      - store_artifacts:
+          path: changelog_artifacts/
+      #TODO: push changelog to S3 with aws-s3/copy (see influxdb .circleci/config.yml)
 
 workflows:
   version:  2
@@ -187,7 +203,12 @@ workflows:
           filters:
             tags:
               only: /.*/
-
+      # FIXME: don't run nightly changelog update on merge (remove this section)
+      - nightly-changelog:
+          filters:
+            branches:
+              only:
+                - master
   nightly:
     triggers:
       - schedule:
@@ -198,3 +219,4 @@ workflows:
                 - master
     jobs:
       - nightly-build
+      - nightly-changelog
