@@ -65,6 +65,9 @@ headers = { Authorization = "your-key" }
 	if err := os.Setenv("KAPACITOR_HTTPPOST_0_HEADERS_Authorization", "my-key"); err != nil {
 		t.Fatalf("failed to set env var: %v", err)
 	}
+	if err := os.Setenv("KAPACITOR_HTTPPOST_0_HEADERS_TestHeader", "test-header-key"); err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
 
 	if err := c.ApplyEnvOverrides(); err != nil {
 		t.Fatalf("failed to apply env overrides: %v", err)
@@ -78,8 +81,11 @@ headers = { Authorization = "your-key" }
 	} else if c.InfluxDB[0].URLs[0] != "http://localhost:18086" {
 		t.Fatalf("unexpected url 0: %s", c.InfluxDB[0].URLs[0])
 	} else if c.HTTPPost[0].Headers["Authorization"] != "my-key" {
-		t.Fatalf("unexpected header Authorization: %s", c.InfluxDB[0].URLs[0])
+		t.Fatalf("unexpected header Authorization: expected: \"my-key\", got %s", c.HTTPPost[0].Headers["Authorization"])
+	} else if c.HTTPPost[0].Headers["TestHeader"] != "test-header-key" {
+		t.Fatalf("Could not insert TestHeader into map: %s", c.InfluxDB[0].URLs[0])
 	}
+
 }
 
 // Ensure the configuration can be parsed.
