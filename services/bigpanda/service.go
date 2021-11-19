@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync/atomic"
+	text "text/template"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
@@ -26,6 +27,7 @@ const (
 
 type Diagnostic interface {
 	WithContext(ctx ...keyvalue.T) Diagnostic
+	TemplateError(err error, kv keyvalue.T)
 	Error(msg string, err error)
 }
 
@@ -84,13 +86,14 @@ type testOptions struct {
 	Level             alert.Level     `json:"level"`
 	Data              alert.EventData `json:"event_data"`
 	Timestamp         time.Time       `json:"timestamp"`
+	Host              string          `json:"host"`
 	PrimaryProperty   string          `json:"primary_property"`
 	SecondaryProperty string          `json:"secondary_property"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		AppKey:  s.config().AppKey,
+		AppKey:  "012345",
 		Message: "test bigpanda message",
 		Level:   alert.Critical,
 		Data: alert.EventData{
@@ -100,6 +103,7 @@ func (s *Service) TestOptions() interface{} {
 			Result: models.Result{},
 		},
 		Timestamp: time.Now(),
+		Host:      "serverA",
 	}
 }
 
@@ -110,14 +114,16 @@ func (s *Service) Test(options interface{}) error {
 	}
 	hc := &HandlerConfig{
 		AppKey:            o.AppKey,
+		Host:              o.Host,
 		PrimaryProperty:   o.PrimaryProperty,
 		SecondaryProperty: o.SecondaryProperty,
 	}
-	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc)
+	attrs := make(map[string]string, 0)
+	return s.Alert("", o.Message, "", o.Level, o.Timestamp, o.Data, hc, attrs)
 }
 
-func (s *Service) Alert(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig) error {
-	req, err := s.preparePost(id, message, details, level, timestamp, data, hc)
+func (s *Service) Alert(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig, attrs map[string]string) error {
+	req, err := s.preparePost(id, message, details, level, timestamp, data, hc, attrs)
 
 	if err != nil {
 		return err
@@ -173,10 +179,20 @@ curl -X POST -H "Content-Type: application/json" \
   "primary_property": "application",
   "secondary_property": "host"
 */
-func (s *Service) preparePost(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig) (*http.Request, error) {
+func (s *Service) preparePost(id string, message string, details string, level alert.Level, timestamp time.Time, data alert.EventData, hc *HandlerConfig, attrs map[string]string) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
+	}
+
+	bpUrl := hc.URL
+	if bpUrl == "" {
+		bpUrl = c.URL
+	}
+
+	alertUrl, err := url.Parse(bpUrl)
+	if err != nil {
+		return nil, err
 	}
 
 	var status string
@@ -199,7 +215,7 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		bpData["description"] = message
 	}
 
-	//ignore default details containing full json event
+	// ignore default details containing full json event
 	if details != "" {
 		unescapeString := html.UnescapeString(details)
 		if !strings.HasPrefix(unescapeString, "{") {
@@ -223,27 +239,46 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		bpData["secondary_property"] = hc.SecondaryProperty
 	}
 
+	// app key
 	if hc.AppKey != "" {
 		bpData["app_key"] = hc.AppKey
 	} else {
 		bpData["app_key"] = c.AppKey
 	}
 
-	for k, v := range data.Tags {
-		bpData[k] = v
+	// host is included in additional attributes
+
+	// auto option evaluation
+	auto := func(key string) bool {
+		return strings.Contains(strings.ToLower(c.AutoAttributes), key)
 	}
 
-	for k, v := range data.Fields {
-		switch value := v.(type) {
-		case string:
-			bpData[k] = value
-		default:
-			b, err := json.Marshal(value)
-			if err != nil {
-				return nil, err
-			}
-			bpData[k] = string(b)
+	// add tags as additional attributes
+	if auto("tags") {
+		for k, v := range data.Tags {
+			bpData[k] = v
 		}
+	}
+
+	// fields tags as additional attributes
+	if auto("fields") {
+		for k, v := range data.Fields {
+			switch value := v.(type) {
+			case string:
+				bpData[k] = value
+			default:
+				b, err := json.Marshal(value)
+				if err != nil {
+					return nil, err
+				}
+				bpData[k] = string(b)
+			}
+		}
+	}
+
+	// add additional attributes (includes "host" attribute)
+	for k, v := range attrs {
+		bpData[k] = v
 	}
 
 	var postTemp bytes.Buffer
@@ -256,22 +291,13 @@ func (s *Service) preparePost(id string, message string, details string, level a
 		return nil, err
 	}
 
-	bpUrl := hc.URL
-	if bpUrl == "" {
-		bpUrl = c.URL
-	}
-
-	alertUrl, err := url.Parse(bpUrl)
-	if err != nil {
-		return nil, err
-	}
-
 	req, err := http.NewRequest("POST", alertUrl.String(), &post)
 	req.Header.Add("Authorization", defaultTokenPrefix+" "+c.Token)
 	req.Header.Add("Content-Type", "application/json")
 	if err != nil {
 		return nil, err
 	}
+
 	return req, nil
 }
 
@@ -284,10 +310,17 @@ type HandlerConfig struct {
 	// If empty uses the service URL from the configuration.
 	URL string `mapstructure:"url"`
 
+	// object that caused the alert
+	Host string `mapstructure:"host"`
+
 	// custom primary BigPanda property
 	PrimaryProperty string `mapstructure:"primary-property"`
+
 	// custom secondary BigPanda property
 	SecondaryProperty string `mapstructure:"secondary-property"`
+
+	// additional attributes
+	Attributes map[string]interface{} `mapstructure:"attributes"`
 }
 
 type handler struct {
@@ -305,6 +338,13 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 }
 
 func (h *handler) Handle(event alert.Event) {
+	td := event.TemplateData()
+	attrs, err := h.renderAttributes(&td)
+	if err != nil {
+		// error already reported
+		return
+	}
+
 	if err := h.s.Alert(
 		event.State.ID,
 		event.State.Message,
@@ -313,7 +353,54 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Time,
 		event.Data,
 		&h.c,
+		attrs,
 	); err != nil {
 		h.diag.Error("failed to send event to BigPanda", err)
 	}
+}
+
+func (h *handler) renderAttributes(td *alert.TemplateData) (map[string]string, error) {
+	var buf bytes.Buffer
+	render := func(name, template string) (string, error) {
+		if template != "" {
+			buf.Reset()
+			templateImpl, err := text.New(name).Parse(template)
+			if err != nil {
+				return "", err
+			}
+			templateImpl.Execute(&buf, td)
+			if err != nil {
+				return "", err
+			}
+			return buf.String(), nil
+		}
+		return "", nil
+	}
+	rendered := make(map[string]string)
+	rHost, err := render("host", h.c.Host)
+	if err != nil {
+		h.diag.TemplateError(err, keyvalue.KV("host", h.c.Host))
+		return nil, err
+	}
+	rendered["host"] = rHost
+	for k, v := range h.c.Attributes {
+		switch value := v.(type) {
+		case string:
+			rValue, err := render(k, value)
+			if err != nil {
+				h.diag.TemplateError(err, keyvalue.KV(k, value))
+				return nil, err
+			}
+			rendered[k] = rValue
+		default:
+			b, err := json.Marshal(value)
+			if err != nil {
+				h.diag.WithContext(keyvalue.KV("key", k)).Error("failed to encode tag value", err)
+				return nil, err
+			}
+			rendered[k] = string(b)
+		}
+	}
+
+	return rendered, nil
 }

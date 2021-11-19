@@ -122,6 +122,7 @@ func TestAlertBigPanda(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().BigPanda()
 	handler.AppKey = "A"
+	handler.Host = "H"
 	handler.PrimaryProperty = "B"
 	handler.SecondaryProperty = "C"
 
@@ -134,6 +135,7 @@ func TestAlertBigPanda(t *testing.T) {
         .history(21)
         .bigPanda()
         .appKey('A')
+        .host('H')
         .primaryProperty('B')
         .secondaryProperty('C')
 `

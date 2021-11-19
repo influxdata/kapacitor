@@ -1705,15 +1705,32 @@ func (n *AlertNodeData) BigPanda() *BigPandaHandler {
 // tick:embedded:AlertNode.BigPanda
 type BigPandaHandler struct {
 	*AlertNodeData `json:"-"`
-	// Application id
+	// Application key
 	// If empty uses the default config
 	AppKey string `json:"app-key"`
+
+	// Object that caused the alert
+	Host string `json:"host"`
 
 	// Custom primary BigPanda property
 	PrimaryProperty string `json:"primary-property"`
 
 	// Custom secondary BigPanda property
 	SecondaryProperty string `json:"secondary-property"`
+
+	// Additional attributes
+	// tick:ignore
+	Attributes map[string]interface{} `tick:"Attribute" json:"attributes"`
+}
+
+// Attribute adds additional attributes to the request.
+// tick:property
+func (bp *BigPandaHandler) Attribute(key string, value interface{}) *BigPandaHandler {
+	if bp.Attributes == nil {
+		bp.Attributes = make(map[string]interface{})
+	}
+	bp.Attributes[key] = value
+	return bp
 }
 
 // Send the alert to Telegram.

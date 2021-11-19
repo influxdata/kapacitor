@@ -180,8 +180,19 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	for _, h := range a.BigPandaHandlers {
 		n.Dot("bigPanda").
 			Dot("appKey", h.AppKey).
+			Dot("host", h.Host).
 			Dot("primaryProperty", h.PrimaryProperty).
 			Dot("secondaryProperty", h.SecondaryProperty)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.Attributes))
+		for k := range h.Attributes {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("attribute", k, h.Attributes[k])
+		}
 	}
 
 	for _, h := range a.SlackHandlers {

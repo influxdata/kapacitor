@@ -521,8 +521,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	for _, s := range n.BigPandaHandlers {
 		c := bigpanda.HandlerConfig{
 			AppKey:            s.AppKey,
+			Host:              s.Host,
 			PrimaryProperty:   s.PrimaryProperty,
 			SecondaryProperty: s.SecondaryProperty,
+			Attributes:        s.Attributes,
 		}
 		h, err := et.tm.BigPandaService.Handler(c, ctx...)
 		if err != nil {
