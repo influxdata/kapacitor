@@ -154,12 +154,12 @@ type Service struct {
 	}
 }
 
-func NewService(d Diagnostic, disabled map[string]struct{}) *Service {
+func NewService(d Diagnostic, disabled map[string]struct{}, topicBufLen int) *Service {
 	s := &Service{
 		disabled:        disabled,
 		handlers:        make(map[string]map[string]handler),
 		closedTopics:    make(map[string]bool),
-		topics:          alert.NewTopics(),
+		topics:          alert.NewTopics(topicBufLen),
 		diag:            d,
 		inhibitorLookup: alert.NewInhibitorLookup(),
 	}
