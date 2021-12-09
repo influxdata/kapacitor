@@ -404,7 +404,7 @@ func (s *Server) appendConfigOverrideService() {
 
 func (s *Server) initAlertService() {
 	d := s.DiagService.NewAlertServiceHandler()
-	srv := alert.NewService(d, s.DisabledHandlers)
+	srv := alert.NewService(d, s.DisabledHandlers, s.config.Alert.TopicBufferLength)
 
 	srv.Commander = s.Commander
 	srv.HTTPDService = s.HTTPDService

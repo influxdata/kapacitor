@@ -11,19 +11,25 @@ import (
 )
 
 const (
-	// eventBufferSize is the number of events to buffer to each handler per topic.
-	eventBufferSize = 5000
+	// DefaultEventBufferSize is the default number of events to buffer to each handler per topic.
+	DefaultEventBufferSize = 5000
+	MinimumEventBufferSize = 1000
 )
 
 type Topics struct {
-	mu sync.RWMutex
-
-	topics map[string]*Topic
+	mu              sync.RWMutex
+	eventBufferSize int
+	topics          map[string]*Topic
 }
 
-func NewTopics() *Topics {
+// NewTopics creates a new Topics struct with a minimum bufferSize of 500.
+func NewTopics(bufferSize int) *Topics {
+	if bufferSize < MinimumEventBufferSize {
+		bufferSize = DefaultEventBufferSize
+	}
 	s := &Topics{
-		topics: make(map[string]*Topic),
+		eventBufferSize: bufferSize,
+		topics:          make(map[string]*Topic),
 	}
 	return s
 }
@@ -54,7 +60,7 @@ func (s *Topics) RestoreTopic(id string, eventStates map[string]EventState) {
 	defer s.mu.Unlock()
 	t, ok := s.topics[id]
 	if !ok {
-		t = newTopic(id)
+		t = s.newTopic(id)
 		s.topics[id] = t
 	}
 	t.restoreEventStates(eventStates)
@@ -65,7 +71,7 @@ func (s *Topics) UpdateEvent(id string, event EventState) {
 	defer s.mu.Unlock()
 	t, ok := s.topics[id]
 	if !ok {
-		t = newTopic(id)
+		t = s.newTopic(id)
 		s.topics[id] = t
 	}
 	t.updateEvent(event)
@@ -93,7 +99,7 @@ func (s *Topics) Collect(event Event) error {
 		// Check again if the topic was created, now that we have the write lock
 		topic = s.topics[event.Topic]
 		if topic == nil {
-			topic = newTopic(event.Topic)
+			topic = s.newTopic(event.Topic)
 			s.topics[event.Topic] = topic
 		}
 		s.mu.Unlock()
@@ -122,7 +128,7 @@ func (s *Topics) RegisterHandler(topic string, h Handler) {
 
 	t, ok := s.topics[topic]
 	if !ok {
-		t = newTopic(topic)
+		t = s.newTopic(topic)
 		s.topics[topic] = t
 	}
 	t.addHandler(h)
@@ -147,7 +153,7 @@ func (s *Topics) ReplaceHandler(topic string, oldH, newH Handler) {
 
 	t, ok := s.topics[topic]
 	if !ok {
-		t = newTopic(topic)
+		t = s.newTopic(topic)
 		s.topics[topic] = t
 	}
 
@@ -185,12 +191,11 @@ func PatternMatch(pattern, id string) bool {
 }
 
 type Topic struct {
-	id string
-
-	mu sync.RWMutex
-
-	events map[string]*EventState
-	sorted []*EventState
+	id           string
+	mu           sync.RWMutex
+	bufferLength int
+	events       map[string]*EventState
+	sorted       []*EventState
 
 	collected *expvar.Int
 	statsKey  string
@@ -198,11 +203,12 @@ type Topic struct {
 	handlers []*bufHandler
 }
 
-func newTopic(id string) *Topic {
+func (s *Topics) newTopic(id string) *Topic {
 	t := &Topic{
-		id:        id,
-		events:    make(map[string]*EventState),
-		collected: new(expvar.Int),
+		id:           id,
+		events:       make(map[string]*EventState),
+		collected:    new(expvar.Int),
+		bufferLength: s.eventBufferSize,
 	}
 	statsKey, statsMap := vars.NewStatistic("topics", map[string]string{
 		"id": id,
@@ -240,7 +246,7 @@ func (t *Topic) addHandler(h Handler) {
 			return
 		}
 	}
-	hdlr := newHandler(h)
+	hdlr := newHandler(h, t.bufferLength)
 	t.handlers = append(t.handlers, hdlr)
 }
 
@@ -385,10 +391,13 @@ type bufHandler struct {
 	wg       sync.WaitGroup
 }
 
-func newHandler(h Handler) *bufHandler {
+func newHandler(h Handler, bufferSize int) *bufHandler {
+	if bufferSize < MinimumEventBufferSize {
+		bufferSize = DefaultEventBufferSize
+	}
 	hdlr := &bufHandler{
 		h:        h,
-		events:   make(chan Event, eventBufferSize),
+		events:   make(chan Event, bufferSize),
 		aborting: make(chan struct{}),
 	}
 	hdlr.wg.Add(1)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 const (
@@ -12,12 +13,14 @@ const (
 
 type Config struct {
 	// Whether we persist the alert topics to BoltDB or not
-	PersistTopics bool `toml:"persist-topics"`
+	PersistTopics     bool `toml:"persist-topics"`
+	TopicBufferLength int  `toml:"topic-buffer-length"`
 }
 
 func NewConfig() Config {
 	return Config{
-		PersistTopics: true,
+		PersistTopics:     true,
+		TopicBufferLength: alert.DefaultEventBufferSize,
 	}
 }
 

@@ -460,9 +460,7 @@ func (c *Config) applyEnvOverridesToMap(prefix string, fieldDesc string, mapValu
 	if spec.Kind() == reflect.Ptr {
 		s = spec.Elem()
 	}
-
 	var value string
-
 	if s.Kind() != reflect.Struct {
 		value = os.Getenv(prefix)
 		// Skip any fields we don't have a value to set
@@ -640,8 +638,28 @@ func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error
 					}
 				}
 			} else if f.Kind() == reflect.Map {
-				for _, k := range f.MapKeys() {
-					if err := c.applyEnvOverridesToMap(fmt.Sprintf("%s_%v", key, k), fieldName, f, k, f.MapIndex(k)); err != nil {
+				keys := map[string]reflect.Value{}
+				for _, kVal := range f.MapKeys() {
+					keys[fmt.Sprintf("%s_%v", key, kVal)] = kVal
+				}
+
+				for _, env := range os.Environ() {
+					if !strings.HasPrefix(env, key) {
+						continue
+					}
+					fullKey := parseEnvKey(env)
+					// we need to replace k with the correctly typed k, if it is in keys.
+					k, ok := keys[fullKey]
+					if !ok {
+						if f.Type().Key().Kind() != reflect.String {
+							return errors.New("This config field does not support creation from environmental variables; key must exist in the config first")
+						}
+						k = reflect.ValueOf(strings.TrimLeft(strings.TrimPrefix(fullKey, key), "_"))
+						if k.String() == "" {
+							continue
+						}
+					}
+					if err := c.applyEnvOverridesToMap(fullKey, fieldName, f, k, reflect.New(f.Type().Elem())); err != nil {
 						return err
 					}
 				}
