@@ -535,24 +535,13 @@ def build(version=None,
             build_command += "-race "
         if len(tags) > 0:
             build_command += "-tags \"{}\" ".format(' '.join(tags))
-        if "1.4" in get_go_version():
-            if static:
-                build_command += "-ldflags=\"-s -X main.version {} -X main.branch {} -X main.commit {} -X main.platform OSS\" ".format(version,
-                                                                                                                  get_current_branch(),
-                                                                                                                  get_current_commit())
-            else:
-                build_command += "-ldflags=\"-X main.version {} -X main.branch {} -X main.commit {} -X main.platform OSS\" ".format(version,
-                                                                                                               get_current_branch(),
-                                                                                                               get_current_commit())
 
-        else:
             # Starting with Go 1.5, the linker flag arguments changed to 'name=value' from 'name value'
-            if static:
-                build_command += "-ldflags=\"-s -X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS\" ".format(version,
-                                                                                                                  get_current_branch(),
-                                                                                                                  get_current_commit())
-            else:
-                build_command += "-ldflags=\"-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS\" ".format(version,
+        build_command += "-ldflags=\""
+        if static:
+            build_command +="-s "
+
+        build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  -X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
                                                                                                                get_current_branch(),
                                                                                                                get_current_commit())
         if static:
