@@ -796,6 +796,10 @@ type EmailHandler struct {
 	// List of email recipients.
 	// tick:ignore
 	ToList []string `tick:"To" json:"to"`
+
+	// ToTemplatesList is the Field or Value from which to grab email addresses
+	// tick:ignore
+	ToTemplatesList []string `tick:"ToTemplates" json:"to-templates"`
 }
 
 // Define the To addresses for the email alert.
@@ -823,6 +827,33 @@ type EmailHandler struct {
 // tick:property
 func (h *EmailHandler) To(to ...string) *EmailHandler {
 	h.ToList = append(h.ToList, to...)
+	return h
+}
+
+// Define the To addresses for the email alert.
+// Multiple calls append to the existing list of addresses.
+// If empty uses the addresses from the configuration.
+//
+// Example:
+//    |alert()
+//       .id('{{ .Name }}')
+//       // Email subject
+//       .message('{{ .ID }}:{{ .Level }}')
+//       //Email body as HTML
+//       .details('''
+//<h1>{{ .ID }}</h1>
+//<b>{{ .Message }}</b>
+//Value: {{ index .Fields "value" }}
+//''')
+//       .email('admin@example.com')
+//         .toTemplates('oncall@example.com')
+//
+// All three email addresses will receive the alert message.
+//
+// Passing addresses to the `email` property directly or using the `email.to` property is the same.
+// tick:property
+func (h *EmailHandler) ToTemplates(to ...string) *EmailHandler {
+	h.ToTemplatesList = append(h.ToTemplatesList, to...)
 	return h
 }
 

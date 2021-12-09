@@ -167,7 +167,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, email := range n.EmailHandlers {
 		c := smtp.HandlerConfig{
-			To: email.ToList,
+			To:          email.ToList,
+			ToTemplates: email.ToTemplatesList,
 		}
 		h := et.tm.SMTPService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)

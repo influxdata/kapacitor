@@ -10775,108 +10775,231 @@ stream
 }
 
 func TestStream_AlertEmail(t *testing.T) {
-	var script = `
-stream
-	|from()
-		.measurement('cpu')
-		.where(lambda: "host" == 'serverA')
-		.groupBy('host')
-	|window()
-		.period(10s)
-		.every(10s)
-	|count('value')
-	|alert()
-		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
-		.details('''
+	var cases = []struct {
+		name     string
+		script   string
+		expected []*smtptest.Message
+	}{
+		{
+			name: "emails directly",
+			script: `stream
+			|from()
+				.measurement('cpu')
+				.where(lambda: "host" == 'serverA')
+				.groupBy('host')
+			|window()
+				.period(10s)
+				.every(10s)
+			|count('value')
+			|alert()
+				.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+				.details('''
 <b>{{.Message}}</b>
 
 Value: {{ index .Fields "count" }}
 <a href="http://graphs.example.com/host/{{index .Tags "host"}}">Details</a>
 ''')
-		.info(lambda: "count" > 6.0)
-		.warn(lambda: "count" > 7.0)
-		.crit(lambda: "count" > 8.0)
-		.email('user1@example.com', 'user2@example.com')
-		.email()
-			.to('user1@example.com', 'user2@example.com')
-`
-
-	expMail := []*smtptest.Message{
-		{
-			Header: mail.Header{
-				"Mime-Version":              []string{"1.0"},
-				"Content-Type":              []string{"text/html; charset=UTF-8"},
-				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":                        []string{"user1@example.com, user2@example.com"},
-				"From":                      []string{"test@example.com"},
-				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
-			},
-			Body: `
+						.info(lambda: "count" > 6.0)
+						.warn(lambda: "count" > 7.0)
+						.crit(lambda: "count" > 8.0)
+						.email('user1@example.com', 'user2@example.com')
+						.email()
+							.to('user1@example.com', 'user2@example.com')
+				`,
+			expected: []*smtptest.Message{
+				{
+					Header: mail.Header{
+						"Mime-Version":              []string{"1.0"},
+						"Content-Type":              []string{"text/html; charset=UTF-8"},
+						"Content-Transfer-Encoding": []string{"quoted-printable"},
+						"To":                        []string{"user1@example.com, user2@example.com"},
+						"From":                      []string{"test@example.com"},
+						"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+					},
+					Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
 
 Value: 10
 <a href=3D"http://graphs.example.com/host/serverA">Details</a>
 `,
-		},
-		{
-			Header: mail.Header{
-				"Mime-Version":              []string{"1.0"},
-				"Content-Type":              []string{"text/html; charset=UTF-8"},
-				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":                        []string{"user1@example.com, user2@example.com"},
-				"From":                      []string{"test@example.com"},
-				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
-			},
-			Body: `
+				},
+				{
+					Header: mail.Header{
+						"Mime-Version":              []string{"1.0"},
+						"Content-Type":              []string{"text/html; charset=UTF-8"},
+						"Content-Transfer-Encoding": []string{"quoted-printable"},
+						"To":                        []string{"user1@example.com, user2@example.com"},
+						"From":                      []string{"test@example.com"},
+						"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+					},
+					Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
 
 Value: 10
 <a href=3D"http://graphs.example.com/host/serverA">Details</a>
 `,
+				}},
+		},
+		{
+			name: "emails directly and in fields",
+			script: `stream
+					|from()
+						.measurement('cpu')
+						.where(lambda: "host" == 'serverA')
+						.groupBy('host')
+					|window()
+						.period(10s)
+						.every(10s)
+					|count('value')
+					|default()
+						.field('extraemail','bob@example.com')
+						.tag('tagemail','bob2@example.com')
+					|alert()
+						.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+						.details('''
+<b>{{.Message}}</b>
+
+Value: {{ index .Fields "count" }}
+<a href="http://graphs.example.com/host/{{index .Tags "host"}}">Details</a>
+''')
+						.info(lambda: "count" > 6.0)
+						.warn(lambda: "count" > 7.0)
+						.crit(lambda: "count" > 8.0)
+						.email()
+							.to('user1@example.com', 'user2@example.com')
+							.toTemplates('{{ index .Fields "extraemail" }}')
+				`,
+			expected: []*smtptest.Message{
+				{
+					Header: mail.Header{
+						"Mime-Version":              []string{"1.0"},
+						"Content-Type":              []string{"text/html; charset=UTF-8"},
+						"Content-Transfer-Encoding": []string{"quoted-printable"},
+						"To":                        []string{"user1@example.com, user2@example.com, bob@example.com"},
+						"From":                      []string{"test@example.com"},
+						"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+					},
+					Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+				}},
+		},
+		{
+			name: "emails directly and in tag",
+			script: `stream
+							|from()
+								.measurement('cpu')
+								.where(lambda: "host" == 'serverA')
+								.groupBy('host')
+							|window()
+								.period(10s)
+								.every(10s)
+							|count('value')
+							|default()
+								.field('extraemail','bob@example.com')
+								.tag('tagemail','bob2@example.com')
+							|alert()
+								.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+								.details('''
+<b>{{.Message}}</b>
+
+Value: {{ index .Fields "count" }}
+<a href="http://graphs.example.com/host/{{index .Tags "host"}}">Details</a>
+''')
+								.info(lambda: "count" > 6.0)
+								.warn(lambda: "count" > 7.0)
+								.crit(lambda: "count" > 8.0)
+								.email()
+									.to('user1@example.com', 'user2@example.com')
+									.toTemplates('{{ index .Tags "tagemail" }}')
+						`,
+			expected: []*smtptest.Message{
+				{
+					Header: mail.Header{
+						"Mime-Version":              []string{"1.0"},
+						"Content-Type":              []string{"text/html; charset=UTF-8"},
+						"Content-Transfer-Encoding": []string{"quoted-printable"},
+						"To":                        []string{"user1@example.com, user2@example.com, bob2@example.com"},
+						"From":                      []string{"test@example.com"},
+						"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
+					},
+					Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+				},
+			},
 		},
 	}
+	for i := range cases {
+		t.Run(cases[i].name, func(t *testing.T) {
+			script := cases[i].script
+			expMail := cases[i].expected
+			smtpServer, err := smtptest.NewServer()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				err := smtpServer.Close()
+				if err != nil {
+					t.Fatalf("error in closing smtpService %v", err)
+				}
+			}()
 
-	smtpServer, err := smtptest.NewServer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer smtpServer.Close()
-	sc := smtp.Config{
-		Enabled: true,
-		Host:    smtpServer.Host,
-		Port:    smtpServer.Port,
-		From:    "test@example.com",
-	}
-	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
-	if err := smtpService.Open(); err != nil {
-		t.Fatal(err)
-	}
-	defer smtpService.Close()
+			sc := smtp.Config{
+				Enabled: true,
+				Host:    smtpServer.Host,
+				Port:    smtpServer.Port,
+				From:    "test@example.com",
+			}
+			smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
+			if err := smtpService.Open(); err != nil {
+				t.Fatal(err)
+			}
 
-	tmInit := func(tm *kapacitor.TaskMaster) {
-		tm.SMTPService = smtpService
-	}
+			// make sure its closed
+			defer func() {
+				err := smtpService.Close()
+				if err != nil {
+					t.Fatalf("error in closing smtpService %v", err)
+				}
+			}()
 
-	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+			tmInit := func(tm *kapacitor.TaskMaster) {
+				tm.SMTPService = smtpService
+			}
 
-	// Close both client and server to ensure all message are processed
-	smtpService.Close()
-	smtpServer.Close()
+			testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	errors := smtpServer.Errors()
-	if got, exp := len(errors), 0; got != exp {
-		t.Errorf("unexpected smtp server errors: %v", errors)
-	}
+			// Close both client and server to ensure all message are processed
+			if err := smtpService.Close(); err != nil {
+				t.Fatalf("error in closing smtpService %v", err)
+			}
+			if err := smtpServer.Close(); err != nil {
+				t.Fatalf("error in closing smtpServer %v", err)
+			}
 
-	msgs := smtpServer.SentMessages()
-	if got, exp := len(msgs), len(expMail); got != exp {
-		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
-	}
-	for i, exp := range expMail {
-		got := msgs[i]
-		if err := exp.Compare(got); err != nil {
-			t.Errorf("%d %s", i, err)
-		}
+			errors := smtpServer.Errors()
+			if got, exp := len(errors), 0; got != exp {
+				t.Errorf("unexpected smtp server errors: %v", errors)
+			}
+
+			msgs := smtpServer.SentMessages()
+			if got, exp := len(msgs), len(expMail); got != exp {
+				t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+			}
+			for i, exp := range expMail {
+				got := msgs[i]
+				if err := exp.Compare(got); err != nil {
+					t.Errorf("%d %s", i, err)
+				}
+			}
+		})
 	}
 }
 
@@ -13672,6 +13795,7 @@ func testStreamerNoOutput(
 	duration time.Duration,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
+	t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 	err := fastForwardTask(clock, et, replayErr, tm, duration)

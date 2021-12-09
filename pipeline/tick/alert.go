@@ -91,6 +91,10 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		for _, to := range h.ToList {
 			n.Dot("to", to)
 		}
+
+		if len(h.ToTemplatesList) != 0 {
+			n.Dot("toTemplates", h.ToTemplatesList)
+		}
 	}
 
 	for _, h := range a.ExecHandlers {

@@ -7643,6 +7643,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"port":               float64(25),
 						"state-changes-only": false,
 						"to":                 nil,
+						"to-templates":       nil,
 						"username":           "",
 					},
 					Redacted: []string{
@@ -7663,6 +7664,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"port":               float64(25),
 					"state-changes-only": false,
 					"to":                 nil,
+					"to-templates":       nil,
 					"username":           "",
 				},
 				Redacted: []string{
@@ -7692,6 +7694,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"password":           true,
 								"port":               float64(25),
 								"state-changes-only": false,
+								"to-templates":       nil,
 								"to":                 nil,
 								"username":           "",
 							},
@@ -7712,6 +7715,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"password":           true,
 							"port":               float64(25),
 							"state-changes-only": false,
+							"to-templates":       nil,
 							"to":                 nil,
 							"username":           "",
 						},
