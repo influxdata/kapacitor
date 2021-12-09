@@ -15,11 +15,11 @@
   - Define the thresholds or expressions to alert on 
 * Alert
   - Where to send the alert. All scripts `.log()` by default.
-  - The tickscripts are written to make it easy to swap in whatever alert output you need. Just change the `alert.log('/tmp/{alert_name}.txt')` line in each tickscipt to your desired alert output. A full listing of outputs with code samples is available in the [kapacitor documentation](https://docs.influxdata.com/kapacitor/v0.13/nodes/alert_node/).
+  - The tickscripts are written to make it easy to swap in whatever alert output you need. Just change the `alert.log('/tmp/{alert_name}.txt')` line in each tickscipt to your desired alert output. A full listing of outputs with code samples is available in the [kapacitor documentation](https://docs.influxdata.com/kapacitor/latest/nodes/alert_node/).
   
 > **On Alert Volume:** These alerts may be very noisy or quiet depending on your environment. They are meant to be starting points for alerts with all the knobs easily adjustable from the Parameters. Many users will also want to eliminate the `.info()` level of logging. It is included here for completeness.
 
-> **On Verbosity:** These scripts are meant as templates for users who are new to writing tickscripts. All of the examples here can be written as one large stream. See the [documentation](https://docs.influxdata.com/kapacitor/v0.13/) for examples and full tick syntax.
+> **On Verbosity:** These scripts are meant as templates for users who are new to writing tickscripts. All of the examples here can be written as one large stream. See the [documentation](https://docs.influxdata.com/kapacitor/latest/) for examples and full tick syntax.
   
 ### Batch script example
 
