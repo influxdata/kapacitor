@@ -540,10 +540,11 @@ def build(version=None,
         build_command += "-ldflags=\""
         if static:
             build_command +="-s "
-
-        build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  -X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
-                                                                                                               get_current_branch(),
-                                                                                                               get_current_commit())
+        if platform == "linux":
+            build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  '
+        build_command += '-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
+                                                                                                            get_current_branch(),
+                                                                                                            get_current_commit())
         if static:
             build_command += "-a -installsuffix cgo "
         build_command += path
