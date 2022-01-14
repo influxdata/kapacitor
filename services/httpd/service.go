@@ -133,7 +133,7 @@ func NewService(c Config, hostname string, t *tls.Config, d Diagnostic, defaultR
 			"",
 			defaultRP,
 		),
-		diag: d,
+		diag:                  d,
 		httpServerErrorLogger: d.NewHTTPServerErrorLogger(),
 	}
 	if s.key == "" {
