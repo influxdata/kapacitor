@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -10,13 +9,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"text/template"
-	"time"
 
+	kafka "github.com/Shopify/sarama"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
-	"github.com/segmentio/kafka-go"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -40,10 +39,10 @@ type Cluster struct {
 // writer wraps a kafka.Writer and tracks stats
 type writer struct {
 	// These fields are use with atomic we want to ensure they are aligned properly so we place them at the top of the struct
-	messageCount int64
-	errorCount   int64
-
-	kafka *kafka.Writer
+	requestsInFlightMetric metrics.Counter
+	errorCount             int64
+	diagnostic             Diagnostic
+	kafka                  kafka.AsyncProducer
 
 	cluster,
 	topic string
@@ -52,10 +51,7 @@ type writer struct {
 
 	statsKey string
 
-	// time.Ticker doesn't expose any way to close its internal channel,
-	// so we have to use a side-channel to signal when it's been stopped.
-	ticker     *time.Ticker
-	tickerDone chan struct{}
+	done chan struct{}
 }
 
 func (w *writer) Open() {
@@ -73,36 +69,39 @@ func (w *writer) Open() {
 		w: w,
 	}
 	statsMap.Set(statWriteMessageCount, writeMessages)
-
-	w.ticker = time.NewTicker(time.Second)
-	w.tickerDone = make(chan struct{}, 1)
+	w.done = make(chan struct{}, 1)
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		w.pollStats()
+		w.pollErrors()
 	}()
 }
 
 func (w *writer) Close() {
-	w.ticker.Stop()
-	close(w.tickerDone)
+
+	close(w.done)
 	vars.DeleteStatistic(w.statsKey)
-	w.kafka.Close()
+	err := w.kafka.Close()
+
+	if err != nil {
+		w.diagnostic.Error("error in kafka client shutdown", err)
+	}
 	w.wg.Wait()
 }
 
-// pollStats periodically reads the writer Stats and accumulates the results.
+// pollErrors periodically reads the writer Stats and accumulates the results.
 // A read operation on the kafka.Writer.Stats() method causes the internal counters to be reset.
 // As a result we control all reads through this method.
-func (w *writer) pollStats() {
+func (w *writer) pollErrors() {
 	for {
 		select {
-		case <-w.tickerDone:
+		case <-w.done:
 			return
-		case <-w.ticker.C:
-			stats := w.kafka.Stats()
-			atomic.AddInt64(&w.messageCount, stats.Messages)
-			atomic.AddInt64(&w.errorCount, stats.Errors)
+		case err := <-w.kafka.Errors():
+			atomic.AddInt64(&w.errorCount, 1)
+			if err != nil {
+				w.diagnostic.Error("kafka client error", err)
+			}
 		}
 	}
 }
@@ -113,10 +112,10 @@ type writeMessageCount struct {
 }
 
 func (w *writeMessageCount) IntValue() int64 {
-	return atomic.LoadInt64(&w.w.messageCount)
+	return w.w.requestsInFlightMetric.Count()
 }
 func (w *writeMessageCount) String() string {
-	return strconv.FormatInt(w.IntValue(), 10)
+	return strconv.FormatInt(w.w.requestsInFlightMetric.Count(), 10)
 }
 
 // writeErrorCount implements the kexpvar.IntVar to expose error counts.
@@ -143,10 +142,12 @@ func (c *Cluster) WriteMessage(diagnostic Diagnostic, target WriteTarget, key, m
 	if err != nil {
 		return err
 	}
-	return w.kafka.WriteMessages(context.Background(), kafka.Message{
-		Key:   key,
-		Value: msg,
-	})
+	w.kafka.Input() <- &kafka.ProducerMessage{
+		Topic: target.Topic,
+		Key:   kafka.ByteEncoder(key),
+		Value: kafka.ByteEncoder(msg),
+	}
+	return nil
 }
 
 func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, error) {
@@ -159,16 +160,23 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.WriterConfig(diagnostic, target)
+			wc, err := c.cfg.writerConfig(diagnostic, target)
 			if err != nil {
 				return nil, err
 			}
-			kw := kafka.NewWriter(wc)
+			kp, err := kafka.NewAsyncProducer(c.cfg.Brokers, wc)
+
+			if err != nil {
+				return nil, err
+			}
+
 			// Create new writer
 			w = &writer{
-				kafka:   kw,
-				cluster: c.cfg.ID,
-				topic:   topic,
+				requestsInFlightMetric: metrics.GetOrRegisterCounter("requests-in-flight", wc.MetricRegistry),
+				kafka:                  kp,
+				cluster:                c.cfg.ID,
+				topic:                  topic,
+				diagnostic:             diagnostic,
 			}
 			w.Open()
 			c.writers[topic] = w
@@ -210,7 +218,8 @@ func configChanged(old, new Config) bool {
 	return old.UseSSL != new.UseSSL ||
 		old.SSLCA != new.SSLCA ||
 		old.SSLCert != new.SSLCert ||
-		old.SSLKey != new.SSLKey
+		old.SSLKey != new.SSLKey ||
+		old.SASLAuth != new.SASLAuth
 }
 
 func (c *Cluster) clearWriters() {
@@ -246,6 +255,7 @@ func (s *Service) Cluster(id string) (*Cluster, bool) {
 	c, ok := s.clusters[id]
 	return c, ok
 }
+
 func (s *Service) Update(newConfigs []interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

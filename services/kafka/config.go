@@ -1,14 +1,14 @@
 package kafka
 
 import (
-	"crypto/tls"
 	"fmt"
 	"time"
 
+	kafka "github.com/Shopify/sarama"
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
-	"github.com/segmentio/kafka-go"
+	"github.com/spaolacci/murmur3"
 )
 
 const (
@@ -44,6 +44,8 @@ type Config struct {
 	SSLKey string `toml:"ssl-key" override:"ssl-key"`
 	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
+	// Authentication using SASL
+	SASLAuth
 }
 
 func NewConfig() Config {
@@ -82,58 +84,61 @@ type WriteTarget struct {
 	PartitionAlgorithm string
 }
 
-func (c Config) WriterConfig(diagnostic Diagnostic, target WriteTarget) (kafka.WriterConfig, error) {
+func (c Config) writerConfig(diagnostic Diagnostic, target WriteTarget) (*kafka.Config, error) {
+	cfg := kafka.NewConfig()
+
 	if target.Topic == "" {
-		return kafka.WriterConfig{}, errors.New("topic must not be empty")
+		return cfg, errors.New("topic must not be empty")
 	}
-	var balancer kafka.Balancer
+	var partitioner kafka.PartitionerConstructor
 	if target.PartitionById {
 		switch target.PartitionAlgorithm {
-		case "crc32c", "":
-			balancer = &kafka.CRC32Balancer{}
+		case "crc32", "":
+			// can't use kafka.NewCustomHashPartitioner, because we need to maintain compatibility
+			partitioner = newCRCPartitioner
 		case "murmur2":
-			balancer = &kafka.Murmur2Balancer{}
+			// can't use kafka.NewCustomHashPartitioner here either, because we need to maintain compatibility
+			partitioner = newMurmur2
+		case "murmur3":
+			partitioner = kafka.NewCustomHashPartitioner(murmur3.New32)
 		case "fnv-1a":
-			balancer = &kafka.Hash{}
+			partitioner = kafka.NewHashPartitioner
 		default:
-			return kafka.WriterConfig{}, fmt.Errorf("invalid partition algorithm: %q", target.PartitionAlgorithm)
+			return cfg, fmt.Errorf("invalid partition algorithm: %q", target.PartitionAlgorithm)
 		}
-	} else {
-		balancer = &kafka.LeastBytes{}
+		cfg.Producer.Partitioner = partitioner
 	}
 
-	var tlsCfg *tls.Config
+	cfg.Producer.Return.Errors = true // so we can display errors
+	cfg.Producer.Return.Successes = false
+	cfg.ClientID = c.ID
+	cfg.Metadata.Full = false // we only want to grab metadata for the topics we care about
+
 	if c.UseSSL {
-		t, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+		var err error
+		cfg.Net.TLS.Enable = true
+		cfg.Net.TLS.Config, err = tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 		if err != nil {
-			return kafka.WriterConfig{}, err
+			return nil, err
 		}
-		tlsCfg = t
 	}
-	dialer := &kafka.Dialer{
-		Timeout: time.Duration(c.Timeout),
-		TLS:     tlsCfg,
-	}
-
-	baseConfig := kafka.WriterConfig{
-		Brokers:      c.Brokers,
-		Dialer:       dialer,
-		ReadTimeout:  time.Duration(c.Timeout),
-		WriteTimeout: time.Duration(c.Timeout),
-		BatchSize:    c.BatchSize,
-		BatchTimeout: time.Duration(c.BatchTimeout),
-		// Async=true allows internal batching of the messages to take place.
-		// It also means that no errors will be captured from the WriteMessages method.
-		// As such we track the WriteStats for errors and report them with Kapacitor's normal diagnostics.
-		Async: true,
-		ErrorLogger: kafka.LoggerFunc(func(s string, x ...interface{}) {
-			diagnostic.Error("kafka client error", fmt.Errorf(s, x...))
-		}),
-		Topic:    target.Topic,
-		Balancer: balancer,
+	if c.Timeout > 0 {
+		cfg.Net.DialTimeout = time.Duration(c.Timeout)
+		cfg.Net.WriteTimeout = time.Duration(c.Timeout)
+		cfg.Net.ReadTimeout = time.Duration(c.Timeout)
 	}
 
-	return baseConfig, nil
+	cfg.Producer.Flush.MaxMessages = c.BatchSize
+	if cfg.Producer.Flush.MaxMessages <= 0 {
+		cfg.Producer.Flush.MaxMessages = DefaultBatchSize
+	}
+	cfg.Producer.Flush.Frequency = time.Duration(c.BatchTimeout)
+
+	// SASL
+	if err := c.SASLAuth.SetSASLConfig(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, cfg.Validate()
 }
 
 type Configs []Config
