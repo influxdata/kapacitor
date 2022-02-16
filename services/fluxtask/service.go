@@ -81,10 +81,16 @@ func (s *Service) Open() error {
 			taskService = combinedTaskService
 			taskControlService = combinedTaskService
 		}
+
+		influxURL := s.config.DefaultInfluxDB
+		if s.config.DefaultInfluxDB == "" {
+			influxURL = s.InfluxDBService.HTTPDService.(*httpd.Service).URL()
+		}
+
 		// TODO: register metrics returned here?
 		executor, _ := executor.NewExecutor(
 			s.logger.With(zap.String("service", "fluxtask-executor")),
-			fluxlocal.NewFluxQueryer(s.config.Secrets, s.logger.With(zap.String("service", "flux-local-querier"))),
+			fluxlocal.NewFluxQueryer(s.config.Secrets, influxURL, s.logger.With(zap.String("service", "flux-local-querier"))),
 			taskService,
 			taskControlService,
 		)
