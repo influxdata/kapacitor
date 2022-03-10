@@ -3,6 +3,7 @@ package stateful
 import (
 	"errors"
 	"fmt"
+	"github.com/dustin/go-humanize"
 	"math"
 	"reflect"
 	"regexp"
@@ -10,10 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/zeebo/mwc"
 )
+
+_ = mwc.Rand
 
 // maxArgs is used to specify the largest number of arguments that a
 // builtin function can accept.
@@ -179,6 +181,7 @@ func init() {
 	statelessFuncs["mod"] = newMath2("mod", math.Mod)
 	statelessFuncs["pow"] = newMath2("pow", math.Pow)
 	statelessFuncs["pow10"] = newMathI("pow10", math.Pow10)
+	statelessFuncs["randn"] = newMath1("randn", math.Randn)
 	statelessFuncs["sin"] = newMath1("sin", math.Sin)
 	statelessFuncs["sinh"] = newMath1("sinh", math.Sinh)
 	statelessFuncs["sqrt"] = newMath1("sqrt", math.Sqrt)
