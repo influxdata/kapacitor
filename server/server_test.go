@@ -10702,12 +10702,20 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			result: func(ctxt context.Context) error {
 				ts := ctxt.Value("server").(*kafkatest.Server)
-				time.Sleep(2 * time.Second)
-				ts.Close()
+				defer ts.Close()
 				got, err := ts.Messages()
 				if err != nil {
 					return err
 				}
+
+				for i := 0; i < 100 && len(got) == 0; i++ {
+					time.Sleep(time.Second)
+					got, err = ts.Messages()
+					if err != nil {
+						return err
+					}
+				}
+
 				exp := []kafkatest.Message{{
 					Topic:     "test",
 					Partition: 3,
@@ -10723,12 +10731,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 							diff = -diff
 						}
 						// It is ok as long as the timestamp is within
-						// 5 seconds of the current time. If we are that close,
+						// 10 seconds of the current time. If we are that close,
 						// then it likely means the timestamp was correctly
 						// written.
-						return diff < 5*time.Second
+						return diff < 10*time.Second
 					}),
 				}
+
 				if !cmp.Equal(exp, got, cmpopts...) {
 					return fmt.Errorf("unexpected kafka messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
@@ -11666,7 +11675,7 @@ stream
 		.crit(lambda: TRUE)
 `
 
-			if _, err := cli.CreateTask(client.CreateTaskOptions{
+			task, err := cli.CreateTask(client.CreateTaskOptions{
 				ID:   "testAlertHandlers",
 				Type: client.StreamTask,
 				DBRPs: []client.DBRP{{
@@ -11675,7 +11684,8 @@ stream
 				}},
 				TICKscript: tick,
 				Status:     client.Enabled,
-			}); err != nil {
+			})
+			if err != nil {
 				t.Fatalf("%s: %v", kind, err)
 			}
 
@@ -11684,10 +11694,14 @@ stream
 			v.Add("precision", "s")
 			s.MustWrite("mydb", "myrp", point, v)
 
+			time.Sleep(5 * time.Second)
+
+			if err := cli.DeleteTask(task.Link); err != nil {
+				t.Fatalf(" Error deleting task: %s: %v", kind, err)
+			}
 			// Close the entire server to ensure all data is processed
 			s.Close()
 			closed = true
-
 			if err := tc.result(ctxt); err != nil {
 				t.Errorf("%s: %v", kind, err)
 			}
@@ -12915,12 +12929,12 @@ host,region=east,host=B v=true 9
 		got[i].Data = models.Result{}
 	}
 	// Sort results since order doesn't matter
-	//sort.Slice(want, func(i, j int) bool {
-	//	if want[i].Time.Equal(want[j].Time) {
-	//		return want[i].ID < want[j].ID
-	//	}
-	//	return want[i].Time.Before(want[j].Time)
-	//})
+	sort.Slice(want, func(i, j int) bool {
+		if want[i].Time.Equal(want[j].Time) {
+			return want[i].ID < want[j].ID
+		}
+		return want[i].Time.Before(want[j].Time)
+	})
 	sort.Slice(got, func(i, j int) bool {
 		if got[i].Time.Equal(got[j].Time) {
 			return got[i].ID < got[j].ID
@@ -12931,11 +12945,11 @@ host,region=east,host=B v=true 9
 	if !cmp.Equal(got, want) {
 		t.Errorf("unexpected alert during inhibited run -want/+got\n%s", cmp.Diff(want, got))
 	}
-	//for i := range want {
-	//	if !cmp.Equal(got[i], want[i]) {
-	//		t.Errorf("unexpected alert during inhibited run -want/+got\n%s", cmp.Diff(want[i], got[i]))
-	//	}
-	//}
+	for i := range want {
+		if !cmp.Equal(got[i], want[i]) {
+			t.Errorf("unexpected alert during inhibited run -want/+got\n%s", cmp.Diff(want[i], got[i]))
+		}
+	}
 }
 
 func TestServer_AlertListHandlers(t *testing.T) {

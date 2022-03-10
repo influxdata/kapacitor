@@ -24,3 +24,4 @@ Dependencies
 * gopkg.in/gomail.v2 [MIT](https://github.com/go-gomail/gomail/blob/v2/LICENSE)
 * github.com/mailru/easyjson [MIT](https://github.com/mailru/easyjson/blob/3fdea8d05856a0c8df22ed4bc71b3219245e4485/LICENSE)
 * google.golang.org/protobuf [BSD](https://github.com/protocolbuffers/protobuf-go/blob/master/LICENSE)
+* github.com/Shopify/sarama [MIT](https://github.com/Shopify/sarama/blob/main/LICENSE)
