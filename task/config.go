@@ -36,6 +36,10 @@ type Config struct {
 	// Secrets is the kapacitor provider for secrets as described at
 	// https://docs.influxdata.com/influxdb/v2.0/security/secrets/
 	Secrets map[string]string `toml:"secrets"`
+
+	// DefaultInfluxDB is the default influxdb instance that task scripts with interact with.
+	// This defaults to the kapacitor's default influxdb if left blank.
+	DefaultInfluxDB string `toml:"default-influxdb"`
 }
 
 const DefaultTaskRunBucket = "kapacitor_fluxtask_logs"
