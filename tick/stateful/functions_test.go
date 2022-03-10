@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/zeebo/mwc"
 )
 
 func Test_Bool(t *testing.T) {
@@ -912,4 +914,47 @@ func Test_StatelessFuncs(t *testing.T) {
 
 	}
 
+}
+
+func Test_Rand_zeros(t *testing.T) {
+	f := newRand()
+	// seed with a known value to force determinism.
+	(*mwc.T)(f).Seed(time.Unix(0, 0).Unix())
+	testCases := []struct {
+		args []interface{}
+		exp  int64
+		err  error
+	}{
+		{args: []interface{}{int64(0)}, exp: 0},
+		{args: []interface{}{int64(1)}, exp: 0},
+		{args: []interface{}{int64(10)}, exp: 3},
+		{args: []interface{}{int64(10)}, exp: 2},
+		{args: []interface{}{int64(10)}, exp: 7},
+		{args: []interface{}{int64(10)}, exp: 9},
+		{args: []interface{}{int64(10)}, exp: 3},
+		{args: []interface{}{int64(10)}, exp: 8},
+		{args: []interface{}{int64(10)}, exp: 7},
+		{args: []interface{}{}, exp: 7383185112808722380},
+	}
+	for i, tc := range testCases {
+		result, err := f.Call(tc.args...)
+		if tc.err != nil {
+			if err == nil {
+				t.Errorf("expected error from rand(%v) got nil exp %s", tc.args, tc.err)
+			} else if got, exp := err.Error(), tc.err.Error(); got != exp {
+				t.Errorf("unexpected error from rand(%v) got %s exp %s", tc.args, got, exp)
+			}
+			continue
+		} else if err != nil {
+			t.Errorf("unexpected error from rand(%v) %s", tc.args, err)
+			continue
+		}
+		res, ok := result.(int64)
+		if !ok {
+			t.Errorf("expected int64 result from rand(%v) %s", tc.args, err)
+		}
+		if res != tc.exp {
+			t.Errorf("expected %v as a result of the %vth run of rand (when given unix zero date as set seed) but got %v", tc.exp, i, res)
+		}
+	}
 }

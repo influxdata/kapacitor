@@ -10,10 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	humanize "github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/zeebo/mwc"
 )
+
+var ErrNotInt = errors.New("value is not an int")
 
 // maxArgs is used to specify the largest number of arguments that a
 // builtin function can accept.
@@ -248,6 +251,7 @@ func NewFunctions() Funcs {
 	funcs["sigma"] = &sigma{}
 	funcs["count"] = &count{}
 	funcs["spread"] = &spread{min: math.Inf(+1), max: math.Inf(-1)}
+	funcs["rand"] = newRand()
 
 	return funcs
 }
@@ -1083,6 +1087,43 @@ func init() {
 
 func (c *count) Signature() map[Domain]ast.ValueType {
 	return countFuncSignature
+}
+
+func newRand() *rand {
+	return (*rand)(mwc.Rand())
+}
+
+// rand gives you a ranom number.  It needs to be initalized before being run
+type rand mwc.T
+
+func (c *rand) Reset() {}
+
+// returns a random number.
+func (c *rand) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) > 1 {
+		return 0, errors.New("rand expects zero or one argument")
+	}
+	if len(args) == 1 {
+		n, ok := args[0].(int64)
+		if !ok {
+			return nil, ErrNotInt
+		}
+		return int64(((*mwc.T)(c).Uint64n(uint64(n)) & (1<<63 - 1))), nil
+	}
+	return int64(((*mwc.T)(c).Uint64() & (1<<63 - 1))), nil
+
+}
+
+var randFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Count Function Signature
+func init() {
+	d := Domain{}
+	randFuncSignature[d] = ast.TInt
+}
+
+func (c *rand) Signature() map[Domain]ast.ValueType {
+	return randFuncSignature
 }
 
 type sigma struct {
