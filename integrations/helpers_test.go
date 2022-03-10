@@ -88,7 +88,7 @@ func compareResults(exp, got models.Result) (bool, string) {
 			return false, fmt.Sprintf("unexpected series columns: i: %d \nexp %v \ngot %v", i, exp.Series[i].Columns, got.Series[i].Columns)
 		}
 		if !reflect.DeepEqual(exp.Series[i].Values, got.Series[i].Values) {
-			return false, fmt.Sprintf("unexpected series values: i: %d \nexp %v \ngot %v", i, exp.Series[i].Values, got.Series[i].Values)
+			return false, fmt.Sprintf("unexpected series values: i: %d \n %s", i, cmp.Diff(exp.Series[i].Values, got.Series[i].Values))
 		}
 	}
 	return true, ""

@@ -251,7 +251,7 @@ func NewFunctions() Funcs {
 	funcs["sigma"] = &sigma{}
 	funcs["count"] = &count{}
 	funcs["spread"] = &spread{min: math.Inf(+1), max: math.Inf(-1)}
-	funcs["rand"] = newRand()
+	funcs["rand"] = NewRand()
 
 	return funcs
 }
@@ -1089,29 +1089,30 @@ func (c *count) Signature() map[Domain]ast.ValueType {
 	return countFuncSignature
 }
 
-func newRand() *rand {
-	return (*rand)(mwc.Rand())
+//NewRand creates a new rng.  We do it this way so we can override it so tests are deterministic.
+var NewRand = func() *Rand {
+	return (*Rand)(mwc.Rand())
 }
 
-// rand gives you a ranom number.  It needs to be initalized before being run
-type rand mwc.T
+// rand gives you a random number.  It needs to be initalized before being run
+type Rand mwc.T
 
-func (c *rand) Reset() {}
+func (c *Rand) Reset() {}
 
 // returns a random number.
-func (c *rand) Call(args ...interface{}) (v interface{}, err error) {
+func (c *Rand) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) > 1 {
 		return 0, errors.New("rand expects zero or one argument")
 	}
 	if len(args) == 1 {
 		n, ok := args[0].(int64)
 		if !ok {
+			fmt.Println(reflect.TypeOf(args[0]).Name())
 			return nil, ErrNotInt
 		}
-		return int64(((*mwc.T)(c).Uint64n(uint64(n)) & (1<<63 - 1))), nil
+		return int64(((*mwc.T)(c).Uint64n(uint64(n)) & ((1 << 63) - 1))), nil
 	}
-	return int64(((*mwc.T)(c).Uint64() & (1<<63 - 1))), nil
-
+	return int64(((*mwc.T)(c).Uint64() & ((1 << 63) - 1))), nil
 }
 
 var randFuncSignature = map[Domain]ast.ValueType{}
@@ -1120,9 +1121,10 @@ var randFuncSignature = map[Domain]ast.ValueType{}
 func init() {
 	d := Domain{}
 	randFuncSignature[d] = ast.TInt
+	randFuncSignature[Domain{ast.TInt}] = ast.TInt
 }
 
-func (c *rand) Signature() map[Domain]ast.ValueType {
+func (c *Rand) Signature() map[Domain]ast.ValueType {
 	return randFuncSignature
 }
 

@@ -917,7 +917,7 @@ func Test_StatelessFuncs(t *testing.T) {
 }
 
 func Test_Rand_zeros(t *testing.T) {
-	f := newRand()
+	f := NewRand()
 	// seed with a known value to force determinism.
 	(*mwc.T)(f).Seed(time.Unix(0, 0).Unix())
 	testCases := []struct {
