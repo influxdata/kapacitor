@@ -61,11 +61,11 @@ func (c Config) Validate() error {
 }
 
 func (c Config) Parse() (out *tls.Config, err error) {
-	if len(c.Ciphers) > 0 {
-		if out == nil {
-			out = new(tls.Config)
-		}
+	if out == nil {
+		out = new(tls.Config)
+	}
 
+	if len(c.Ciphers) > 0 {
 		for _, name := range c.Ciphers {
 			strUpperName := strings.ToUpper(name)
 			cipher, ok := ciphers[strUpperName]
@@ -74,25 +74,23 @@ func (c Config) Parse() (out *tls.Config, err error) {
 			}
 			out.CipherSuites = append(out.CipherSuites, cipher)
 		}
+	} else {
+		for _, cipher := range ciphers {
+			out.CipherSuites = append(out.CipherSuites, cipher)
+		}
 	}
 
 	if c.MinVersion != "" {
-		if out == nil {
-			out = new(tls.Config)
-		}
-
 		version, ok := versionsMap[strings.ToUpper(c.MinVersion)]
 		if !ok {
 			return nil, badVersion(c.MinVersion)
 		}
 		out.MinVersion = version
+	} else {
+		out.MinVersion = tls.VersionTLS12
 	}
 
 	if c.MaxVersion != "" {
-		if out == nil {
-			out = new(tls.Config)
-		}
-
 		version, ok := versionsMap[strings.ToUpper(c.MaxVersion)]
 		if !ok {
 			return nil, badVersion(c.MaxVersion)
@@ -104,16 +102,13 @@ func (c Config) Parse() (out *tls.Config, err error) {
 }
 
 var ciphers = map[string]uint16{
-	"TLS_RSA_WITH_RC4_128_SHA":                tls.TLS_RSA_WITH_RC4_128_SHA,
 	"TLS_RSA_WITH_AES_128_CBC_SHA":            tls.TLS_RSA_WITH_AES_128_CBC_SHA,
 	"TLS_RSA_WITH_AES_256_CBC_SHA":            tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 	"TLS_RSA_WITH_AES_128_CBC_SHA256":         tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
 	"TLS_RSA_WITH_AES_128_GCM_SHA256":         tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
 	"TLS_RSA_WITH_AES_256_GCM_SHA384":         tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-	"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":        tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
 	"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
 	"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":    tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-	"TLS_ECDHE_RSA_WITH_RC4_128_SHA":          tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA,
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
 	"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":      tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
 	"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
@@ -146,6 +141,10 @@ var availableCiphers = func() string {
 var deprecatedCiphers = map[string]struct{}{
 	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":       struct{}{}, // broken by sweet32 https://sweet32.info/
 	"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA": struct{}{}, // broken by sweet32 https://sweet32.info/
+	"TLS_ECDHE_RSA_WITH_RC4_128_SHA":      struct{}{}, // Broken cipher RC4 is deprecated by RFC 7465
+	"TLS_ECDHE_ECDSA_WITH_RC4_128_SHA":    struct{}{}, // Broken cipher RC4 is deprecated by RFC 7465
+	"TLS_RSA_WITH_RC4_128_SHA":            struct{}{}, // Broken cipher RC4 is deprecated by RFC 7465
+
 }
 
 func badCipher(name string) error {
@@ -183,6 +182,8 @@ var deprecatedVersions = map[string]struct{}{
 	"SSL3.0": struct{}{},
 	"TLS1.0": struct{}{},
 	"1.0":    struct{}{},
+	"TLS1.1": struct{}{},
+	"1.1":    struct{}{},
 }
 
 func badVersion(name string) error {
