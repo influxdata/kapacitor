@@ -1,54 +1,88 @@
-# Changelog
+CHANGELOG for Kapacitor master commit 95dd289843c5a556977e129385d27bd511f6dec2
 
-## Unreleased
-
-### Features
-- [#2575](https://github.com/influxdata/kapacitor/pull/2575): Support the "attributes" attribute in Alerta node
-- [#2630](https://github.com/influxdata/kapacitor/pull/2630): Upgrade to the new `google.golang` Protobuf library
-- [#2643](https://github.com/influxdata/kapacitor/pull/2643): Add "host" and "attribute" options to BigPanda node and "auto-attributes" configuration option
-
-## v1.6.2 [2021-09-24]
-
-### Bugfixes
-- [#2582](https://github.com/influxdata/kapacitor/pull/2582): expvar string json encoding to handle special chars, thanks @prashanthjbabu! 
-- [#2605](https://github.com/influxdata/kapacitor/pull/2605): Updated jwt dependencies of libraries because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
-- [#2601](https://github.com/influxdata/kapacitor/pull/2601): Switched to github.com/golang-jwt/jwt for kapacitor's use because of https://nvd.nist.gov/vuln/detail/CVE-2020-26160
-- [#2618](https://github.com/influxdata/kapacitor/pull/2618): Switch task service to use Flux formatter that preserves comments
+## v1.6.4 [2022-03-15]
+----------------------
 
 ### Features
 
-- [#2621](https://github.com/influxdata/kapacitor/pull/2621): Add template-id to task list.
-- [#2622](https://github.com/influxdata/kapacitor/pull/2622): auto-create 1.x DB or 2.x bucket for flux task logs
-- [#2608](https://github.com/influxdata/kapacitor/pull/2608): Allow for compact json in templates and BP
+1. [839e032](https://github.com/influxdata/kapacitor/commit/839e032): This adds SASL support to kafka alerts
+
+### Bug Fixes
+
+1. [d4fcc6b](https://github.com/influxdata/kapacitor/commit/d4fcc6b): Flux limits and bad flux httpclient
+1. [1959476](https://github.com/influxdata/kapacitor/commit/1959476): Update sarama for  https://github.com/Shopify/sarama/issues/2129
+1. [95dd289](https://github.com/influxdata/kapacitor/commit/95dd289): properly depreciate TLS<1.2, DES and RC4 based ciphers
+
+## v1.6.3 [2021-12-10]
+----------------------
+
+### Features
+
+1. [935fdf0](https://github.com/influxdata/kapacitor/commit/935fdf0): Support the "attributes" attribute in Alerta node
+1. [8c9ed5d](https://github.com/influxdata/kapacitor/commit/8c9ed5d): Add BigPanda handler options
+1. [a353257](https://github.com/influxdata/kapacitor/commit/a353257): Env var config can now add new items
+1. [af204c7](https://github.com/influxdata/kapacitor/commit/af204c7): Make topic queue length configurable
+1. [4c2b965](https://github.com/influxdata/kapacitor/commit/4c2b965): Templating for address in email alert
+
+### Bug Fixes
+
+1. [720aba1](https://github.com/influxdata/kapacitor/commit/720aba1): Deprecations in response to sweet32
+1. [2526656](https://github.com/influxdata/kapacitor/commit/2526656): Better error message for missing flux data
+
+
+## v1.6.2 [2021-09-29]
+----------------------
+
+### Features
+
+1. [cbcd989](https://github.com/influxdata/kapacitor/commit/cbcd989): Add template-id to task list
+1. [b498fce](https://github.com/influxdata/kapacitor/commit/b498fce): Auto-create 1.x DB or 2.x bucket for flux task logs
+1. [b4091b8](https://github.com/influxdata/kapacitor/commit/b4091b8): Allow for compact json in templates and BP
+
+### Bug Fixes
+
+1. [10535e8](https://github.com/influxdata/kapacitor/commit/10535e8): Switch flux formatter to one that preserves comments
+
 
 ## v1.6.1 [2021-07-22]
+----------------------
 
 ### Features
-- [#2589](https://github.com/influxdata/kapacitor/pull/2589): Flag for blacklisting CIDR ranges for certain handlers, and nodes
-- [#2591](https://github.com/influxdata/kapacitor/pull/2591): Flag for disabling alert handlers, this is useful for security (such as disabling exec on a shared machine)
 
-### Bugfixes
-- [#2585](https://github.com/influxdata/kapacitor/pull/2585): Make DeleteGroupMessage align with GroupInfoer interface, thanks @prashanthjbabu!
-- [#2596](https://github.com/influxdata/kapacitor/pull/2596): Fix payload serialization for BigPanda
+1. [815bf2b](https://github.com/influxdata/kapacitor/commit/815bf2b): Flag to allow blacklisting CIDR ranges
 
-## v1.6.0 [2021-06-28]
+### Bug Fixes
+
+1. [df99b44](https://github.com/influxdata/kapacitor/commit/df99b44): Fields of alerting data point are serialized to proper types
+1. [2bd467c](https://github.com/influxdata/kapacitor/commit/2bd467c): Fields of alerting data point should be serialized as a string
+
+
+## v1.6.0 [2021-06-14]
+----------------------
 
 ### Features
-- [#2484](https://github.com/influxdata/kapacitor/pull/2484): Add Zenoss alert event handler.
-- [#2493](https://github.com/influxdata/kapacitor/pull/2493): Route kafka alerts to partitions by ID, and allow for configuring the hashing strategy.
-- [#2512](https://github.com/influxdata/kapacitor/pull/2512): Pull in auth code from Kapacitor Enterprise.
-- [#2530](https://github.com/influxdata/kapacitor/pull/2530): Add a node tricklenode that converts batches to streams, the inverse of windownode.
-- [#2544](https://github.com/influxdata/kapacitor/pull/2544): flux tasks skeleton in Kapacitor
-- [#2550](https://github.com/influxdata/kapacitor/pull/2550): add queryFluxNode that allows for querying flux in batch tasks
-- [#2555](https://github.com/influxdata/kapacitor/pull/2555): run flux tasks with built-in flux engine
-- [#2559](https://github.com/influxdata/kapacitor/pull/2559): kapacitor cli supports flux tasks
-- [#2560](https://github.com/influxdata/kapacitor/pull/2560): enable new-style slack apps
-- [#2562](https://github.com/influxdata/kapacitor/pull/2560): handle Delete messages in the joinNode
-- [#2576](https://github.com/influxdata/kapacitor/pull/2576): shared secret auth to influxdb in OSS
 
-### Bugfixes
-- [#2564](https://github.com/influxdata/kapacitor/pull/2564): Fix a panic in the scraper handler when debug mode is enabled
-- [#2579](https://github.com/influxdata/kapacitor/pull/2579): Fix: cli auth and error handling for flux tasks
+1. [226f1ca](https://github.com/influxdata/kapacitor/commit/226f1ca): Flux tasks skeleton in Kapacitor
+1. [5c162cd](https://github.com/influxdata/kapacitor/commit/5c162cd): Run flux tasks with built-in flux engine
+1. [a731363](https://github.com/influxdata/kapacitor/commit/a731363): Kapacitor cli supports flux tasks
+1. [5a1ba2c](https://github.com/influxdata/kapacitor/commit/5a1ba2c): Enable new-style slack apps
+1. [fef0d30](https://github.com/influxdata/kapacitor/commit/fef0d30): Tricklenode
+1. [a6a0c27](https://github.com/influxdata/kapacitor/commit/a6a0c27): Flux batch queries in TICKscripts
+1. [e5cd456](https://github.com/influxdata/kapacitor/commit/e5cd456): Shared secret auth to influxdb in OSS
+
+### Bug Fixes
+
+1. [c5603f3](https://github.com/influxdata/kapacitor/commit/c5603f3): Race in sideload update
+1. [4ca7790](https://github.com/influxdata/kapacitor/commit/4ca7790): Add TICKscript AST processing
+1. [f6f7229](https://github.com/influxdata/kapacitor/commit/f6f7229): External ServiceNow testability
+1. [1f2c956](https://github.com/influxdata/kapacitor/commit/1f2c956): External BigPanda testability
+1. [ebee9bf](https://github.com/influxdata/kapacitor/commit/ebee9bf): Make ChannelURL naming consistent
+1. [53a1d22](https://github.com/influxdata/kapacitor/commit/53a1d22): Zenoss config handling
+1. [452f2b2](https://github.com/influxdata/kapacitor/commit/452f2b2): Property name compatibility
+1. [6ceb6ec](https://github.com/influxdata/kapacitor/commit/6ceb6ec): Setup test options from configuration
+1. [22315fb](https://github.com/influxdata/kapacitor/commit/22315fb): Null pointer panic in scraper handler
+1. [53cf295](https://github.com/influxdata/kapacitor/commit/53cf295): Revert ChannelURL mapping to preserve backward compatibility with saved TICKscripts
+1. [931e72a](https://github.com/influxdata/kapacitor/commit/931e72a): Cli auth and error handling for flux tasks
 
 ## v1.5.9 [2021-04-01]
 
