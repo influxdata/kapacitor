@@ -13,14 +13,12 @@ type UnionNode struct {
 	u *pipeline.UnionNode
 
 	// Buffer of points/batches from each source.
-	sources []*timeMessageCircularQueue
+	sources []*CircularQueue[timeMessage]
 	// the low water marks for each source.
 	lowMarks []time.Time
 	lock     sync.Mutex
 	rename   string
 }
-
-//go:generate tmpl -data "[\"timeMessage\"]" -o=union_circularqueues.gen.go circularqueue.gen.go.tmpl
 
 type timeMessage interface {
 	edge.Message
@@ -42,9 +40,9 @@ func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, d NodeDiagnostic) (*
 func (n *UnionNode) runUnion([]byte) error {
 	// Keep buffer of values from parents so they can be ordered.
 
-	n.sources = make([]*timeMessageCircularQueue, len(n.ins))
+	n.sources = make([]*CircularQueue[timeMessage], len(n.ins))
 	for i := range n.ins {
-		n.sources[i] = newTimeMessageCircularQueue()
+		n.sources[i] = NewCircularQueue[timeMessage]()
 	}
 	n.lowMarks = make([]time.Time, len(n.ins))
 
@@ -63,7 +61,7 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 	}
 
 	// Add newest point to buffer
-	n.sources[src].Enqueue(batch)
+	Enqueue[timeMessage](n.sources[src], batch)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -83,7 +81,7 @@ func (n *UnionNode) Point(src int, p edge.PointMessage) error {
 	}
 
 	// Add newest point to buffer
-	n.sources[src].Enqueue(p)
+	Enqueue[timeMessage](n.sources[src], p)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -94,7 +92,7 @@ func (n *UnionNode) Barrier(src int, b edge.BarrierMessage) error {
 	defer n.timer.Stop()
 
 	// Add newest point to buffer
-	n.sources[src].Enqueue(b)
+	Enqueue[timeMessage](n.sources[src], b)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -117,8 +115,8 @@ func (n *UnionNode) emitReady(drain bool) error {
 		validSources := 0
 		for i, values := range n.sources {
 			sourceMark := n.lowMarks[i]
-			if values.Len() > 0 {
-				t := values.Peek(0).Time()
+			if values.Len > 0 {
+				t := Peek(values, 0).Time()
 				if mark.IsZero() || t.Before(mark) {
 					mark = t
 				}
@@ -142,10 +140,10 @@ func (n *UnionNode) emitReady(drain bool) error {
 
 		// Emit all values that are at or below the mark.
 		for i = range n.sources {
-			l := n.sources[i].Len()
+			l := n.sources[i].Len
 			j := 0
 			for j = 0; j < l; j++ {
-				v = n.sources[i].Peek(j)
+				v = Peek(n.sources[i], j)
 				if !v.Time().After(mark) {
 					err := n.emit(v)
 					if err != nil {

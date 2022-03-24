@@ -1,6 +1,6 @@
 module github.com/influxdata/kapacitor
 
-go 1.17
+go 1.18
 
 require (
 	github.com/BurntSushi/toml v0.3.1
@@ -27,7 +27,7 @@ require (
 	github.com/influxdata/influx-cli/v2 v2.0.0-20210526124422-63da8eccbdb7
 	github.com/influxdata/influxdb v1.8.4
 	github.com/influxdata/influxdb/v2 v2.0.1-alpha.10.0.20210507184756-dc72dc3f0c07
-	github.com/influxdata/pkg-config v0.2.11
+	github.com/influxdata/pkg-config v0.2.12
 	github.com/influxdata/usage-client v0.0.0-20160829180054-6d3895376368
 	github.com/influxdata/wlog v0.0.0-20160411224016-7c63b0a71ef8
 	github.com/k-sone/snmpgo v3.2.0+incompatible

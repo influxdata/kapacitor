@@ -601,11 +601,11 @@ func (s *Service) removeHandlers() error {
 		return err
 	}
 	for _, id := range diff(s.handlers, loadedHandlers) {
-		pair := strings.Split(id, "/")
-		if len(pair) != 2 {
-			return errors.New("expected id to be topicID/handlerID")
+		topicID, handlerID, found := strings.Cut(id, "/")
+		if !found {
+			return errors.New("expected id to be topicID/handlerID but it was: \"" + id + "\"")
 		}
-		l := s.cli.TopicHandlerLink(pair[0], pair[1])
+		l := s.cli.TopicHandlerLink(topicID, handlerID)
 		if err := s.cli.DeleteTopicHandler(l); err != nil {
 			return err
 		}
