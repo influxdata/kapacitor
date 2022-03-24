@@ -7,7 +7,7 @@ executors:
       # NOTE: To upgrade the Go version, first push the upgrade to the cross-builder Dockerfile in the edge repo,
       # then update the version here to match. Until we finish the migration to using the cross-builder image,
       # you'll also need to update references to `cimg/go` and `GO_VERSION` in this file.
-      - image: quay.io/influxdb/cross-builder:go1.17.2-3990b5e53287dffd196048dd74b6bb0c92e1c5fa
+      - image: quay.io/influxdb/cross-builder:go1.18-19532d83ff625362c07ca99eee6ea2e1d6bdc22e
     resource_class: large
   linux-amd64:
     machine:
