@@ -17,7 +17,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxql"
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
@@ -1283,7 +1284,7 @@ func (c *Client) ListTasks(opt *ListTasksOptions) ([]Task, error) {
 	return r.Tasks, nil
 }
 
-func (c *Client) TaskOutput(link Link, name string) (*influxql.Result, error) {
+func (c *Client) TaskOutput(link Link, name string) (*query.Result, error) {
 	u := *c.url
 	u.Path = path.Join(link.Href, name)
 
@@ -1291,7 +1292,7 @@ func (c *Client) TaskOutput(link Link, name string) (*influxql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &influxql.Result{}
+	r := &query.Result{}
 	_, err = c.Do(req, r, http.StatusOK)
 	if err != nil {
 		return nil, err

@@ -15,6 +15,8 @@ func TestQuery_Clone(t *testing.T) {
 		"SELECT mean(usage) FROM telegraf.autogen.cpu WHERE host = 'serverA' AND dc = 'slc'",
 		"SELECT mean(usage) FROM telegraf.autogen.cpu WHERE host = 'serverA' AND dc = 'slc' OR product = 'login'",
 		"SELECT mean(usage) FROM telegraf.autogen.cpu WHERE host = 'serverA' AND (dc = 'slc' OR product = 'login')",
+		"SELECT * from (SELECT usage FROM telegraf.autogen.cpu)",
+		"SELECT * INTO telegraf.autogen.cpu FROM (SELECT usage FROM telegraf.autogen.cpu)",
 	}
 
 	equal := func(q0, q1 *kapacitor.Query) error {

@@ -12545,11 +12545,13 @@ stream
 		t.Errorf("got %v exp %v", len(points), 1)
 	} else {
 		p := points[0]
-		if p.Name() != "m" {
+		if string(p.Name()) != "m" {
 			t.Errorf("got %v exp %v", p.Name(), "m")
 		}
-		if p.Fields()["count"] != int64(10) {
-			t.Errorf("got %v exp %v", p.Fields()["count"], 10.0)
+		if fields, err := p.Fields(); fields["count"] != int64(10) {
+			t.Errorf("got %v exp %v", fields["count"], 10.0)
+		} else if err != nil {
+			t.Errorf("expected no error on fields but got %v", err)
 		}
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)

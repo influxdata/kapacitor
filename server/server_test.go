@@ -31,9 +31,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"
-	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/toml"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/command"
@@ -3686,18 +3687,18 @@ test value=1 0000000012
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := response{
 		ID:      "test-count",
 		Message: "test-count got: 15",
 		Time:    time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 		Level:   "CRITICAL",
-		Data: influxql.Result{
+		Data: query.Result{
 			Series: imodels.Rows{
 				{
 					Name:    "test",
@@ -3893,18 +3894,18 @@ test value=1 0000000012
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := response{
 		ID:      "test-count",
 		Message: "test-count got: 15",
 		Time:    time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 		Level:   "CRITICAL",
-		Data: influxql.Result{
+		Data: query.Result{
 			Series: imodels.Rows{
 				{
 					Name:    "test",
@@ -4096,11 +4097,11 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := []response{
 		{
@@ -4108,7 +4109,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Message: "test-batch got: 3",
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4132,7 +4133,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Message: "test-batch got: 4",
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4309,11 +4310,11 @@ func TestServer_ReplayBatch(t *testing.T) {
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := []response{
 		{
@@ -4321,7 +4322,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Message: "test-batch got: 3",
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4345,7 +4346,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Message: "test-batch got: 4",
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4562,11 +4563,11 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := []response{
 		{
@@ -4574,7 +4575,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Message: "test-batch got: 3",
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4598,7 +4599,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Message: "test-batch got: 4",
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4846,11 +4847,11 @@ func TestServer_ReplayQuery(t *testing.T) {
 	}
 	defer f.Close()
 	type response struct {
-		ID      string          `json:"id"`
-		Message string          `json:"message"`
-		Time    time.Time       `json:"time"`
-		Level   string          `json:"level"`
-		Data    influxql.Result `json:"data"`
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
 	}
 	exp := []response{
 		{
@@ -4858,7 +4859,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Message: "test-batch got: 3",
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
@@ -4882,7 +4883,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Message: "test-batch got: 4",
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
-			Data: influxql.Result{
+			Data: query.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",

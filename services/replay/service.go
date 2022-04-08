@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor"
 	kclient "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/clock"

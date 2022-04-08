@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 

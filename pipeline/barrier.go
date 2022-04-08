@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 )
 
 // A BarrierNode will emit a barrier with the current time, according to the system

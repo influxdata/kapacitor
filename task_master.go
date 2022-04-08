@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/influxdb/tsdb"
+
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/command"
@@ -265,6 +267,10 @@ type TaskMaster struct {
 	drained bool
 	mu      sync.RWMutex
 	wg      sync.WaitGroup
+}
+
+func (tm *TaskMaster) WritePointsPrivileged(ctx tsdb.WriteContext, database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
+	panic("not implemented") // we shouldn't need this.
 }
 
 type forkKey struct {
@@ -782,17 +788,22 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 	if retentionPolicy == "" {
 		retentionPolicy = tm.DefaultRetentionPolicy
 	}
+
 	for _, mp := range points {
+		mpFields, err := mp.Fields()
+		if err != nil {
+			return err
+		}
 		p := edge.NewPointMessage(
-			mp.Name(),
+			string(mp.Name()),
 			database,
 			retentionPolicy,
 			models.Dimensions{},
-			models.Fields(mp.Fields()),
+			models.Fields(mpFields),
 			models.Tags(mp.Tags().Map()),
 			mp.Time(),
 		)
-		err := tm.writePointsIn.CollectPoint(p)
+		err = tm.writePointsIn.CollectPoint(p)
 		if err != nil {
 			return err
 		}

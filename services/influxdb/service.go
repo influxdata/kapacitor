@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxql"
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/keyvalue"

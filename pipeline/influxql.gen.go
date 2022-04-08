@@ -6,41 +6,41 @@
 
 package pipeline
 
-import "github.com/influxdata/influxdb/influxql"
+import "github.com/influxdata/influxdb/query"
 
 //tick:ignore
 type ReduceCreater struct {
-	CreateFloatReducer func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter)
+	CreateFloatReducer func() (query.FloatPointAggregator, query.FloatPointEmitter)
 
-	CreateFloatIntegerReducer func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter)
+	CreateFloatIntegerReducer func() (query.FloatPointAggregator, query.IntegerPointEmitter)
 
-	CreateFloatStringReducer func() (influxql.FloatPointAggregator, influxql.StringPointEmitter)
+	CreateFloatStringReducer func() (query.FloatPointAggregator, query.StringPointEmitter)
 
-	CreateFloatBooleanReducer func() (influxql.FloatPointAggregator, influxql.BooleanPointEmitter)
+	CreateFloatBooleanReducer func() (query.FloatPointAggregator, query.BooleanPointEmitter)
 
-	CreateIntegerFloatReducer func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter)
+	CreateIntegerFloatReducer func() (query.IntegerPointAggregator, query.FloatPointEmitter)
 
-	CreateIntegerReducer func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter)
+	CreateIntegerReducer func() (query.IntegerPointAggregator, query.IntegerPointEmitter)
 
-	CreateIntegerStringReducer func() (influxql.IntegerPointAggregator, influxql.StringPointEmitter)
+	CreateIntegerStringReducer func() (query.IntegerPointAggregator, query.StringPointEmitter)
 
-	CreateIntegerBooleanReducer func() (influxql.IntegerPointAggregator, influxql.BooleanPointEmitter)
+	CreateIntegerBooleanReducer func() (query.IntegerPointAggregator, query.BooleanPointEmitter)
 
-	CreateStringFloatReducer func() (influxql.StringPointAggregator, influxql.FloatPointEmitter)
+	CreateStringFloatReducer func() (query.StringPointAggregator, query.FloatPointEmitter)
 
-	CreateStringIntegerReducer func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter)
+	CreateStringIntegerReducer func() (query.StringPointAggregator, query.IntegerPointEmitter)
 
-	CreateStringReducer func() (influxql.StringPointAggregator, influxql.StringPointEmitter)
+	CreateStringReducer func() (query.StringPointAggregator, query.StringPointEmitter)
 
-	CreateStringBooleanReducer func() (influxql.StringPointAggregator, influxql.BooleanPointEmitter)
+	CreateStringBooleanReducer func() (query.StringPointAggregator, query.BooleanPointEmitter)
 
-	CreateBooleanFloatReducer func() (influxql.BooleanPointAggregator, influxql.FloatPointEmitter)
+	CreateBooleanFloatReducer func() (query.BooleanPointAggregator, query.FloatPointEmitter)
 
-	CreateBooleanIntegerReducer func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter)
+	CreateBooleanIntegerReducer func() (query.BooleanPointAggregator, query.IntegerPointEmitter)
 
-	CreateBooleanStringReducer func() (influxql.BooleanPointAggregator, influxql.StringPointEmitter)
+	CreateBooleanStringReducer func() (query.BooleanPointAggregator, query.StringPointEmitter)
 
-	CreateBooleanReducer func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter)
+	CreateBooleanReducer func() (query.BooleanPointAggregator, query.BooleanPointEmitter)
 
 	TopBottomCallInfo      *TopBottomCallInfo
 	IsSimpleSelector       bool

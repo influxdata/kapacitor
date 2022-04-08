@@ -6,7 +6,7 @@ import (
 	"time"
 	"reflect"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -21,7 +21,7 @@ func convert{{.Name}}Point(
 	field string,
 	isSimpleSelector bool,
 	topBottomInfo *pipeline.TopBottomCallInfo,
-) (*influxql.{{.Name}}Point, error) {
+) (*query.{{.Name}}Point, error) {
 	value, ok := p.Fields()[field]
 	if !ok {
 		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
@@ -30,9 +30,9 @@ func convert{{.Name}}Point(
 	if !ok {
 		return nil, fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", field, value)
 	}
-	ap := &influxql.{{.Name}}Point{
+	ap := &query.{{.Name}}Point{
 		Name:  name,
-		Tags:  influxql.NewTags(p.Tags()),
+		Tags:  query.NewTags(p.Tags()),
 		Time:  p.Time().UnixNano(),
 		Value: typed,
 	}
@@ -52,10 +52,10 @@ type {{.name}}PointAggregator struct {
 	field         string
 	topBottomInfo *pipeline.TopBottomCallInfo
 	isSimpleSelector bool
-	aggregator influxql.{{.Name}}PointAggregator
+	aggregator query.{{.Name}}PointAggregator
 }
 
-func {{.name}}PopulateAuxFieldsAndTags(ap *influxql.{{.Name}}Point, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+func {{.name}}PopulateAuxFieldsAndTags(ap *query.{{.Name}}Point, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
 	ap.Aux = make([]interface{}, len(fieldsAndTags))
 	for i, name := range fieldsAndTags {
 		if f, ok := fields[name]; ok {
@@ -77,7 +77,7 @@ func (a *{{.name}}PointAggregator) AggregatePoint(name string, p edge.FieldsTags
 
 type {{.name}}PointEmitter struct {
 	baseReduceContext
-	emitter influxql.{{.Name}}PointEmitter
+	emitter query.{{.Name}}PointEmitter
 	isSimpleSelector bool
     byName bool
 }
@@ -90,7 +90,7 @@ func (e *{{.name}}PointEmitter) EmitPoint() (edge.PointMessage, error) {
 	ap := slice[0]
 	var t time.Time
 	if e.pointTimes {
-		if ap.Time == influxql.ZeroTime {
+		if ap.Time == query.ZeroTime {
 			t = e.time
 		} else {
 			t = time.Unix(0, ap.Time).UTC()
@@ -136,7 +136,7 @@ func (e *{{.name}}PointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
-			if ap.Time == influxql.ZeroTime {
+			if ap.Time == query.ZeroTime {
 				t = e.time
 			} else {
 				t = time.Unix(0, ap.Time).UTC()

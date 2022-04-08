@@ -18,7 +18,7 @@ func (m *NoopMetaClient) CreateDatabase(name string) (*meta.DatabaseInfo, error)
 func (m *NoopMetaClient) CreateDatabaseWithRetentionPolicy(name string, rpi *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error) {
 	return nil, nil
 }
-func (m *NoopMetaClient) CreateRetentionPolicy(database string, rpi *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error) {
+func (m *NoopMetaClient) CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec, makeDefault bool) (*meta.RetentionPolicyInfo, error) {
 	return nil, nil
 }
 func (m *NoopMetaClient) Database(name string) *meta.DatabaseInfo {

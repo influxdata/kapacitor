@@ -102,6 +102,15 @@ func TestTaskTypeFromProgram(t *testing.T) {
 			taskType: client.BatchTask,
 		},
 		{
+			name: "var batch subquery",
+			tickscript: `dbrp "telegraf"."autogen"
+			
+			var x = batch|query('SELECT * FROM (SELECT * FROM "telegraf"."autogen"."mymeas")')
+			`,
+			taskType: client.BatchTask,
+		},
+
+		{
 			name: "mixed type",
 			tickscript: `dbrp "telegraf"."autogen"
 			

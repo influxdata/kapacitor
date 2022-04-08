@@ -6,11 +6,11 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/query"
 )
 
 // The result from an output.
-type Result influxql.Result
+type Result query.Result
 
 // Unmarshal a Result object from JSON.
 func ResultFromJSON(in io.Reader) (r Result) {
