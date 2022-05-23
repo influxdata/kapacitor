@@ -44,14 +44,14 @@ type writer struct {
 	diagnostic             Diagnostic
 	kafka                  kafka.AsyncProducer
 
-	cluster,
-	topic string
-
-	wg sync.WaitGroup
+	cluster *Cluster
+	topic   string
 
 	statsKey string
 
-	done chan struct{}
+	clearedFromErr bool
+	done           chan struct{}
+	wg             sync.WaitGroup
 }
 
 func (w *writer) Open() {
@@ -101,6 +101,10 @@ func (w *writer) pollErrors() {
 			atomic.AddInt64(&w.errorCount, 1)
 			if err != nil {
 				w.diagnostic.Error("kafka client error", err)
+				if !w.clearedFromErr {
+					w.clearedFromErr = true
+					go w.cluster.clearWriter(w.topic)
+				}
 			}
 		}
 	}
@@ -227,6 +231,11 @@ func (c *Cluster) clearWriters() {
 		w.Close()
 		delete(c.writers, t)
 	}
+}
+
+func (c *Cluster) clearWriter(topic string) {
+	c.writers[t].Close()
+	delete(c.writers, t)
 }
 
 type Service struct {
