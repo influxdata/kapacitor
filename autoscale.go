@@ -8,7 +8,6 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/influxdata/kapacitor/tick/ast"

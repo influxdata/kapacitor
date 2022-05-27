@@ -208,6 +208,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	for _, log := range n.MlogHandlers {
+		c := alertservice.DefaultLogHandlerConfig()
+		c.Path = log.FilePath
+		if log.Mode != 0 {
+			c.Mode = os.FileMode(log.Mode)
+		}
+		h, err := alertservice.NewMlogHandler(c, an.diag)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Mlog alert handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
 	for _, vo := range n.VictorOpsHandlers {
 		c := victorops.HandlerConfig{
 			RoutingKey: vo.RoutingKey,

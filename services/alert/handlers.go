@@ -82,6 +82,39 @@ func (h *logHandler) Handle(event alert.Event) {
 	}
 }
 
+type mlogHandler struct {
+	logpath string
+	mode    os.FileMode
+	diag    HandlerDiagnostic
+}
+
+func NewMlogHandler(c LogHandlerConfig, d HandlerDiagnostic) (alert.Handler, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	return &mlogHandler{
+		logpath: c.Path,
+		mode:    c.Mode,
+		diag:    d,
+	}, nil
+}
+
+func (h *mlogHandler) Handle(event alert.Event) {
+	ad := event.AlertData()
+	file := fmt.Sprintf("%s/%d_%s.log", h.logpath, ad.Time.Unix(), ad.ID)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
+	if err != nil {
+		h.diag.Error("failed to open file for alert logging", err, keyvalue.KV("file", file))
+		return
+	}
+	defer f.Close()
+
+	err = json.NewEncoder(f).Encode(ad)
+	if err != nil {
+		h.diag.Error("failed to marshal alert data json", err)
+	}
+}
+
 type ExecHandlerConfig struct {
 	Prog      string            `mapstructure:"prog"`
 	Args      []string          `mapstructure:"args"`
