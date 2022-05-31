@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/Shopify/sarama v1.33.0
+	github.com/Shopify/sarama v1.34.0
 	github.com/aws/aws-sdk-go v1.38.3
 	github.com/benbjohnson/clock v1.1.0
 	github.com/benbjohnson/tmpl v1.0.0
@@ -185,7 +185,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
-	github.com/pierrec/lz4/v4 v4.1.8 // indirect
+	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -212,7 +212,7 @@ require (
 	go.uber.org/multierr v1.5.0 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
+	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
