@@ -6,18 +6,17 @@ import (
 )
 
 type TelegrafOutNode struct {
-	chainnode `json:"-"`
-	toml      string
+	chainnode  `json:"-"`
+	TOMLConfig string
 }
 
-func newTegrafOutNode() *TelegrafOutNode {
-
+func newTelegrafOutNode(edgeType EdgeType) *TelegrafOutNode {
 	return &TelegrafOutNode{
-		chainnode: newBasicChainNode("telegrafOut", BatchEdge, StreamEdge),
+		chainnode: newBasicChainNode("telegrafOut", edgeType, edgeType),
 	}
 }
 
-// MarshalJSON converts TrickleNode to JSON
+// MarshalJSON converts TelegrafOutNode to JSON
 // tick:ignore
 func (n *TelegrafOutNode) MarshalJSON() ([]byte, error) {
 	var raw = &struct {
@@ -28,12 +27,12 @@ func (n *TelegrafOutNode) MarshalJSON() ([]byte, error) {
 			Type: "eval",
 			ID:   n.ID(),
 		},
-		TOMLConfig: n.toml,
+		TOMLConfig: n.TOMLConfig,
 	}
 	return json.Marshal(raw)
 }
 
-// UnmarshalJSON converts JSON to an TrickleNode
+// UnmarshalJSON converts JSON to an TelegrafOutNode
 // tick:ignore
 func (n *TelegrafOutNode) UnmarshalJSON(data []byte) error {
 	var raw = &struct {

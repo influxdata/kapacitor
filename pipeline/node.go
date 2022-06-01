@@ -452,6 +452,12 @@ func (n *chainnode) Sample(rate interface{}) *SampleNode {
 	return s
 }
 
+func (n *chainnode) TelegrafOut() *TelegrafOutNode {
+	s := newTelegrafOutNode(n.Provides())
+	n.linkChild(s)
+	return s
+}
+
 // Create a new node that computes the derivative of adjacent points.
 func (n *chainnode) Derivative(field string) *DerivativeNode {
 	s := newDerivativeNode(n.Provides(), field)
