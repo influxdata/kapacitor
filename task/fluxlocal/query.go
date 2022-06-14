@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/influxdata/flux/dependency"
+
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/dependencies"
 	"github.com/influxdata/flux/dependencies/filesystem"
@@ -39,7 +41,7 @@ func NewFluxQueryer(secrets map[string]string, defaultInfluxDBHost string, logge
 	}
 }
 
-func (f *fluxQueryer) injectDependencies(ctx context.Context) context.Context {
+func (f *fluxQueryer) injectDependencies(ctx context.Context) (context.Context, *dependency.Span) {
 	validator := &url.PassValidator{}
 	deps := dependencies.NewDefaultDependencies(f.defaultInfluxDBHost)
 
@@ -53,17 +55,31 @@ func (f *fluxQueryer) injectDependencies(ctx context.Context) context.Context {
 	}
 
 	// inject the dependencies to the context.
-	return deps.Inject(ctx)
+	return dependency.Inject(ctx, deps)
 }
 
 func (f *fluxQueryer) Query(ctx context.Context, compiler flux.Compiler) (flux.ResultIterator, error) {
 	f.logger.Info("executed flux query")
-	ctx = f.injectDependencies(context.Background())
+	var span *dependency.Span
+	ctx, span = f.injectDependencies(context.Background())
+	defer span.Finish()
 	program, err := compiler.Compile(ctx, runtime.Default)
-	alloc := &memory.Allocator{}
-	query, err := program.Start(ctx, alloc)
+	query, err := program.Start(ctx, memory.DefaultAllocator)
 	if err != nil {
 		return nil, errors.Wrap(err, "error while executing flux program")
 	}
-	return flux.NewResultIteratorFromQuery(query), nil
+	return &spannedResultIterator{
+		ResultIterator: flux.NewResultIteratorFromQuery(query),
+		span:           span,
+	}, nil
+}
+
+type spannedResultIterator struct {
+	flux.ResultIterator
+	span *dependency.Span
+}
+
+func (s *spannedResultIterator) Release() {
+	s.ResultIterator.Release()
+	s.span.Finish()
 }
