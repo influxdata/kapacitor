@@ -85,11 +85,13 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
 	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/services/zenoss/zenosstest"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
 	"github.com/k-sone/snmpgo"
+	"github.com/zeebo/mwc"
 )
 
 var diagService *diagnostic.Service
@@ -11642,6 +11644,45 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalNow", script, time.Second, expectedOutput, false, nil)
+}
+
+func TestStream_EvalRand(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('data')
+	|eval(lambda: rand(0), lambda: rand(20), lambda: rand(1), lambda: rand())
+		.as('rand0', 'rand20','rand1','rand')
+	|httpOut('TestStream_EvalRand')
+`
+	// make the rng deterministic for the test
+	tempRand := stateful.NewRand
+	stateful.NewRand = func() *stateful.Rand {
+		r := mwc.T{}
+		r.Seed(time.Unix(0, 0).UTC().Unix())
+		return (*stateful.Rand)(&r)
+	}
+	defer func() { stateful.NewRand = tempRand }()
+	expectedOutput := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "data",
+				Tags:    map[string]string{"owner": "ownerA"},
+				Columns: []string{"time", "rand", "rand0", "rand1", "rand20"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(3131420824542496000), // this is due to a limitation of JSON, which httpOut uses
+						float64(0),
+						float64(0),
+						float64(3),
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_EvalRand", script, time.Second, expectedOutput, false, nil)
 }
 
 func TestStream_Autoscale(t *testing.T) {
