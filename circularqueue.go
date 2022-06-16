@@ -6,7 +6,6 @@ type CircularQueue[T any] struct {
 	head int
 	tail int
 	Len  int
-	Peek *T
 }
 
 func NewCircularQueue[T any](buf ...T) *CircularQueue[T] {
@@ -22,7 +21,7 @@ func NewCircularQueue[T any](buf ...T) *CircularQueue[T] {
 }
 
 // Enqueue adds an item to the queue.
-func Enqueue[T any](q *CircularQueue[T], v T) {
+func (q *CircularQueue[T]) Enqueue(v T) {
 	// if full we must grow and insert together. This is an expensive op
 	if cap(q.data) > q.Len { // no need to grow
 		if q.tail == len(q.data) {
@@ -85,7 +84,7 @@ func (q *CircularQueue[T]) Dequeue(n int) {
 }
 
 // Peek peeks i ahead of the current head of queue.  It should be used in conjunction with .Len() to prevent a panic.
-func Peek[x any](q *CircularQueue[x], i int) x {
+func (q *CircularQueue[x]) Peek(i int) x {
 	if i < 0 || i >= q.Len {
 		panic("peek index is out of bounds")
 	}

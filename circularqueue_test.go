@@ -15,7 +15,7 @@ func Test_intCircularBufPeek(t *testing.T) {
 	peekRes := []int{}
 	q := NewCircularQueue([]int{1, 2, 3, 4, 5, 6, 7}...)
 	for i := 0; i < q.Len; i++ {
-		peekRes = append(peekRes, Peek(q, i))
+		peekRes = append(peekRes, q.Peek(i))
 	}
 	if !reflect.DeepEqual(peekRes, exp) {
 		t.Errorf("expected peeking, we would see %v, got %v", exp, peekRes)
@@ -23,7 +23,7 @@ func Test_intCircularBufPeek(t *testing.T) {
 	}
 	peekRes = []int{}
 	for i := 0; i < q.Len; i++ {
-		peekRes = append(peekRes, Peek(q, i))
+		peekRes = append(peekRes, q.Peek(i))
 	}
 
 	if !reflect.DeepEqual(peekRes, exp) {
@@ -146,12 +146,12 @@ func Test_intCircularBuf(t *testing.T) {
 			res := []int{}
 			for j := 0; j < len(c.dequeueTimes); j++ {
 				for i := range c.add[j] {
-					Enqueue(q, c.add[j][i])
+					q.Enqueue(c.add[j][i])
 				}
 				peekRes := []int{}
 				if len(peekRes) > 0 {
 					for i := 0; i < q.Len; i++ {
-						peekRes = append(peekRes, Peek(q, i))
+						peekRes = append(peekRes, q.Peek(i))
 					}
 					if !reflect.DeepEqual(peekRes, c.expectedPrePeek[j]) {
 						t.Errorf("expected peeking before we called next, on step %d we would see %v, got %v", j, c.expectedPeek[j], peekRes)
@@ -159,13 +159,13 @@ func Test_intCircularBuf(t *testing.T) {
 				}
 				for i := 0; i < c.dequeueTimes[j]; i++ {
 					if q.Len > 0 {
-						res = append(res, Peek(q, 0))
+						res = append(res, q.Peek(0))
 						q.Dequeue(1)
 					}
 				}
 				peekRes = []int{}
 				for i := 0; i < q.Len; i++ {
-					peekRes = append(peekRes, Peek(q, i))
+					peekRes = append(peekRes, q.Peek(i))
 				}
 				if !reflect.DeepEqual(peekRes, c.expectedPeek[j]) {
 					t.Errorf("expected peeking, on step %d we would see %v, got %v", j, c.expectedPeek[j], peekRes)
@@ -201,7 +201,7 @@ func Test_leakCircularBuf(t *testing.T) {
 			finalizedItems = append(finalizedItems, *q)
 			finalizedLock.Unlock()
 		})
-		Enqueue(q, item)
+		q.Enqueue(item)
 	}
 
 	// go through the queue till it is empty

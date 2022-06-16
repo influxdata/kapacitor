@@ -196,7 +196,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		if buf != nil {
 			l := buf.Len
 			for i = 0; i < l; i++ {
-				pt := Peek(buf, i)
+				pt := buf.Peek(i)
 				st := pt.Msg.Time().Round(n.j.Tolerance)
 				if st.Before(lowMark) {
 					// Send point by itself since it won't get a match.
@@ -224,7 +224,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 			var i int
 			l := matches.Len
 			for i = 0; i < l; i++ {
-				match := Peek(matches, i)
+				match := matches.Peek(i)
 				pt := match.Msg.Time().Round(n.j.Tolerance)
 				if pt.Equal(t) {
 					// Option 1, send both points
@@ -251,12 +251,12 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 			} else {
 				// Option 2
 				// Cache this point for when its match arrives.
-				Enqueue(n.getOrCreateSpecificGroup(groupId), p)
+				n.getOrCreateSpecificGroup(groupId).Enqueue(p)
 			}
 		}
 	} else {
 		// Cache match point.
-		Enqueue(n.getOrCreateMatchGroup(groupId), p)
+		n.getOrCreateMatchGroup(groupId).Enqueue(p)
 
 		// Send all specific points that match, to the group.
 		var i int
@@ -264,7 +264,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		if buf != nil {
 			l := buf.Len
 			for i = 0; i < l; i++ {
-				pt := Peek(buf, i)
+				pt := buf.Peek(i)
 				st := pt.Msg.Time().Round(n.j.Tolerance)
 				if st.Equal(t) {
 					n.sendMatchPoint(pt, p)
@@ -375,14 +375,14 @@ func (g *joinGroup) Collect(src int, p timeMessage) error {
 	}
 	l := sets.Len
 	for i := 0; i < l; i++ {
-		if x := Peek(sets, i); !x.Has(src) {
+		if x := sets.Peek(i); !x.Has(src) {
 			set = x
 			break
 		}
 	}
 	if set == nil {
 		set = g.newJoinset(t)
-		Enqueue(g.sets[t], set)
+		g.sets[t].Enqueue(set)
 	}
 	set.Set(src, p)
 
@@ -439,7 +439,7 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 	i := 0
 	l := sets.Len
 	for ; i < l; i++ {
-		set := Peek(sets, i)
+		set := sets.Peek(i)
 		if set.Ready() || !onlyReadySets {
 			err := g.emitJoinedSet(set)
 			if err != nil {

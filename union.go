@@ -61,7 +61,7 @@ func (n *UnionNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) erro
 	}
 
 	// Add newest point to buffer
-	Enqueue[timeMessage](n.sources[src], batch)
+	n.sources[src].Enqueue(batch)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -81,7 +81,7 @@ func (n *UnionNode) Point(src int, p edge.PointMessage) error {
 	}
 
 	// Add newest point to buffer
-	Enqueue[timeMessage](n.sources[src], p)
+	n.sources[src].Enqueue(p)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -92,7 +92,7 @@ func (n *UnionNode) Barrier(src int, b edge.BarrierMessage) error {
 	defer n.timer.Stop()
 
 	// Add newest point to buffer
-	Enqueue[timeMessage](n.sources[src], b)
+	n.sources[src].Enqueue(b)
 
 	// Emit the next values
 	return n.emitReady(false)
@@ -116,7 +116,7 @@ func (n *UnionNode) emitReady(drain bool) error {
 		for i, values := range n.sources {
 			sourceMark := n.lowMarks[i]
 			if values.Len > 0 {
-				t := Peek(values, 0).Time()
+				t := values.Peek(0).Time()
 				if mark.IsZero() || t.Before(mark) {
 					mark = t
 				}
@@ -143,7 +143,7 @@ func (n *UnionNode) emitReady(drain bool) error {
 			l := n.sources[i].Len
 			j := 0
 			for j = 0; j < l; j++ {
-				v = Peek(n.sources[i], j)
+				v = n.sources[i].Peek(j)
 				if !v.Time().After(mark) {
 					err := n.emit(v)
 					if err != nil {
