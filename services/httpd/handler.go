@@ -759,11 +759,11 @@ func parseCredentials(r *http.Request) (credentials, error) {
 	// Check for the HTTP Authorization header.
 	if s := r.Header.Get("Authorization"); s != "" {
 		// Check for Bearer token.
-		strs := strings.Split(s, " ")
-		if len(strs) == 2 && strs[0] == "Bearer" {
+		bearer, token, found := strings.Cut(s, " ")
+		if found && bearer == "Bearer" {
 			return credentials{
 				Method: BearerAuthentication,
-				Token:  strs[1],
+				Token:  token,
 			}, nil
 		}
 

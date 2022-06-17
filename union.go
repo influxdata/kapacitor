@@ -13,14 +13,12 @@ type UnionNode struct {
 	u *pipeline.UnionNode
 
 	// Buffer of points/batches from each source.
-	sources []*timeMessageCircularQueue
+	sources []*CircularQueue[timeMessage]
 	// the low water marks for each source.
 	lowMarks []time.Time
 	lock     sync.Mutex
 	rename   string
 }
-
-//go:generate tmpl -data "[\"timeMessage\"]" -o=union_circularqueues.gen.go circularqueue.gen.go.tmpl
 
 type timeMessage interface {
 	edge.Message
@@ -42,9 +40,9 @@ func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, d NodeDiagnostic) (*
 func (n *UnionNode) runUnion([]byte) error {
 	// Keep buffer of values from parents so they can be ordered.
 
-	n.sources = make([]*timeMessageCircularQueue, len(n.ins))
+	n.sources = make([]*CircularQueue[timeMessage], len(n.ins))
 	for i := range n.ins {
-		n.sources[i] = newTimeMessageCircularQueue()
+		n.sources[i] = NewCircularQueue[timeMessage]()
 	}
 	n.lowMarks = make([]time.Time, len(n.ins))
 
@@ -117,7 +115,7 @@ func (n *UnionNode) emitReady(drain bool) error {
 		validSources := 0
 		for i, values := range n.sources {
 			sourceMark := n.lowMarks[i]
-			if values.Len() > 0 {
+			if values.Len > 0 {
 				t := values.Peek(0).Time()
 				if mark.IsZero() || t.Before(mark) {
 					mark = t
@@ -142,7 +140,7 @@ func (n *UnionNode) emitReady(drain bool) error {
 
 		// Emit all values that are at or below the mark.
 		for i = range n.sources {
-			l := n.sources[i].Len()
+			l := n.sources[i].Len
 			j := 0
 			for j = 0; j < l; j++ {
 				v = n.sources[i].Peek(j)
