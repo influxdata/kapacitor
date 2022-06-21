@@ -11,7 +11,7 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/zeebo/mwc"
 )

@@ -15,8 +15,8 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/influxdata/influxdb"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/uuid"
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
@@ -412,7 +412,7 @@ func (h *Handler) serve404(w http.ResponseWriter, r *http.Request) {
 	HttpError(w, "Not Found", true, http.StatusNotFound)
 }
 
-func (h *Handler) writeError(w http.ResponseWriter, result influxql.Result, statusCode int) {
+func (h *Handler) writeError(w http.ResponseWriter, result query.Result, statusCode int) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(result.Err.Error()))
 	w.Write([]byte("\n"))
@@ -437,7 +437,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 	if r.Header.Get("Content-encoding") == "gzip" {
 		b, err := gzip.NewReader(r.Body)
 		if err != nil {
-			h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
+			h.writeError(w, query.Result{Err: err}, http.StatusBadRequest)
 			return
 		}
 		body = b
@@ -449,7 +449,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 		if h.writeTrace {
 			h.diag.Error("write handler unabled to read bytes from request body", err)
 		}
-		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
+		h.writeError(w, query.Result{Err: err}, http.StatusBadRequest)
 		return
 	}
 	h.statMap.Add(statWriteRequestBytesReceived, int64(len(b)))
@@ -474,13 +474,13 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
+		h.writeError(w, query.Result{Err: err}, http.StatusBadRequest)
 		return
 	}
 
 	database := qp.Get("db")
 	if database == "" {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
+		h.writeError(w, query.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
 		return
 	}
 
@@ -489,7 +489,7 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		Privilege: auth.WritePrivilege,
 	}
 	if err := user.AuthorizeAction(action); err != nil {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("%q user is not authorized to write to database %q", user.Name(), database)}, http.StatusUnauthorized)
+		h.writeError(w, query.Result{Err: fmt.Errorf("%q user is not authorized to write to database %q", user.Name(), database)}, http.StatusUnauthorized)
 		return
 	}
 
@@ -501,11 +501,11 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		points,
 	); influxdb.IsClientError(err) {
 		h.statMap.Add(statPointsWrittenFail, int64(len(points)))
-		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
+		h.writeError(w, query.Result{Err: err}, http.StatusBadRequest)
 		return
 	} else if err != nil {
 		h.statMap.Add(statPointsWrittenFail, int64(len(points)))
-		h.writeError(w, influxql.Result{Err: err}, http.StatusInternalServerError)
+		h.writeError(w, query.Result{Err: err}, http.StatusInternalServerError)
 		return
 	}
 
@@ -576,7 +576,7 @@ func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
 	w.Write(b)
 }
 
-func resultError(w http.ResponseWriter, result influxql.Result, code int) {
+func resultError(w http.ResponseWriter, result query.Result, code int) {
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(&result)
 }

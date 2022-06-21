@@ -12,11 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"go.uber.org/zap"
+
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/services/collectd"
 	"github.com/influxdata/influxdb/services/graphite"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/opentsdb"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/command"
@@ -893,11 +896,7 @@ func (s *Server) appendCollectdService() error {
 		return nil
 	}
 	srv := collectd.NewService(c)
-	w, err := s.DiagService.NewStaticLevelHandler("info", "collectd")
-	if err != nil {
-		return fmt.Errorf("failed to create static level handler for collectd: %v", err)
-	}
-	srv.SetLogOutput(w)
+	srv.WithLogger(s.DiagService.NewZapLogger(zapcore.InfoLevel))
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
@@ -915,11 +914,7 @@ func (s *Server) appendOpenTSDBService() error {
 	if err != nil {
 		return err
 	}
-	w, err := s.DiagService.NewStaticLevelHandler("info", "opentsdb")
-	if err != nil {
-		return fmt.Errorf("failed to create static level handler for opentsdb: %v", err)
-	}
-	srv.SetLogOutput(w)
+	srv.WithLogger(s.DiagService.NewZapLogger(zap.InfoLevel).With(zap.String("service", "opentsdb")))
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
@@ -936,11 +931,7 @@ func (s *Server) appendGraphiteServices() error {
 		if err != nil {
 			return errors.Wrap(err, "creating new graphite service")
 		}
-		w, err := s.DiagService.NewStaticLevelHandler("info", "graphite")
-		if err != nil {
-			return fmt.Errorf("failed to create static level handler for graphite: %v", err)
-		}
-		srv.SetLogOutput(w)
+		srv.WithLogger(s.DiagService.NewZapLogger(zap.InfoLevel).With(zap.String("service", "graphite")))
 
 		srv.PointsWriter = s.TaskMaster
 		srv.MetaClient = s.MetaClient
@@ -1387,6 +1378,6 @@ type Queryexecutor struct{}
 func (qe *Queryexecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db string) error {
 	return nil
 }
-func (qe *Queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
+func (qe *Queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *query.Result, error) {
 	return nil, errors.New("cannot execute queries against Kapacitor")
 }

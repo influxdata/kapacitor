@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -23,7 +23,7 @@ func convertFloatPoint(
 	field string,
 	isSimpleSelector bool,
 	topBottomInfo *pipeline.TopBottomCallInfo,
-) (*influxql.FloatPoint, error) {
+) (*query.FloatPoint, error) {
 	value, ok := p.Fields()[field]
 	if !ok {
 		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
@@ -32,9 +32,9 @@ func convertFloatPoint(
 	if !ok {
 		return nil, fmt.Errorf("field %s has wrong type: got %T exp float64", field, value)
 	}
-	ap := &influxql.FloatPoint{
+	ap := &query.FloatPoint{
 		Name:  name,
-		Tags:  influxql.NewTags(p.Tags()),
+		Tags:  query.NewTags(p.Tags()),
 		Time:  p.Time().UnixNano(),
 		Value: typed,
 	}
@@ -54,10 +54,10 @@ type floatPointAggregator struct {
 	field            string
 	topBottomInfo    *pipeline.TopBottomCallInfo
 	isSimpleSelector bool
-	aggregator       influxql.FloatPointAggregator
+	aggregator       query.FloatPointAggregator
 }
 
-func floatPopulateAuxFieldsAndTags(ap *influxql.FloatPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+func floatPopulateAuxFieldsAndTags(ap *query.FloatPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
 	ap.Aux = make([]interface{}, len(fieldsAndTags))
 	for i, name := range fieldsAndTags {
 		if f, ok := fields[name]; ok {
@@ -79,7 +79,7 @@ func (a *floatPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTime
 
 type floatPointEmitter struct {
 	baseReduceContext
-	emitter          influxql.FloatPointEmitter
+	emitter          query.FloatPointEmitter
 	isSimpleSelector bool
 	byName           bool
 }
@@ -92,7 +92,7 @@ func (e *floatPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	ap := slice[0]
 	var t time.Time
 	if e.pointTimes {
-		if ap.Time == influxql.ZeroTime {
+		if ap.Time == query.ZeroTime {
 			t = e.time
 		} else {
 			t = time.Unix(0, ap.Time).UTC()
@@ -138,7 +138,7 @@ func (e *floatPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
-			if ap.Time == influxql.ZeroTime {
+			if ap.Time == query.ZeroTime {
 				t = e.time
 			} else {
 				t = time.Unix(0, ap.Time).UTC()
@@ -181,7 +181,7 @@ func convertIntegerPoint(
 	field string,
 	isSimpleSelector bool,
 	topBottomInfo *pipeline.TopBottomCallInfo,
-) (*influxql.IntegerPoint, error) {
+) (*query.IntegerPoint, error) {
 	value, ok := p.Fields()[field]
 	if !ok {
 		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
@@ -190,9 +190,9 @@ func convertIntegerPoint(
 	if !ok {
 		return nil, fmt.Errorf("field %s has wrong type: got %T exp int64", field, value)
 	}
-	ap := &influxql.IntegerPoint{
+	ap := &query.IntegerPoint{
 		Name:  name,
-		Tags:  influxql.NewTags(p.Tags()),
+		Tags:  query.NewTags(p.Tags()),
 		Time:  p.Time().UnixNano(),
 		Value: typed,
 	}
@@ -212,10 +212,10 @@ type integerPointAggregator struct {
 	field            string
 	topBottomInfo    *pipeline.TopBottomCallInfo
 	isSimpleSelector bool
-	aggregator       influxql.IntegerPointAggregator
+	aggregator       query.IntegerPointAggregator
 }
 
-func integerPopulateAuxFieldsAndTags(ap *influxql.IntegerPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+func integerPopulateAuxFieldsAndTags(ap *query.IntegerPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
 	ap.Aux = make([]interface{}, len(fieldsAndTags))
 	for i, name := range fieldsAndTags {
 		if f, ok := fields[name]; ok {
@@ -237,7 +237,7 @@ func (a *integerPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTi
 
 type integerPointEmitter struct {
 	baseReduceContext
-	emitter          influxql.IntegerPointEmitter
+	emitter          query.IntegerPointEmitter
 	isSimpleSelector bool
 	byName           bool
 }
@@ -250,7 +250,7 @@ func (e *integerPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	ap := slice[0]
 	var t time.Time
 	if e.pointTimes {
-		if ap.Time == influxql.ZeroTime {
+		if ap.Time == query.ZeroTime {
 			t = e.time
 		} else {
 			t = time.Unix(0, ap.Time).UTC()
@@ -296,7 +296,7 @@ func (e *integerPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
-			if ap.Time == influxql.ZeroTime {
+			if ap.Time == query.ZeroTime {
 				t = e.time
 			} else {
 				t = time.Unix(0, ap.Time).UTC()
@@ -339,7 +339,7 @@ func convertStringPoint(
 	field string,
 	isSimpleSelector bool,
 	topBottomInfo *pipeline.TopBottomCallInfo,
-) (*influxql.StringPoint, error) {
+) (*query.StringPoint, error) {
 	value, ok := p.Fields()[field]
 	if !ok {
 		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
@@ -348,9 +348,9 @@ func convertStringPoint(
 	if !ok {
 		return nil, fmt.Errorf("field %s has wrong type: got %T exp string", field, value)
 	}
-	ap := &influxql.StringPoint{
+	ap := &query.StringPoint{
 		Name:  name,
-		Tags:  influxql.NewTags(p.Tags()),
+		Tags:  query.NewTags(p.Tags()),
 		Time:  p.Time().UnixNano(),
 		Value: typed,
 	}
@@ -370,10 +370,10 @@ type stringPointAggregator struct {
 	field            string
 	topBottomInfo    *pipeline.TopBottomCallInfo
 	isSimpleSelector bool
-	aggregator       influxql.StringPointAggregator
+	aggregator       query.StringPointAggregator
 }
 
-func stringPopulateAuxFieldsAndTags(ap *influxql.StringPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+func stringPopulateAuxFieldsAndTags(ap *query.StringPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
 	ap.Aux = make([]interface{}, len(fieldsAndTags))
 	for i, name := range fieldsAndTags {
 		if f, ok := fields[name]; ok {
@@ -395,7 +395,7 @@ func (a *stringPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTim
 
 type stringPointEmitter struct {
 	baseReduceContext
-	emitter          influxql.StringPointEmitter
+	emitter          query.StringPointEmitter
 	isSimpleSelector bool
 	byName           bool
 }
@@ -408,7 +408,7 @@ func (e *stringPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	ap := slice[0]
 	var t time.Time
 	if e.pointTimes {
-		if ap.Time == influxql.ZeroTime {
+		if ap.Time == query.ZeroTime {
 			t = e.time
 		} else {
 			t = time.Unix(0, ap.Time).UTC()
@@ -454,7 +454,7 @@ func (e *stringPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
-			if ap.Time == influxql.ZeroTime {
+			if ap.Time == query.ZeroTime {
 				t = e.time
 			} else {
 				t = time.Unix(0, ap.Time).UTC()
@@ -497,7 +497,7 @@ func convertBooleanPoint(
 	field string,
 	isSimpleSelector bool,
 	topBottomInfo *pipeline.TopBottomCallInfo,
-) (*influxql.BooleanPoint, error) {
+) (*query.BooleanPoint, error) {
 	value, ok := p.Fields()[field]
 	if !ok {
 		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
@@ -506,9 +506,9 @@ func convertBooleanPoint(
 	if !ok {
 		return nil, fmt.Errorf("field %s has wrong type: got %T exp bool", field, value)
 	}
-	ap := &influxql.BooleanPoint{
+	ap := &query.BooleanPoint{
 		Name:  name,
-		Tags:  influxql.NewTags(p.Tags()),
+		Tags:  query.NewTags(p.Tags()),
 		Time:  p.Time().UnixNano(),
 		Value: typed,
 	}
@@ -528,10 +528,10 @@ type booleanPointAggregator struct {
 	field            string
 	topBottomInfo    *pipeline.TopBottomCallInfo
 	isSimpleSelector bool
-	aggregator       influxql.BooleanPointAggregator
+	aggregator       query.BooleanPointAggregator
 }
 
-func booleanPopulateAuxFieldsAndTags(ap *influxql.BooleanPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+func booleanPopulateAuxFieldsAndTags(ap *query.BooleanPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
 	ap.Aux = make([]interface{}, len(fieldsAndTags))
 	for i, name := range fieldsAndTags {
 		if f, ok := fields[name]; ok {
@@ -553,7 +553,7 @@ func (a *booleanPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTi
 
 type booleanPointEmitter struct {
 	baseReduceContext
-	emitter          influxql.BooleanPointEmitter
+	emitter          query.BooleanPointEmitter
 	isSimpleSelector bool
 	byName           bool
 }
@@ -566,7 +566,7 @@ func (e *booleanPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	ap := slice[0]
 	var t time.Time
 	if e.pointTimes {
-		if ap.Time == influxql.ZeroTime {
+		if ap.Time == query.ZeroTime {
 			t = e.time
 		} else {
 			t = time.Unix(0, ap.Time).UTC()
@@ -612,7 +612,7 @@ func (e *booleanPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
-			if ap.Time == influxql.ZeroTime {
+			if ap.Time == query.ZeroTime {
 				t = e.time
 			} else {
 				t = time.Unix(0, ap.Time).UTC()

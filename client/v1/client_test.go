@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/kapacitor/client/v1"
 )
 
@@ -1020,7 +1020,7 @@ func Test_TaskOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exp := &influxql.Result{
+	exp := &query.Result{
 		Series: models.Rows{{
 			Name:    "cpu",
 			Columns: []string{"time", "value"},

@@ -1,13 +1,13 @@
 package pipeline
 
-import "github.com/influxdata/influxdb/influxql"
+import "github.com/influxdata/influxdb/query"
 
 //tick:ignore
 type ReduceCreater struct {
 {{with $types := .}}
 {{range $a := $types}}
 {{range $e := $types}}
-	Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer func() (influxql.{{$a.Name}}PointAggregator, influxql.{{$e.Name}}PointEmitter)
+	Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer func() (query.{{$a.Name}}PointAggregator, query.{{$e.Name}}PointEmitter)
 {{end}}{{end}}{{end}}
 
 	TopBottomCallInfo *TopBottomCallInfo

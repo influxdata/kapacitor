@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/influxdata/flux"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxql"
 	influxcli "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"

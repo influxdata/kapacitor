@@ -95,12 +95,18 @@ func readPointsFromIO(data io.ReadCloser, points chan<- edge.PointMessage, preci
 			return err
 		}
 		mp := mps[0]
+
+		mpfields, err := mp.Fields()
+		if err != nil {
+			return err
+		}
+
 		p := edge.NewPointMessage(
-			mp.Name(),
+			string(mp.Name()), //TODO(docmerlin): there has to be a better way of handling things so we don't allocate everywhere
 			db,
 			rp,
 			models.Dimensions{},
-			models.Fields(mp.Fields()),
+			models.Fields(mpfields),
 			models.Tags(mp.Tags().Map()),
 			mp.Time().UTC(),
 		)

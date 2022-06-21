@@ -22,7 +22,7 @@ import (
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/ghodss/yaml"
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/pkg/errors"
 )
