@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 )
 
 // A node that handles creating several child QueryNodes.

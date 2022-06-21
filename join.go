@@ -5,15 +5,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
 )
-
-//go:generate tmpl -data "[\"srcPoint\",\"joinsetPtr\"]" -o=join_circularqueues.gen.go circularqueue.gen.go.tmpl
 
 type JoinNode struct {
 	node
@@ -28,9 +26,9 @@ type JoinNode struct {
 	lowMarks map[srcGroup]time.Time
 
 	// Buffer for caching points that need to be matched with specific points.
-	matchGroupsBuffer map[models.GroupID]*srcPointCircularQueue
+	matchGroupsBuffer map[models.GroupID]*CircularQueue[srcPoint]
 	// Buffer for caching specific points until their match arrivces.
-	specificGroupsBuffer map[models.GroupID]*srcPointCircularQueue
+	specificGroupsBuffer map[models.GroupID]*CircularQueue[srcPoint]
 
 	reported    map[int]bool
 	allReported bool
@@ -42,8 +40,8 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, d NodeDiagnostic) (*Jo
 		j:                    n,
 		node:                 node{Node: n, et: et, diag: d},
 		groups:               make(map[models.GroupID]*joinGroup),
-		matchGroupsBuffer:    make(map[models.GroupID]*srcPointCircularQueue),
-		specificGroupsBuffer: make(map[models.GroupID]*srcPointCircularQueue),
+		matchGroupsBuffer:    make(map[models.GroupID]*CircularQueue[srcPoint]),
+		specificGroupsBuffer: make(map[models.GroupID]*CircularQueue[srcPoint]),
 		lowMarks:             make(map[srcGroup]time.Time),
 		reported:             make(map[int]bool),
 	}
@@ -196,7 +194,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		var i int
 		buf := n.specificGroupsBuffer[groupId]
 		if buf != nil {
-			l := buf.Len()
+			l := buf.Len
 			for i = 0; i < l; i++ {
 				pt := buf.Peek(i)
 				st := pt.Msg.Time().Round(n.j.Tolerance)
@@ -224,7 +222,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		matched := false
 		if matches != nil {
 			var i int
-			l := matches.Len()
+			l := matches.Len
 			for i = 0; i < l; i++ {
 				match := matches.Peek(i)
 				pt := match.Msg.Time().Round(n.j.Tolerance)
@@ -264,7 +262,7 @@ func (n *JoinNode) matchPoints(p srcPoint) {
 		var i int
 		buf := n.specificGroupsBuffer[groupId]
 		if buf != nil {
-			l := buf.Len()
+			l := buf.Len
 			for i = 0; i < l; i++ {
 				pt := buf.Peek(i)
 				st := pt.Msg.Time().Round(n.j.Tolerance)
@@ -324,37 +322,35 @@ func (n *JoinNode) getOrCreateGroup(groupID models.GroupID) *joinGroup {
 func (n *JoinNode) newGroup(count int) *joinGroup {
 	return &joinGroup{
 		n:    n,
-		sets: make(map[time.Time]*joinsetPtrCircularQueue),
+		sets: make(map[time.Time]*CircularQueue[*joinset]),
 		head: make([]time.Time, count),
 	}
 }
 
-func (n *JoinNode) getOrCreateMatchGroup(id models.GroupID) *srcPointCircularQueue {
+func (n *JoinNode) getOrCreateMatchGroup(id models.GroupID) *CircularQueue[srcPoint] {
 	buf := n.matchGroupsBuffer[id]
 	if buf == nil {
-		buf = newSrcPointCircularQueue()
+		buf = NewCircularQueue[srcPoint]()
 		n.matchGroupsBuffer[id] = buf
 	}
 
 	return buf
 }
 
-func (n *JoinNode) getOrCreateSpecificGroup(id models.GroupID) *srcPointCircularQueue {
+func (n *JoinNode) getOrCreateSpecificGroup(id models.GroupID) *CircularQueue[srcPoint] {
 	buf := n.specificGroupsBuffer[id]
 	if buf == nil {
-		buf = newSrcPointCircularQueue()
+		buf = NewCircularQueue[srcPoint]()
 		n.specificGroupsBuffer[id] = buf
 	}
 	return buf
 }
 
-type joinsetPtr *joinset
-
 // handles emitting joined sets once enough data has arrived from parents.
 type joinGroup struct {
 	n *JoinNode
 
-	sets       map[time.Time]*joinsetPtrCircularQueue
+	sets       map[time.Time]*CircularQueue[*joinset]
 	head       []time.Time
 	oldestTime time.Time
 }
@@ -374,12 +370,12 @@ func (g *joinGroup) Collect(src int, p timeMessage) error {
 	var set *joinset
 	sets := g.sets[t]
 	if sets == nil {
-		sets = newJoinsetPtrCircularQueue(g.newJoinset(t))
+		sets = NewCircularQueue[*joinset](g.newJoinset(t))
 		g.sets[t] = sets
 	}
-	l := sets.Len()
+	l := sets.Len
 	for i := 0; i < l; i++ {
-		if x := sets.Peek(i); !((*joinset)(x)).Has(src) {
+		if x := sets.Peek(i); !x.Has(src) {
 			set = x
 			break
 		}
@@ -441,9 +437,9 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 	}
 	sets := g.sets[g.oldestTime]
 	i := 0
-	l := sets.Len()
+	l := sets.Len
 	for ; i < l; i++ {
-		set := (*joinset)(sets.Peek(i))
+		set := sets.Peek(i)
 		if set.Ready() || !onlyReadySets {
 			err := g.emitJoinedSet(set)
 			if err != nil {
@@ -453,7 +449,7 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 			break
 		}
 	}
-	if i == sets.Len() {
+	if i == sets.Len {
 		delete(g.sets, g.oldestTime)
 	} else {
 		g.sets[g.oldestTime].Dequeue(i)

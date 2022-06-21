@@ -182,13 +182,7 @@ func sectionAndElementFromPath(p, basePath string) (section, element string, has
 }
 
 func sectionAndElementFromID(id string) (section, element string) {
-	parts := strings.Split(id, "/")
-	if l := len(parts); l == 1 {
-		section = parts[0]
-	} else if l == 2 {
-		section = parts[0]
-		element = parts[1]
-	}
+	section, element, _ = strings.Cut(id, "/")
 	return
 }
 

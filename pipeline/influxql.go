@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxql"
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl
@@ -47,6 +48,9 @@ type InfluxQLNode struct {
 
 	// tick:ignore
 	PointTimes bool `tick:"UsePointTimes" json:"usePointTimes"`
+
+	//tick:ignore
+	Reducer Node
 
 	// tick:ignore
 	Args []interface{} `json:"args"`
@@ -171,20 +175,20 @@ func (n *InfluxQLNode) UsePointTimes() *InfluxQLNode {
 // Count the number of points.
 func (n *chainnode) Count(field string) *InfluxQLNode {
 	i := newInfluxQLNode("count", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatIntegerReducer: func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewFloatFuncIntegerReducer(influxql.FloatCountReduce, &influxql.IntegerPoint{Value: 0})
+		CreateFloatIntegerReducer: func() (query.FloatPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewFloatFuncIntegerReducer(query.FloatCountReduce, &query.IntegerPoint{Value: 0})
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerCountReduce, &influxql.IntegerPoint{Value: 0})
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerCountReduce, &query.IntegerPoint{Value: 0})
 			return fn, fn
 		},
-		CreateStringIntegerReducer: func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewStringFuncIntegerReducer(influxql.StringCountReduce, &influxql.IntegerPoint{Value: 0})
+		CreateStringIntegerReducer: func() (query.StringPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewStringFuncIntegerReducer(query.StringCountReduce, &query.IntegerPoint{Value: 0})
 			return fn, fn
 		},
-		CreateBooleanIntegerReducer: func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewBooleanFuncIntegerReducer(influxql.BooleanCountReduce, &influxql.IntegerPoint{Value: 0})
+		CreateBooleanIntegerReducer: func() (query.BooleanPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewBooleanFuncIntegerReducer(query.BooleanCountReduce, &query.IntegerPoint{Value: 0})
 			return fn, fn
 		},
 		IsEmptyOK: true,
@@ -196,20 +200,20 @@ func (n *chainnode) Count(field string) *InfluxQLNode {
 // Produce batch of only the distinct points.
 func (n *chainnode) Distinct(field string) *InfluxQLNode {
 	i := newInfluxQLNode("distinct", field, n.Provides(), BatchEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatDistinctReducer()
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatDistinctReducer()
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerDistinctReducer()
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerDistinctReducer()
 			return fn, fn
 		},
-		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
-			fn := influxql.NewStringDistinctReducer()
+		CreateStringReducer: func() (query.StringPointAggregator, query.StringPointEmitter) {
+			fn := query.NewStringDistinctReducer()
 			return fn, fn
 		},
-		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
-			fn := influxql.NewBooleanDistinctReducer()
+		CreateBooleanReducer: func() (query.BooleanPointAggregator, query.BooleanPointEmitter) {
+			fn := query.NewBooleanDistinctReducer()
 			return fn, fn
 		},
 	})
@@ -220,12 +224,12 @@ func (n *chainnode) Distinct(field string) *InfluxQLNode {
 // Compute the mean of the data.
 func (n *chainnode) Mean(field string) *InfluxQLNode {
 	i := newInfluxQLNode("mean", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatMeanReducer()
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatMeanReducer()
 			return fn, fn
 		},
-		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewIntegerMeanReducer()
+		CreateIntegerFloatReducer: func() (query.IntegerPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewIntegerMeanReducer()
 			return fn, fn
 		},
 	})
@@ -237,12 +241,12 @@ func (n *chainnode) Mean(field string) *InfluxQLNode {
 // if you want the median point use `.percentile(field, 50.0)`.
 func (n *chainnode) Median(field string) *InfluxQLNode {
 	i := newInfluxQLNode("median", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatMedianReduceSlice)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatSliceFuncReducer(query.FloatMedianReduceSlice)
 			return fn, fn
 		},
-		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncFloatReducer(influxql.IntegerMedianReduceSlice)
+		CreateIntegerFloatReducer: func() (query.IntegerPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewIntegerSliceFuncFloatReducer(query.IntegerMedianReduceSlice)
 			return fn, fn
 		},
 	})
@@ -253,12 +257,12 @@ func (n *chainnode) Median(field string) *InfluxQLNode {
 // Compute the mode of the data.
 func (n *chainnode) Mode(field string) *InfluxQLNode {
 	i := newInfluxQLNode("mode", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatModeReduceSlice)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatSliceFuncReducer(query.FloatModeReduceSlice)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.IntegerModeReduceSlice)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerSliceFuncReducer(query.IntegerModeReduceSlice)
 			return fn, fn
 		},
 	})
@@ -269,12 +273,14 @@ func (n *chainnode) Mode(field string) *InfluxQLNode {
 // Compute the difference between `min` and `max` points.
 func (n *chainnode) Spread(field string) *InfluxQLNode {
 	i := newInfluxQLNode("spread", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatSpreadReduceSlice)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			// fn := NewFloatSliceFuncReducer(query.FloatSpreadReduceSlice)
+			fn := query.NewFloatSpreadReducer()
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.IntegerSpreadReduceSlice)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			//fn := query.NewIntegerSliceFuncReducer(query.IntegerSpreadReduceSlice)
+			fn := query.NewIntegerSpreadReducer()
 			return fn, fn
 		},
 	})
@@ -285,12 +291,12 @@ func (n *chainnode) Spread(field string) *InfluxQLNode {
 // Compute the sum of all values.
 func (n *chainnode) Sum(field string) *InfluxQLNode {
 	i := newInfluxQLNode("sum", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatFuncReducer(influxql.FloatSumReduce, &influxql.FloatPoint{Value: 0})
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatFuncReducer(query.FloatSumReduce, &query.FloatPoint{Value: 0})
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerSumReduce, &influxql.IntegerPoint{Value: 0})
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerSumReduce, &query.IntegerPoint{Value: 0})
 			return fn, fn
 		},
 		IsEmptyOK: true,
@@ -306,20 +312,20 @@ func (n *chainnode) Sum(field string) *InfluxQLNode {
 // Select the first point.
 func (n *chainnode) First(field string) *InfluxQLNode {
 	i := newInfluxQLNode("first", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatFuncReducer(influxql.FloatFirstReduce, nil)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatFuncReducer(query.FloatFirstReduce, nil)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerFirstReduce, nil)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerFirstReduce, nil)
 			return fn, fn
 		},
-		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
-			fn := influxql.NewStringFuncReducer(influxql.StringFirstReduce, nil)
+		CreateStringReducer: func() (query.StringPointAggregator, query.StringPointEmitter) {
+			fn := query.NewStringFuncReducer(query.StringFirstReduce, nil)
 			return fn, fn
 		},
-		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
-			fn := influxql.NewBooleanFuncReducer(influxql.BooleanFirstReduce, nil)
+		CreateBooleanReducer: func() (query.BooleanPointAggregator, query.BooleanPointEmitter) {
+			fn := query.NewBooleanFuncReducer(query.BooleanFirstReduce, nil)
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -331,20 +337,20 @@ func (n *chainnode) First(field string) *InfluxQLNode {
 // Select the last point.
 func (n *chainnode) Last(field string) *InfluxQLNode {
 	i := newInfluxQLNode("last", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatFuncReducer(influxql.FloatLastReduce, nil)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatFuncReducer(query.FloatLastReduce, nil)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerLastReduce, nil)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerLastReduce, nil)
 			return fn, fn
 		},
-		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
-			fn := influxql.NewStringFuncReducer(influxql.StringLastReduce, nil)
+		CreateStringReducer: func() (query.StringPointAggregator, query.StringPointEmitter) {
+			fn := query.NewStringFuncReducer(query.StringLastReduce, nil)
 			return fn, fn
 		},
-		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
-			fn := influxql.NewBooleanFuncReducer(influxql.BooleanLastReduce, nil)
+		CreateBooleanReducer: func() (query.BooleanPointAggregator, query.BooleanPointEmitter) {
+			fn := query.NewBooleanFuncReducer(query.BooleanLastReduce, nil)
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -356,12 +362,12 @@ func (n *chainnode) Last(field string) *InfluxQLNode {
 // Select the minimum point.
 func (n *chainnode) Min(field string) *InfluxQLNode {
 	i := newInfluxQLNode("min", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatFuncReducer(influxql.FloatMinReduce, nil)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatFuncReducer(query.FloatMinReduce, nil)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerMinReduce, nil)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerMinReduce, nil)
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -373,12 +379,12 @@ func (n *chainnode) Min(field string) *InfluxQLNode {
 // Select the maximum point.
 func (n *chainnode) Max(field string) *InfluxQLNode {
 	i := newInfluxQLNode("max", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatFuncReducer(influxql.FloatMaxReduce, nil)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatFuncReducer(query.FloatMaxReduce, nil)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerFuncReducer(influxql.IntegerMaxReduce, nil)
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerFuncReducer(query.IntegerMaxReduce, nil)
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -390,12 +396,12 @@ func (n *chainnode) Max(field string) *InfluxQLNode {
 // Select a point at the given percentile. This is a selector function, no interpolation between points is performed.
 func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 	i := newInfluxQLNode("percentile", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.NewFloatPercentileReduceSliceFunc(percentile))
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatSliceFuncReducer(query.NewFloatPercentileReduceSliceFunc(percentile))
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.NewIntegerPercentileReduceSliceFunc(percentile))
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerSliceFuncReducer(query.NewIntegerPercentileReduceSliceFunc(percentile))
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -417,20 +423,12 @@ func (n *chainnode) Top(num int64, field string, fieldsAndTags ...string) *Influ
 		tags[i] = i
 	}
 	i := newInfluxQLNode("top", field, n.Provides(), BatchEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.NewFloatTopReduceSliceFunc(
-				int(num),
-				tags,
-				influxql.Interval{},
-			))
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatTopReducer(int(num))
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.NewIntegerTopReduceSliceFunc(
-				int(num),
-				tags,
-				influxql.Interval{},
-			))
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerTopReducer(int(num))
 			return fn, fn
 		},
 		TopBottomCallInfo: &TopBottomCallInfo{
@@ -452,20 +450,12 @@ func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *In
 		tags[i] = i
 	}
 	i := newInfluxQLNode("bottom", field, n.Provides(), BatchEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.NewFloatBottomReduceSliceFunc(
-				int(num),
-				tags,
-				influxql.Interval{},
-			))
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatBottomReducer(int(num))
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.NewIntegerBottomReduceSliceFunc(
-				int(num),
-				tags,
-				influxql.Interval{},
-			))
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerBottomReducer(int(num))
 			return fn, fn
 		},
 		TopBottomCallInfo: &TopBottomCallInfo{
@@ -487,12 +477,12 @@ func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *In
 // Compute the standard deviation.
 func (n *chainnode) Stddev(field string) *InfluxQLNode {
 	i := newInfluxQLNode("stddev", field, n.Provides(), StreamEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatStddevReduceSlice)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatSliceFuncReducer(query.FloatStddevReduceSlice)
 			return fn, fn
 		},
-		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncFloatReducer(influxql.IntegerStddevReduceSlice)
+		CreateIntegerFloatReducer: func() (query.IntegerPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewIntegerSliceFuncFloatReducer(query.IntegerStddevReduceSlice)
 			return fn, fn
 		},
 	})
@@ -503,20 +493,20 @@ func (n *chainnode) Stddev(field string) *InfluxQLNode {
 // Compute the elapsed time between points
 func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 	i := newInfluxQLNode("elapsed", field, n.Provides(), n.Provides(), ReduceCreater{
-		CreateFloatIntegerReducer: func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewFloatElapsedReducer(influxql.Interval{Duration: unit})
+		CreateFloatIntegerReducer: func() (query.FloatPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewFloatElapsedReducer(query.Interval{Duration: unit})
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerElapsedReducer(influxql.Interval{Duration: unit})
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerElapsedReducer(query.Interval{Duration: unit})
 			return fn, fn
 		},
-		CreateStringIntegerReducer: func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewStringElapsedReducer(influxql.Interval{Duration: unit})
+		CreateStringIntegerReducer: func() (query.StringPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewStringElapsedReducer(query.Interval{Duration: unit})
 			return fn, fn
 		},
-		CreateBooleanIntegerReducer: func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewBooleanElapsedReducer(influxql.Interval{Duration: unit})
+		CreateBooleanIntegerReducer: func() (query.BooleanPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewBooleanElapsedReducer(query.Interval{Duration: unit})
 			return fn, fn
 		},
 		IsStreamTransformation: true,
@@ -529,12 +519,12 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 // Compute the difference between points independent of elapsed time.
 func (n *chainnode) Difference(field string) *InfluxQLNode {
 	i := newInfluxQLNode("difference", field, n.Provides(), n.Provides(), ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatDifferenceReducer()
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatDifferenceReducer(false)
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerDifferenceReducer()
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerDifferenceReducer(false)
 			return fn, fn
 		},
 		IsStreamTransformation: true,
@@ -547,12 +537,12 @@ func (n *chainnode) Difference(field string) *InfluxQLNode {
 // No points are emitted until the window is full.
 func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
 	i := newInfluxQLNode("movingAverage", field, n.Provides(), n.Provides(), ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatMovingAverageReducer(int(window))
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatMovingAverageReducer(int(window))
 			return fn, fn
 		},
-		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewIntegerMovingAverageReducer(int(window))
+		CreateIntegerFloatReducer: func() (query.IntegerPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewIntegerMovingAverageReducer(int(window))
 			return fn, fn
 		},
 		IsStreamTransformation: true,
@@ -575,12 +565,12 @@ func (n *chainnode) HoltWintersWithFit(field string, h, m int64, interval time.D
 
 func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration, includeFitData bool) *InfluxQLNode {
 	i := newInfluxQLNode("holtWinters", field, n.Provides(), BatchEdge, ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatHoltWintersReducer(int(h), int(m), includeFitData, interval)
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatHoltWintersReducer(int(h), int(m), includeFitData, interval)
 			return fn, fn
 		},
-		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatHoltWintersReducer(int(h), int(m), includeFitData, interval)
+		CreateIntegerFloatReducer: func() (query.IntegerPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatHoltWintersReducer(int(h), int(m), includeFitData, interval)
 			return fn, fn
 		},
 	})
@@ -595,12 +585,12 @@ func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration
 // A point is emitted for every point collected.
 func (n *chainnode) CumulativeSum(field string) *InfluxQLNode {
 	i := newInfluxQLNode("cumulativeSum", field, n.Provides(), n.Provides(), ReduceCreater{
-		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatCumulativeSumReducer()
+		CreateFloatReducer: func() (query.FloatPointAggregator, query.FloatPointEmitter) {
+			fn := query.NewFloatCumulativeSumReducer()
 			return fn, fn
 		},
-		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerCumulativeSumReducer()
+		CreateIntegerReducer: func() (query.IntegerPointAggregator, query.IntegerPointEmitter) {
+			fn := query.NewIntegerCumulativeSumReducer()
 			return fn, fn
 		},
 		IsStreamTransformation: true,

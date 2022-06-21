@@ -1114,7 +1114,7 @@
     "github.com/influxdata/influxdb",
     "github.com/influxdata/influxdb/client",
     "github.com/influxdata/influxdb/client/v2",
-    "github.com/influxdata/influxdb/influxql",
+    "github.com/influxdata/influxql",
     "github.com/influxdata/influxdb/models",
     "github.com/influxdata/influxdb/services/collectd",
     "github.com/influxdata/influxdb/services/graphite",

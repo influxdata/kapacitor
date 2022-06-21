@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxql"
 )
 
 // NodeTypeOf is used by all Node to identify the node duration Marshal and Unmarshal
