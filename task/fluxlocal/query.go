@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/influxdata/flux/dependency"
-
 	"github.com/influxdata/flux"
 	"github.com/influxdata/flux/dependencies"
 	"github.com/influxdata/flux/dependencies/filesystem"
