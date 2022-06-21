@@ -60,9 +60,11 @@ func (f *fluxQueryer) injectDependencies(ctx context.Context) (context.Context, 
 func (f *fluxQueryer) Query(ctx context.Context, compiler flux.Compiler) (flux.ResultIterator, error) {
 	f.logger.Info("executed flux query")
 	var span *dependency.Span
-	ctx, span = f.injectDependencies(context.Background())
-	defer span.Finish()
+	ctx, span = f.injectDependencies(ctx)
 	program, err := compiler.Compile(ctx, runtime.Default)
+	if err != nil {
+		return nil, errors.Wrap(err, "error while compiling flux program")
+	}
 	query, err := program.Start(ctx, memory.DefaultAllocator)
 	if err != nil {
 		return nil, errors.Wrap(err, "error while executing flux program")
