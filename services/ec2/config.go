@@ -9,7 +9,7 @@ import (
 	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/discovery/ec2"
+	ec2 "github.com/prometheus/prometheus/discovery/aws"
 )
 
 // Config is EC2 service discovery configuration
@@ -55,8 +55,8 @@ func (c Config) ClientConfig() (client.Config, error) {
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (e Config) PromConfig() *ec2.SDConfig {
-	return &ec2.SDConfig{
+func (e Config) PromConfig() *ec2.EC2SDConfig {
+	return &ec2.EC2SDConfig{
 		Region:          e.Region,
 		AccessKey:       e.AccessKey,
 		SecretKey:       config2.Secret(e.SecretKey),

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/scraper"
 	"log"
 	"runtime"
 	"strconv"
@@ -46,7 +47,6 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/uuid"
-	plog "github.com/prometheus/common/log"
 )
 
 func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
@@ -1250,7 +1250,7 @@ func (h *ScraperHandler) Fatalf(s string, ctx ...interface{}) {
 	h.l.Error(fmt.Sprintf(s, ctx...))
 }
 
-func (h *ScraperHandler) With(key string, value interface{}) plog.Logger {
+func (h *ScraperHandler) With(key string, value interface{}) scraper.Logger {
 	var field Field
 
 	switch value.(type) {

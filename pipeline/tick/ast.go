@@ -149,6 +149,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 	case *pipeline.StreamNode:
 		s := StreamNode{}
 		return s.Build()
+	case *pipeline.TelegrafOutNode:
+		return NewTelegraf(parents).Build(node)
 	case *pipeline.TrickleNode:
 		return NewTrickle(parents).Build(node)
 	case *pipeline.BatchNode:

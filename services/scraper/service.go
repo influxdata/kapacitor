@@ -10,7 +10,6 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
-	plog "github.com/prometheus/common/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
@@ -25,9 +24,36 @@ var (
 	_ storage.Appender = &ServiceAppenderAdapter{}
 )
 
+type Logger interface {
+	Debug(...interface{})
+	Debugln(...interface{})
+	Debugf(string, ...interface{})
+
+	Info(...interface{})
+	Infoln(...interface{})
+	Infof(string, ...interface{})
+
+	Warn(...interface{})
+	Warnln(...interface{})
+	Warnf(string, ...interface{})
+
+	Error(...interface{})
+	Errorln(...interface{})
+	Errorf(string, ...interface{})
+
+	Fatal(...interface{})
+	Fatalln(...interface{})
+	Fatalf(string, ...interface{})
+
+	With(key string, value interface{}) Logger
+
+	SetFormat(string) error
+	SetLevel(string) error
+}
+
 // Prometheus logger
 type Diagnostic interface {
-	plog.Logger
+	Logger
 	Log(...interface{}) error
 }
 
