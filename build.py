@@ -158,7 +158,7 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("""go install -mod=mod 
+    run("""go install -mod=mod
         google.golang.org/protobuf/cmd/protoc-gen-go \
         github.com/benbjohnson/tmpl \
         github.com/mailru/easyjson/easyjson \
@@ -516,7 +516,7 @@ def build(version=None,
                 cc = "aarch64-unknown-linux-musl-cc"
                 tags += ["netgo", "osusergo", "static_build", "noasm"]
         elif platform == "darwin" and arch == "amd64":
-            cc = "x86_64-apple-darwin16-clang"
+            cc = "x86_64-apple-darwin18-clang"
             tags += [ "netgo", "osusergo"]
         elif  platform == "windows" and arch == "amd64":
             cc = "x86_64-w64-mingw32-gcc"
