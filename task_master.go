@@ -24,7 +24,6 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
 	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -179,17 +178,15 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(telegram.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
-	HipChatService interface {
-		Global() bool
-		StateChangesOnly() bool
-		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
-	}
 	KafkaService interface {
 		Handler(kafka.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
 		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
+	RemovedService interface {
+		Handle(event2 alert.Event)
 	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
@@ -321,7 +318,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService
-	n.HipChatService = tm.HipChatService
+	n.RemovedService = tm.RemovedService
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService
 	n.TalkService = tm.TalkService

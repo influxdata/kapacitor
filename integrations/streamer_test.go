@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/removed"
+	"github.com/influxdata/kapacitor/services/removed/removedtest"
 	"html"
 	"io/ioutil"
 	"math/rand"
@@ -44,8 +46,6 @@ import (
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/discord/discordtest"
-	"github.com/influxdata/kapacitor/services/hipchat"
-	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -9106,7 +9106,7 @@ stream
 }
 
 func TestStream_AlertHipChat(t *testing.T) {
-	ts := hipchattest.NewServer()
+	ts := removedtest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -9132,37 +9132,11 @@ stream
 			.token('testtokenTestRoom')
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
-
-		c := hipchat.NewConfig()
-		c.Enabled = true
-		c.URL = ts.URL
-		c.Room = "1231234"
-		c.Token = "testtoken1231234"
-		sl := hipchat.NewService(c, diagService.NewHipChatHandler())
-		tm.HipChatService = sl
+		tm.RemovedService = removed.NewService("HipChat", nil, diagService.NewRemovedHandler(removed.HipChatName))
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	exp := []interface{}{
-		hipchattest.Request{
-			URL: "/1234567/notification?auth_token=testtoken1234567",
-			PostData: hipchattest.PostData{
-				From:    "kapacitor",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Color:   "red",
-				Notify:  true,
-			},
-		},
-		hipchattest.Request{
-			URL: "/Test%20Room/notification?auth_token=testtokenTestRoom",
-			PostData: hipchattest.PostData{
-				From:    "kapacitor",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Color:   "red",
-				Notify:  true,
-			},
-		},
-	}
+	var exp []any
 
 	ts.Close()
 	var got []interface{}

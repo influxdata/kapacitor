@@ -1133,6 +1133,7 @@ func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handle
 }
 
 // Send the alert to HipChat.
+// WARNING: THE HIPCHAT ALERT HANDLER HAS BEEN REMOVED
 // For step-by-step instructions on setting up Kapacitor with HipChat, see the [Event Handler Setup Guide](https://docs.influxdata.com//kapacitor/latest/guides/event-handler-setup/#hipchat-setup).
 // To allow Kapacitor to post to HipChat,
 // go to the URL https://www.hipchat.com/docs/apiv2 for

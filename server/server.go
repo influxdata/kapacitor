@@ -4,6 +4,7 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/removed"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -41,7 +42,6 @@ import (
 	"github.com/influxdata/kapacitor/services/file_discovery"
 	"github.com/influxdata/kapacitor/services/fluxtask"
 	"github.com/influxdata/kapacitor/services/gce"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -280,7 +280,6 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service, disabl
 	if err := s.appendDiscordService(); err != nil {
 		return nil, errors.Wrap(err, "discord service")
 	}
-	s.appendHipChatService()
 	s.appendKafkaService()
 	if err := s.appendMQTTService(); err != nil {
 		return nil, errors.Wrap(err, "mqtt service")
@@ -293,6 +292,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service, disabl
 	if err := s.appendHTTPPostService(); err != nil {
 		return nil, errors.Wrap(err, "httppost service")
 	}
+	s.appendRemovedServices()
 	s.appendServiceNowService()
 	s.appendSMTPService()
 	s.appendTeamsService()
@@ -810,18 +810,6 @@ func (s *Server) appendTelegramService() {
 	s.AppendService("telegram", srv)
 }
 
-func (s *Server) appendHipChatService() {
-	c := s.config.HipChat
-	d := s.DiagService.NewHipChatHandler()
-	srv := hipchat.NewService(c, d)
-
-	s.TaskMaster.HipChatService = srv
-	s.AlertService.HipChatService = srv
-
-	s.SetDynamicService("hipchat", srv)
-	s.AppendService("hipchat", srv)
-}
-
 func (s *Server) appendKafkaService() {
 	c := s.config.Kafka
 	d := s.DiagService.NewKafkaHandler()
@@ -962,6 +950,15 @@ func (s *Server) appendStatsService() {
 		s.StatsService = srv
 		s.TaskMaster.TimingService = srv
 		s.AppendService("stats", srv)
+	}
+}
+
+// here we append the removed services
+func (s *Server) appendRemovedServices() {
+	for name := range removed.ServiceNames {
+		srv := removed.NewService(name, vars.Info, s.DiagService.NewRemovedHandler(name))
+		s.AppendService(name, srv)
+		s.SetDynamicService(name, srv)
 	}
 }
 
@@ -1170,6 +1167,9 @@ func (s *Server) watchServices() {
 
 func (s *Server) watchConfigUpdates() {
 	for cu := range s.configUpdates {
+		if _, ok := removed.ServiceNames[cu.Name]; ok {
+			cu.ErrC <- removed.ErrRemoved(cu.Name)
+		}
 		if srv, ok := s.DynamicServices[cu.Name]; !ok {
 			cu.ErrC <- fmt.Errorf("received configuration update for unknown dynamic service %s", cu.Name)
 		} else {

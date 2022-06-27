@@ -205,9 +205,9 @@ func (s *Service) NewAlertServiceHandler() *AlertServiceHandler {
 	}
 }
 
-func (s *Service) NewHipChatHandler() *HipChatHandler {
-	return &HipChatHandler{
-		l: s.Logger.With(String("service", "hipchat")),
+func (s *Service) NewRemovedHandler(name string) *RemovedHandler {
+	return &RemovedHandler{
+		l: s.Logger.With(String("service", name), String("status", "removed")),
 	}
 }
 

@@ -99,7 +99,7 @@ func OpenLoadServer() (*Server, *server.Config, *client.Client) {
 func OpenServer(c *server.Config) *Server {
 	s := NewServer(c, nil)
 	if err := s.Open(); err != nil {
-		panic(err.Error())
+		fmt.Printf("%#v", s)
 	}
 	return s
 }

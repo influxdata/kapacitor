@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/removed"
 	"log"
 	"runtime"
 	"strconv"
@@ -20,7 +21,6 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/ec2"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
@@ -398,22 +398,22 @@ func (h *AlertaHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 
-// HipChat handler
-type HipChatHandler struct {
-	l Logger
-}
-
-func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
-	fields := logFieldsFromContext(ctx)
-
-	return &HipChatHandler{
-		l: h.l.With(fields...),
-	}
-}
-
-func (h *HipChatHandler) Error(msg string, err error) {
-	h.l.Error(msg, Error(err))
-}
+//// HipChat handler
+//type HipChatHandler struct {
+//	l Logger
+//}
+//
+//func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
+//	fields := logFieldsFromContext(ctx)
+//
+//	return &HipChatHandler{
+//		l: h.l.With(fields...),
+//	}
+//}
+//
+//func (h *HipChatHandler) Error(msg string, err error) {
+//	h.l.Error(msg, Error(err))
+//}
 
 // Kafka handler
 type KafkaHandler struct {
@@ -826,6 +826,23 @@ func (h *HTTPPostHandler) WithContext(ctx ...keyvalue.T) httppost.Diagnostic {
 	fields := logFieldsFromContext(ctx)
 
 	return &HTTPPostHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+// Removed handler
+type RemovedHandler struct {
+	l Logger
+}
+
+func (h *RemovedHandler) Error(msg string, err error, ctx ...keyvalue.T) {
+	Err(h.l, msg, err, ctx)
+}
+
+func (h *RemovedHandler) WithContext(ctx ...keyvalue.T) removed.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &RemovedHandler{
 		l: h.l.With(fields...),
 	}
 }
