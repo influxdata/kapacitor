@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/removed/removedtest"
 	"io"
 	"io/ioutil"
@@ -6587,13 +6588,9 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
-				Name: "hipchat",
-				Options: client.ServiceTestOptions{
-					"room":    "",
-					"message": "test hipchat message",
-					"level":   "CRITICAL",
-				},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
+				Name:    "hipchat",
+				Options: client.ServiceTestOptions{"Name": "hipchat"},
 			},
 			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/httppost"},
@@ -7067,7 +7064,7 @@ func TestServer_DoServiceTest(t *testing.T) {
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
-				Message: "service is not enabled",
+				Message: removed.ErrHipChatRemoved.Error(),
 			},
 		},
 		{
@@ -7247,24 +7244,26 @@ func TestServer_DoServiceTest(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// Create default config
-		c := NewConfig()
-		if tc.setDefaults != nil {
-			tc.setDefaults(c)
-		}
-		s := OpenServer(c)
-		cli := Client(s)
-		defer s.Close()
+		t.Run(tc.service, func(t *testing.T) {
+			// Create default config
+			c := NewConfig()
+			if tc.setDefaults != nil {
+				tc.setDefaults(c)
+			}
+			s := OpenServer(c)
+			cli := Client(s)
+			defer s.Close()
 
-		tr, err := cli.DoServiceTest(cli.ServiceTestLink(tc.service), tc.options)
-		if err != nil {
-			t.Fatal(err)
-		}
+			tr, err := cli.DoServiceTest(cli.ServiceTestLink(tc.service), tc.options)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		if !reflect.DeepEqual(tr, tc.exp) {
-			t.Log("Options", tc.options)
-			t.Errorf("unexpected service test result for %s:\ngot\n%#v\nexp\n%#v\n", tc.service, tr, tc.exp)
-		}
+			if !reflect.DeepEqual(tr, tc.exp) {
+				t.Log("Options", tc.options)
+				t.Errorf("unexpected service test result for %s:\ngot\n%#v\nexp\n%#v\n", tc.service, tr, tc.exp)
+			}
+		})
 	}
 }
 
