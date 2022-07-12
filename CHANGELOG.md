@@ -25,6 +25,7 @@ CHANGELOG for Kapacitor master commit 4f8a995be494bbca09af981f01ae985e23e98087
 
 1. [d4fcc6b](https://github.com/influxdata/kapacitor/commit/d4fcc6b): Flux limits and bad flux httpclient
 1. [1959476](https://github.com/influxdata/kapacitor/commit/1959476): Update sarama for  https://github.com/Shopify/sarama/issues/2129
+1. [95dd289](https://github.com/influxdata/kapacitor/commit/95dd289): properly depreciate TLS<1.2, DES and RC4 based ciphers
 
 
 ## v1.6.3 [2021-12-10]
