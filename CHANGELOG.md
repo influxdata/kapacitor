@@ -1,4 +1,18 @@
-CHANGELOG for Kapacitor master commit 95dd289843c5a556977e129385d27bd511f6dec2
+CHANGELOG for Kapacitor master commit 4f8a995be494bbca09af981f01ae985e23e98087
+
+## v1.6.5 [2021-07-12]
+----------------------
+
+### Features
+
+1. [b69fc92](https://github.com/influxdata/kapacitor/commit/b69fc92): Rand function for tick lambdas
+1. [c05878b](https://github.com/influxdata/kapacitor/commit/c05878b): Newer influxql
+
+### Bug Fixes
+
+1. [d467fea](https://github.com/influxdata/kapacitor/commit/d467fea): Updated kafka client to fix a bug in the library
+1. [933e5d0](https://github.com/influxdata/kapacitor/commit/933e5d0): Update flux to 0.171 for: 'interface {} is nil, not string'
+
 
 ## v1.6.4 [2022-03-15]
 ----------------------
@@ -11,7 +25,7 @@ CHANGELOG for Kapacitor master commit 95dd289843c5a556977e129385d27bd511f6dec2
 
 1. [d4fcc6b](https://github.com/influxdata/kapacitor/commit/d4fcc6b): Flux limits and bad flux httpclient
 1. [1959476](https://github.com/influxdata/kapacitor/commit/1959476): Update sarama for  https://github.com/Shopify/sarama/issues/2129
-1. [95dd289](https://github.com/influxdata/kapacitor/commit/95dd289): properly depreciate TLS<1.2, DES and RC4 based ciphers
+
 
 ## v1.6.3 [2021-12-10]
 ----------------------
