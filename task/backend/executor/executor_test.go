@@ -56,6 +56,7 @@ func taskExecutorSystem(t *testing.T) tes {
 		tcs         = &taskControlService{TaskControlService: taskStore}
 		ex, metrics = NewExecutor(zaptest.NewLogger(t), qs, taskStore, tcs)
 	)
+	ex.SetLimitFunc(ConcurrencyLimit(ex))
 	return tes{
 		svc:     qs,
 		ex:      ex,
@@ -69,19 +70,7 @@ func (t *tes) Close() error {
 	return t.i.Close()
 }
 
-func TestTaskExecutor(t *testing.T) {
-	t.Run("QuerySuccess", testQuerySuccess)
-	t.Run("QueryFailure", testQueryFailure)
-	t.Run("ManualRun", testManualRun)
-	t.Run("ResumeRun", testResumingRun)
-	t.Run("WorkerLimit", testWorkerLimit)
-	t.Run("LimitFunc", testLimitFunc)
-	t.Run("Metrics", testMetrics)
-	t.Run("IteratorFailure", testIteratorFailure)
-	t.Run("ErrorHandling", testErrorHandling)
-}
-
-func testQuerySuccess(t *testing.T) {
+func TestQuerySuccess(t *testing.T) {
 	t.Parallel()
 
 	tes := taskExecutorSystem(t)
@@ -150,7 +139,7 @@ func testQuerySuccess(t *testing.T) {
 	}
 }
 
-func testQueryFailure(t *testing.T) {
+func TestQueryFailure(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -187,7 +176,7 @@ func testQueryFailure(t *testing.T) {
 	}
 }
 
-func testManualRun(t *testing.T) {
+func TestManualRun(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -234,7 +223,7 @@ func testManualRun(t *testing.T) {
 	}
 }
 
-func testResumingRun(t *testing.T) {
+func TestResumingRun(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -277,7 +266,7 @@ func testResumingRun(t *testing.T) {
 	}
 }
 
-func testWorkerLimit(t *testing.T) {
+func TestWorkerLimit(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -307,7 +296,53 @@ func testWorkerLimit(t *testing.T) {
 	}
 }
 
-func testLimitFunc(t *testing.T) {
+func TestConcurrencyLimit(t *testing.T) {
+	t.Parallel()
+	tes := taskExecutorSystem(t)
+
+	testScript := `option task = {
+		concurrency: 1,
+		name: %q,
+		every: 1m,
+	}
+	from(bucket: "one") |> to(bucket: "two", orgID: "0000000000000000")`
+
+	script := fmt.Sprintf(testScript, t.Name())
+	ctx := context.Background()
+	task, err := tes.i.CreateTask(ctx, taskmodel.TaskCreate{OwnerUsername: "executortest-user", Flux: script})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forcedErr := errors.New("forced")
+	forcedQueryErr := taskmodel.ErrQueryError(forcedErr)
+	tes.svc.FailNextQuery(forcedErr)
+
+	count := 0
+	tes.ex.SetLimitFunc(func(*taskmodel.Task, *taskmodel.Run) error {
+		count++
+		if count < 2 {
+			return errors.New("not there yet")
+		}
+		return nil
+	})
+
+	promise, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-promise.Done()
+
+	if got := promise.Error(); got.Error() != forcedQueryErr.Error() {
+		t.Fatal("failed to get failure from forced error")
+	}
+
+	if count != 2 {
+		t.Fatalf("failed to call limitFunc enough times: %d", count)
+	}
+}
+
+func TestLimitFunc(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -346,7 +381,7 @@ func testLimitFunc(t *testing.T) {
 	}
 }
 
-func testMetrics(t *testing.T) {
+func TestMetrics(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 	metrics := tes.metrics
@@ -417,7 +452,7 @@ func testMetrics(t *testing.T) {
 	assert.Greater(t, *m.Histogram.SampleSum, float64(100), "run latency metric unexpectedly small")
 }
 
-func testIteratorFailure(t *testing.T) {
+func TestIteratorFailure(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 
@@ -465,7 +500,7 @@ func testIteratorFailure(t *testing.T) {
 	}
 }
 
-func testErrorHandling(t *testing.T) {
+func TestErrorHandling(t *testing.T) {
 	t.Parallel()
 	tes := taskExecutorSystem(t)
 

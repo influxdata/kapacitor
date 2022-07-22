@@ -88,17 +88,18 @@ func (s *Service) Open() error {
 		}
 
 		// TODO: register metrics returned here?
-		executor, _ := executor.NewExecutor(
+		exe, _ := executor.NewExecutor(
 			s.logger.With(zap.String("service", "fluxtask-executor")),
 			fluxlocal.NewFluxQueryer(s.config.Secrets, influxURL, s.logger.With(zap.String("service", "flux-local-querier"))),
 			taskService,
 			taskControlService,
 		)
+		exe.SetLimitFunc(executor.ConcurrencyLimit(exe))
 		var err error
 		schLogger := s.logger.With(zap.String("service", "fluxtask-scheduler"))
 		//TODO: register metrics returned here?
 		s.scheduler, _, err = scheduler.NewScheduler(
-			executor,
+			exe,
 			backend.NewSchedulableTaskService(s.kvService),
 			scheduler.WithOnErrorFn(func(ctx context.Context, taskID scheduler.ID, scheduledAt time.Time, err error) {
 				schLogger.Info(
@@ -115,7 +116,7 @@ func (s *Service) Open() error {
 		taskCoord := coordinator.NewCoordinator(
 			coordLogger,
 			s.scheduler,
-			executor)
+			exe)
 		taskService = middleware.New(taskService, taskCoord)
 		if err := backend.TaskNotifyCoordinatorOfExisting(
 			context.Background(),
@@ -123,7 +124,7 @@ func (s *Service) Open() error {
 			taskControlService,
 			taskCoord,
 			func(ctx context.Context, taskID platform.ID, runID platform.ID) error {
-				_, err := executor.ResumeCurrentRun(ctx, taskID, runID)
+				_, err := exe.ResumeCurrentRun(ctx, taskID, runID)
 				return err
 			},
 			coordLogger); err != nil {
