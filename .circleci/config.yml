@@ -166,7 +166,7 @@ jobs:
 
   changelog:
     docker:
-      - image: quay.io/influxdb/changelogger:0dbf37ba8a912460358d322dcad414b80ce074f2
+      - image: quay.io/influxdb/changelogger:49956d24b2812ff1866f5870c18572f0344abf1b
     steps:
       - checkout
       - run:
