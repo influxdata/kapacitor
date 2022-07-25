@@ -200,7 +200,7 @@ def run_tests(race, parallel, timeout, verbose):
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
 
-    test_command = "go test"
+    test_command = "go test --failfast"
     if verbose:
         test_command += " -v"
     if race:
