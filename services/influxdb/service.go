@@ -738,7 +738,7 @@ func (c *influxdbCluster) watchSubs() {
 		c.subSyncTicker = time.NewTicker(c.subscriptionSyncInterval)
 		ticker := c.subSyncTicker
 		go func() {
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.LinkSubscriptions()
 			}
 		}()

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/removed"
 	"log"
 	"runtime"
 	"strconv"
@@ -31,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
@@ -397,23 +397,6 @@ func (h *AlertaHandler) TemplateError(err error, kv keyvalue.T) {
 func (h *AlertaHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
-
-//// HipChat handler
-//type HipChatHandler struct {
-//	l Logger
-//}
-//
-//func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
-//	fields := logFieldsFromContext(ctx)
-//
-//	return &HipChatHandler{
-//		l: h.l.With(fields...),
-//	}
-//}
-//
-//func (h *HipChatHandler) Error(msg string, err error) {
-//	h.l.Error(msg, Error(err))
-//}
 
 // Kafka handler
 type KafkaHandler struct {

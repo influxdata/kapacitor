@@ -204,7 +204,7 @@ func (mux *ServeMux) Patterns() []string {
 	defer mux.mu.Unlock()
 	patterns := make([]string, len(mux.m))
 	i := 0
-	for p, _ := range mux.m {
+	for p := range mux.m {
 		patterns[i] = p
 		i++
 	}

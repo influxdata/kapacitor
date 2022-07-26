@@ -153,27 +153,27 @@ func TestUDFNode_UnmarshalJSON(t *testing.T) {
 }`,
 			want: &UDFNode{
 				options: map[string]*agent.OptionInfo{
-					"mph": &agent.OptionInfo{
+					"mph": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_INT,
 						},
 					},
-					"gigawatts": &agent.OptionInfo{
+					"gigawatts": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_DOUBLE,
 						},
 					},
-					"nearClockTower": &agent.OptionInfo{
+					"nearClockTower": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_BOOL,
 						},
 					},
-					"martySays": &agent.OptionInfo{
+					"martySays": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_STRING,
 						},
 					},
-					"future": &agent.OptionInfo{
+					"future": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_DURATION,
 							agent.ValueType_STRING,
@@ -251,27 +251,27 @@ func TestUDFNode_UnmarshalJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			u := &UDFNode{
 				options: map[string]*agent.OptionInfo{
-					"mph": &agent.OptionInfo{
+					"mph": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_INT,
 						},
 					},
-					"gigawatts": &agent.OptionInfo{
+					"gigawatts": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_DOUBLE,
 						},
 					},
-					"nearClockTower": &agent.OptionInfo{
+					"nearClockTower": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_BOOL,
 						},
 					},
-					"martySays": &agent.OptionInfo{
+					"martySays": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_STRING,
 						},
 					},
-					"future": &agent.OptionInfo{
+					"future": {
 						ValueTypes: []agent.ValueType{
 							agent.ValueType_DURATION,
 							agent.ValueType_STRING,

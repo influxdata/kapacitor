@@ -4,7 +4,6 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/removed"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,8 +11,6 @@ import (
 	"runtime/pprof"
 	"sync"
 	"time"
-
-	"go.uber.org/zap"
 
 	"github.com/influxdata/influxdb/query"
 	"github.com/influxdata/influxdb/services/collectd"
@@ -57,6 +54,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/scraper"
@@ -85,6 +83,7 @@ import (
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 

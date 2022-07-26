@@ -3,7 +3,6 @@ package server
 import (
 	"encoding"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/removed"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -44,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/scraper"

@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/removed"
-	"github.com/influxdata/kapacitor/services/removed/removedtest"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -59,6 +57,8 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
 	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
+	"github.com/influxdata/kapacitor/services/removed"
+	"github.com/influxdata/kapacitor/services/removed/removedtest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/servicenow/servicenowtest"
@@ -8025,7 +8025,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ts.Close()
 				got := ts.Requests()
 				if len(got) != 0 {
-					fmt.Errorf("unexpected hipchat request, hipchat support has been removed:\ngot\n%+v\n", got)
+					return fmt.Errorf("unexpected hipchat request, hipchat support has been removed:\ngot\n%+v\n", got)
 				}
 
 				return nil

@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/removed"
-	"github.com/influxdata/kapacitor/services/removed/removedtest"
 	"html"
 	"io/ioutil"
 	"math/rand"
@@ -23,6 +21,9 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/removed"
+	"github.com/influxdata/kapacitor/services/removed/removedtest"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
@@ -150,7 +151,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					1011.0,
 				}},
@@ -179,27 +180,27 @@ func TestStream_ChangeDetect(t *testing.T) {
 				Tags:    nil,
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 						"bad",
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 						"good",
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						"bad",
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 						"good",
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 						"bad",
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						"good",
 					},
@@ -228,22 +229,22 @@ func TestStream_ChangeDetect_Many(t *testing.T) {
 				Tags:    nil,
 				Columns: []string{"time", "a", "b"},
 				Values: [][]interface{}{
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 						"bad",
 						0.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 						"good",
 						0.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 						"bad",
 						1.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 						"bad",
 						0.0,
@@ -274,7 +275,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					1.0,
 				}},
@@ -304,47 +305,47 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "derivative", "value"},
 				Values: [][]interface{}{
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 						1.0,
 						1001.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 						1.0,
 						1003.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 						1.0,
 						1004.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 						2.0,
 						1006.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 						1.0,
 						1007.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 						0.0,
 						1007.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						1.0,
 						1008.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 						1.0,
 						1009.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 						1.0,
 						1010.0,
@@ -375,7 +376,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					9.0,
 				}},
@@ -405,7 +406,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					10.0,
 				}},
@@ -435,7 +436,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					1.0,
 				}},
@@ -464,7 +465,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					-99.7,
 				}},
@@ -614,7 +615,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					4.0,
 				}},
@@ -644,7 +645,7 @@ stream
 				Name:    "packets",
 				Tags:    nil,
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					5.0,
 				}},
@@ -812,7 +813,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					3.0,
 				}},
@@ -848,7 +849,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					3.0,
 				}},
@@ -2472,7 +2473,7 @@ past
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "current.count", "diff", "past.count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					5.0,
 					1.0,
@@ -2524,7 +2525,7 @@ past
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "current.count", "diff", "past.count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					5.0,
 					1.0,
@@ -2576,7 +2577,7 @@ past
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "current.count", "diff", "past.count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 					1.0,
@@ -2628,7 +2629,7 @@ past
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "current.count", "diff", "past.count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 					1.0,
@@ -2660,7 +2661,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -2686,7 +2687,7 @@ stream
 				Name:    "types",
 				Tags:    nil,
 				Columns: []string{"time", "bool", "float", "int", "str"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					true,
 					84.0,
@@ -2730,7 +2731,7 @@ stream
 				Name:    "types",
 				Tags:    nil,
 				Columns: []string{"time", "neg", "pos", "value0", "value1"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					-1.0,
 					1.0,
@@ -2760,7 +2761,7 @@ stream
 				Name:    "types",
 				Tags:    nil,
 				Columns: []string{"time", "neg", "other", "pos", "value0"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					-1.0,
 					5.0,
@@ -2790,7 +2791,7 @@ stream
 				Name:    "types",
 				Tags:    nil,
 				Columns: []string{"time", "value0", "zero"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					0.0,
 					0.0,
@@ -2819,7 +2820,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value": "0"},
 				Columns: []string{"time"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				}},
 			},
@@ -2827,7 +2828,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value": "1"},
 				Columns: []string{"time"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				}},
 			},
@@ -2855,7 +2856,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value": "0"},
 				Columns: []string{"time", "another", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2.0,
 					"0",
@@ -2865,7 +2866,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value": "1"},
 				Columns: []string{"time", "another", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2.0,
 					"1",
@@ -2895,7 +2896,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value_tag": "0"},
 				Columns: []string{"time", "another", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2.0,
 					0.0,
@@ -2905,7 +2906,7 @@ stream
 				Name:    "types",
 				Tags:    map[string]string{"value_tag": "1"},
 				Columns: []string{"time", "another", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2.0,
 					1.0,
@@ -3076,7 +3077,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					57.0,
 				}},
@@ -3106,7 +3107,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"cpu": "cpu-total", "host": "serverA"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					9.0,
 				}},
@@ -3134,7 +3135,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					9.0,
 				}},
@@ -3143,7 +3144,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverB"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					6.0,
 				}},
@@ -3152,7 +3153,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverC"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					3.0,
 				}},
@@ -3185,7 +3186,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 					18.0,
 				}},
@@ -3194,7 +3195,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverB"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 					12.0,
 				}},
@@ -3203,7 +3204,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverC"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 					6.0,
 				}},
@@ -3231,7 +3232,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					23.0,
 				}},
@@ -3263,7 +3264,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							97.1,
 						}},
@@ -3277,7 +3278,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							92.6,
 						}},
@@ -3291,7 +3292,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 							95.6,
 						}},
@@ -3305,7 +3306,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 							93.1,
 						}},
@@ -3319,7 +3320,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							92.6,
 						}},
@@ -3333,7 +3334,7 @@ func TestStream_HttpPost(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 							95.8,
 						}},
@@ -3363,7 +3364,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					95.8,
 				}},
@@ -3402,7 +3403,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							97.1,
 						}},
@@ -3417,7 +3418,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "b"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							92.6,
 						}},
@@ -3432,7 +3433,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "b"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 							95.6,
 						}},
@@ -3447,7 +3448,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "c"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 							93.1,
 						}},
@@ -3462,7 +3463,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "c"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							92.6,
 						}},
@@ -3477,7 +3478,7 @@ func TestStream_HttpPost_URL_Template(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 							95.8,
 						}},
@@ -3511,7 +3512,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					95.8,
 				}},
@@ -3554,7 +3555,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							97.1,
 						}},
@@ -3568,7 +3569,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							92.6,
 						}},
@@ -3582,7 +3583,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 							95.6,
 						}},
@@ -3596,7 +3597,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 							93.1,
 						}},
@@ -3610,7 +3611,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							92.6,
 						}},
@@ -3624,7 +3625,7 @@ func TestStream_HttpPostEndpoint(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 							95.8,
 						}},
@@ -3656,7 +3657,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					95.8,
 				}},
@@ -3735,7 +3736,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					95.8,
 				}},
@@ -3882,7 +3883,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -3912,7 +3913,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 				}},
@@ -3921,7 +3922,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverB"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 				}},
@@ -3930,7 +3931,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverC"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					1.0,
 				}},
@@ -3960,7 +3961,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 				}},
@@ -3969,7 +3970,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverB", "type": "idle"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					5.0,
 				}},
@@ -3978,7 +3979,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverC", "type": "idle"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					1.0,
 				}},
@@ -4009,7 +4010,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"type": "idle"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					11.0,
 				}},
@@ -4040,7 +4041,7 @@ stream
 				Name:    "mock",
 				Tags:    map[string]string{"t": "A"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 					4.0,
 				}},
@@ -4049,7 +4050,7 @@ stream
 				Name:    "mock",
 				Tags:    map[string]string{"t": "B"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 					4.0,
 				}},
@@ -4082,7 +4083,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -4120,7 +4121,7 @@ data
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -4151,7 +4152,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -4182,7 +4183,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -4213,7 +4214,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					47.0,
 				}},
@@ -4222,7 +4223,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					45.0,
 				}},
@@ -4231,7 +4232,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					32.0,
 				}},
@@ -4276,7 +4277,7 @@ byCpu
 				Name:    "cpu",
 				Tags:    map[string]string{"cpu": "cpu0", "host": "serverA"},
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.7823116704593873,
 				}},
@@ -4285,7 +4286,7 @@ byCpu
 				Name:    "cpu",
 				Tags:    map[string]string{"cpu": "cpu1", "host": "serverA"},
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.7676074281820646,
 				}},
@@ -4294,7 +4295,7 @@ byCpu
 				Name:    "cpu",
 				Tags:    map[string]string{"cpu": "cpu-total", "host": "serverA"},
 				Columns: []string{"time", "mean"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					1.0,
 				}},
@@ -4325,7 +4326,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					47.0,
 				}},
@@ -4334,7 +4335,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					45.0,
 				}},
@@ -4343,7 +4344,7 @@ stream
 				Name:    "errors",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					32.0,
 				}},
@@ -4352,7 +4353,7 @@ stream
 				Name:    "disk",
 				Tags:    map[string]string{"service": "sda"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					810.0,
 				}},
@@ -4381,7 +4382,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A"},
 				Columns: []string{"time", "auth.server01.value", "auth.server02.value", "cart.server01.value", "cart.server02.value", "log.server01.value", "log.server02.value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					700.0,
 					702.0,
@@ -4395,7 +4396,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B"},
 				Columns: []string{"time", "auth.server01.value", "auth.server02.value", "cart.server01.value", "cart.server02.value", "log.server01.value", "log.server02.value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					750.0,
 					752.0,
@@ -4430,7 +4431,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A"},
 				Columns: []string{"time", "auth.server01", "auth.server02", "cart.server01", "cart.server02", "log.server01", "log.server02"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					700.0,
 					702.0,
@@ -4444,7 +4445,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B"},
 				Columns: []string{"time", "auth.server01", "auth.server02", "cart.server01", "cart.server02", "log.server01", "log.server02"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					750.0,
 					752.0,
@@ -4482,7 +4483,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "second.service": "log", "first.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.0 / 6.0,
 				}},
@@ -4491,7 +4492,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.0 / 8.0,
 				}},
@@ -4500,7 +4501,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					6.0 / 8.0,
 				}},
@@ -4509,7 +4510,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "second.service": "log", "first.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.5 / 6.5,
 				}},
@@ -4518,7 +4519,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.5 / 8.5,
 				}},
@@ -4527,7 +4528,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					6.5 / 8.5,
 				}},
@@ -4560,7 +4561,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.0 / 6.0,
 				}},
@@ -4569,7 +4570,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "cart", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.0 / 8.0,
 				}},
@@ -4578,7 +4579,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "other.service": "log", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.5 / 6.5,
 				}},
@@ -4587,7 +4588,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "other.service": "cart", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.5 / 8.5,
 				}},
@@ -4620,7 +4621,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log", "third.service": "cart"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2100.0,
 				}},
@@ -4629,7 +4630,7 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "first.service": "auth", "second.service": "log", "third.service": "cart"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					2250.0,
 				}},
@@ -4679,7 +4680,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					47.0,
@@ -4690,7 +4691,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					45.0,
@@ -4701,7 +4702,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					32.0,
@@ -4809,7 +4810,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					47.0,
@@ -4820,7 +4821,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					45.0,
@@ -4831,7 +4832,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					32.0,
@@ -4883,7 +4884,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					47.0,
@@ -4894,7 +4895,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					45.0,
@@ -4905,7 +4906,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					32.0,
@@ -5101,7 +5102,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 				}},
@@ -5110,7 +5111,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 				}},
@@ -5119,7 +5120,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					8.0,
 				}},
@@ -5162,7 +5163,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 				}},
@@ -5171,7 +5172,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 				}},
@@ -5180,7 +5181,7 @@ errorCounts
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					8.0,
 				}},
@@ -5225,7 +5226,7 @@ cpu
 				Name:    "magic",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
@@ -5275,7 +5276,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "cartA"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					15.0,
 					47.0,
@@ -5286,7 +5287,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "cartA"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					32.0,
 					47.0,
@@ -5297,7 +5298,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "login"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					15.0,
 					45.0,
@@ -5308,7 +5309,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "login"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					23.0,
 					45.0,
@@ -5319,7 +5320,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "C", "service": "login"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 					45.0,
@@ -5330,7 +5331,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "front"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					19.0,
 					32.0,
@@ -5341,7 +5342,7 @@ errorsByServiceGlobal
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "front"},
 				Columns: []string{"time", "dc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					13.0,
 					32.0,
@@ -5393,7 +5394,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "cartA", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 					47.0,
@@ -5404,7 +5405,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "cartA", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					5.0,
 					47.0,
@@ -5415,7 +5416,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "cartA", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					14.0,
 					47.0,
@@ -5426,7 +5427,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "cartA", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					18.0,
 					47.0,
@@ -5437,7 +5438,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "login", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					5.0,
 					45.0,
@@ -5448,7 +5449,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "login", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 					45.0,
@@ -5459,7 +5460,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "login", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					3.0,
 					45.0,
@@ -5470,7 +5471,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "login", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					20.0,
 					45.0,
@@ -5481,7 +5482,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "C", "service": "login", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					7.0,
 					45.0,
@@ -5492,7 +5493,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "front", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					9.0,
 					32.0,
@@ -5503,7 +5504,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "front", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 					32.0,
@@ -5514,7 +5515,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "front", "rack": "0"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					4.0,
 					32.0,
@@ -5525,7 +5526,7 @@ errorsByServiceGlobal
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "B", "service": "front", "rack": "1"},
 				Columns: []string{"time", "loc.sum", "service.sum", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					9.0,
 					32.0,
@@ -5568,7 +5569,7 @@ building
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "shack", "floor": "1"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					7.0 / 30.0,
 				}},
@@ -5577,7 +5578,7 @@ building
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "shack", "floor": "2"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					11.0 / 30.0,
 				}},
@@ -5586,7 +5587,7 @@ building
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "shack", "floor": "3"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					12.0 / 30.0,
 				}},
@@ -5595,7 +5596,7 @@ building
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "hut", "floor": "1"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					19.0 / 40.0,
 				}},
@@ -5604,7 +5605,7 @@ building
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "hut", "floor": "2"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					21.0 / 40.0,
 				}},
@@ -5822,7 +5823,7 @@ cpuT
 				Name:    "cpu_all",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					20.0,
 				}},
@@ -5866,7 +5867,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							98.0,
 						}},
@@ -5875,7 +5876,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "1"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 							92.0,
 						}},
@@ -5884,7 +5885,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "total"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 							92.0,
 						}},
@@ -5900,7 +5901,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 							92.0,
 						}},
@@ -5909,7 +5910,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "1"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 							92.0,
 						}},
@@ -5918,7 +5919,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "total"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							93.0,
 						}},
@@ -5934,7 +5935,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 							96.0,
 						}},
@@ -5943,7 +5944,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "1"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 							93.0,
 						}},
@@ -5952,7 +5953,7 @@ cpuT
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "total"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 							96.0,
 						}},
@@ -5967,7 +5968,7 @@ cpuT
 				Name:    "cpu_all",
 				Tags:    map[string]string{"cpu": "0"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 					95.0,
 				}},
@@ -5976,7 +5977,7 @@ cpuT
 				Name:    "cpu_all",
 				Tags:    map[string]string{"cpu": "1"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 					95.0,
 				}},
@@ -5985,7 +5986,7 @@ cpuT
 				Name:    "cpu_all",
 				Tags:    map[string]string{"cpu": "total"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					96.0,
 				}},
@@ -6020,7 +6021,7 @@ stream
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
-		testCase{
+		{
 			Method: "sum",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6028,7 +6029,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							940.0,
 						}},
@@ -6036,7 +6037,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "count",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6044,7 +6045,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							10.0,
 						}},
@@ -6052,7 +6053,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "distinct",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6090,7 +6091,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "mean",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6098,7 +6099,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							94.0,
 						}},
@@ -6106,7 +6107,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "median",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6114,7 +6115,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							94.0,
 						}},
@@ -6122,7 +6123,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "mode",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6130,7 +6131,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mode"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							95.0,
 						}},
@@ -6138,7 +6139,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "min",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6147,7 +6148,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							91.0,
 						}},
@@ -6155,7 +6156,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "min",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6163,7 +6164,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							91.0,
 						}},
@@ -6171,7 +6172,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "max",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6180,7 +6181,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							98.0,
 						}},
@@ -6188,7 +6189,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "max",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6196,7 +6197,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							98.0,
 						}},
@@ -6204,7 +6205,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "spread",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6212,7 +6213,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							7.0,
 						}},
@@ -6220,7 +6221,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "stddev",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6228,7 +6229,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							2.160246899469287,
 						}},
@@ -6236,7 +6237,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "first",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6245,7 +6246,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							98.0,
 						}},
@@ -6253,7 +6254,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "first",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6261,7 +6262,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							98.0,
 						}},
@@ -6269,7 +6270,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "last",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6278,7 +6279,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 							95.0,
 						}},
@@ -6286,7 +6287,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "last",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6294,7 +6295,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							95.0,
 						}},
@@ -6302,7 +6303,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "percentile",
 			Args:   "'value', 50.0",
 			ER: models.Result{
@@ -6311,7 +6312,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "percentile"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							93.0,
 						}},
@@ -6319,7 +6320,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "top",
 			UsePointTimes: true,
 			Args:          "2, 'value'",
@@ -6345,7 +6346,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "top",
 			Args:   "2, 'value'",
 			ER: models.Result{
@@ -6370,7 +6371,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "bottom",
 			UsePointTimes: true,
 			Args:          "3, 'value'",
@@ -6401,7 +6402,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "bottom",
 			Args:   "3, 'value'",
 			ER: models.Result{
@@ -6482,7 +6483,7 @@ stream
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
-		testCase{
+		{
 			Method: "sum",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6490,7 +6491,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							940.0,
 						}},
@@ -6498,7 +6499,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "count",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6506,7 +6507,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							10.0,
 						}},
@@ -6514,7 +6515,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "distinct",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6552,7 +6553,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "mean",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6560,7 +6561,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							94.0,
 						}},
@@ -6568,7 +6569,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "median",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6576,7 +6577,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							94.0,
 						}},
@@ -6584,7 +6585,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "mode",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6592,7 +6593,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mode"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							95.0,
 						}},
@@ -6600,7 +6601,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "min",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6609,7 +6610,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 							91.0,
 						}},
@@ -6617,7 +6618,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "min",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6625,7 +6626,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							91.0,
 						}},
@@ -6633,7 +6634,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "max",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6642,7 +6643,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							98.0,
 						}},
@@ -6650,7 +6651,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "max",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6658,7 +6659,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							98.0,
 						}},
@@ -6666,7 +6667,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "spread",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6674,7 +6675,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							7.0,
 						}},
@@ -6682,7 +6683,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "stddev",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6690,7 +6691,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							2.160246899469287,
 						}},
@@ -6698,7 +6699,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "first",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6707,7 +6708,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							98.0,
 						}},
@@ -6715,7 +6716,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "first",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6723,7 +6724,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							98.0,
 						}},
@@ -6731,7 +6732,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "last",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -6740,7 +6741,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 							95.0,
 						}},
@@ -6748,7 +6749,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "last",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6756,7 +6757,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							95.0,
 						}},
@@ -6764,7 +6765,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "percentile",
 			Args:   "'value', 50.0",
 			ER: models.Result{
@@ -6773,7 +6774,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "percentile"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							93.0,
 						}},
@@ -6781,7 +6782,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "top",
 			UsePointTimes: true,
 			Args:          "2, 'value'",
@@ -6807,7 +6808,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "top",
 			Args:   "2, 'value'",
 			ER: models.Result{
@@ -6832,7 +6833,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "bottom",
 			UsePointTimes: true,
 			Args:          "3, 'value'",
@@ -6863,7 +6864,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "bottom",
 			Args:   "3, 'value'",
 			ER: models.Result{
@@ -6941,7 +6942,7 @@ stream
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
-		testCase{
+		{
 			Method: "count",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6949,7 +6950,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							10.0,
 						}},
@@ -6957,7 +6958,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "distinct",
 			ER: models.Result{
 				Series: models.Rows{
@@ -6995,7 +6996,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "first",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -7004,7 +7005,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							"98",
 						}},
@@ -7012,7 +7013,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "first",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7020,7 +7021,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							"98",
 						}},
@@ -7028,7 +7029,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "last",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -7037,7 +7038,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 							"95",
 						}},
@@ -7045,7 +7046,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "last",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7053,7 +7054,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							"95",
 						}},
@@ -7110,7 +7111,7 @@ stream
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
-		testCase{
+		{
 			Method: "count",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7118,7 +7119,7 @@ stream
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							10.0,
 						}},
@@ -7126,7 +7127,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "distinct",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7148,7 +7149,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "first",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -7157,7 +7158,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 							false,
 						}},
@@ -7165,7 +7166,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "first",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7173,7 +7174,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							false,
 						}},
@@ -7181,7 +7182,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method:        "last",
 			UsePointTimes: true,
 			ER: models.Result{
@@ -7190,7 +7191,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 							true,
 						}},
@@ -7198,7 +7199,7 @@ stream
 				},
 			},
 		},
-		testCase{
+		{
 			Method: "last",
 			ER: models.Result{
 				Series: models.Rows{
@@ -7206,7 +7207,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							endTime,
 							true,
 						}},
@@ -7396,7 +7397,7 @@ stream
 				Name:    "cpu",
 				Tags:    nil,
 				Columns: []string{"time", "customField"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					42.0,
 				}},
@@ -7432,7 +7433,7 @@ func TestStream_Alert(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 							10.0,
 						}},
@@ -7481,7 +7482,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "CRITICAL", "id": "kapacitor/cpu/serverA"},
 				Columns: []string{"time", "count", "id", "level", "msg"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 					"kapacitor/cpu/serverA",
@@ -7526,7 +7527,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 								7.0,
 							}},
@@ -7549,7 +7550,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 								6.0,
 							}},
@@ -7572,7 +7573,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 								7.0,
 							}},
@@ -7595,7 +7596,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								7.0,
 							}},
@@ -7618,7 +7619,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 								8.0,
 							}},
@@ -7641,7 +7642,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 								6.0,
 							}},
@@ -7682,7 +7683,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
 				Columns: []string{"time", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 					6.0,
 				}},
@@ -7724,7 +7725,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 								45.0,
 							}},
@@ -7748,7 +7749,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								40.0,
 							}},
@@ -7772,7 +7773,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 								30.0,
 							}},
@@ -7796,7 +7797,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 								9.0,
 							}},
@@ -7820,7 +7821,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								45.0,
 							}},
@@ -7844,7 +7845,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 								61.0,
 							}},
@@ -7868,7 +7869,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								30.0,
 							}},
@@ -7892,7 +7893,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 								19.0,
 							}},
@@ -7916,7 +7917,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 								45.0,
 							}},
@@ -7940,7 +7941,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 								61.0,
 							}},
@@ -7964,7 +7965,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 								81.0,
 							}},
@@ -7988,7 +7989,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 								29.0,
 							}},
@@ -8041,7 +8042,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "OK", "id": "kapacitor/cpu/serverA", "type": "usage"},
 				Columns: []string{"time", "id", "level", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					"kapacitor/cpu/serverA",
 					"OK",
@@ -8085,7 +8086,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 								45.0,
 							}},
@@ -8109,7 +8110,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								40.0,
 							}},
@@ -8133,7 +8134,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 								30.0,
 							}},
@@ -8157,7 +8158,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 								29.0,
 							}},
@@ -8181,7 +8182,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								45.0,
 							}},
@@ -8205,7 +8206,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 								61.0,
 							}},
@@ -8229,7 +8230,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								49.0,
 							}},
@@ -8253,7 +8254,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 								29.0,
 							}},
@@ -8277,7 +8278,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 								45.0,
 							}},
@@ -8301,7 +8302,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 								61.0,
 							}},
@@ -8325,7 +8326,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 								81.0,
 							}},
@@ -8349,7 +8350,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 								69.0,
 							}},
@@ -8373,7 +8374,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 								50.0,
 							}},
@@ -8397,7 +8398,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
 								41.0,
 							}},
@@ -8421,7 +8422,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
 								25.0,
 							}},
@@ -8474,7 +8475,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "OK", "id": "kapacitor/cpu/serverA", "type": "usage"},
 				Columns: []string{"time", "id", "level", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
 					"kapacitor/cpu/serverA",
 					"OK",
@@ -8519,7 +8520,7 @@ func TestStream_AlertDuration(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 								9.0,
 							}},
@@ -8543,7 +8544,7 @@ func TestStream_AlertDuration(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 								8.0,
 							}},
@@ -8567,7 +8568,7 @@ func TestStream_AlertDuration(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								6.0,
 							}},
@@ -8591,7 +8592,7 @@ func TestStream_AlertDuration(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 								8.0,
 							}},
@@ -8615,7 +8616,7 @@ func TestStream_AlertDuration(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 								3.0,
 							}},
@@ -8656,7 +8657,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "duration", "value"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 					float64(3 * time.Second),
 					3.0,
@@ -9084,7 +9085,7 @@ stream
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA"},
 						Columns: []string{"time", "count"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 							10.0,
 						}},
@@ -10123,7 +10124,7 @@ stream
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "count"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 								10.0,
 							}},
@@ -10194,7 +10195,7 @@ stream
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
 							Columns: []string{"time", "count"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 								10.0,
 							}},
@@ -10620,7 +10621,7 @@ stream
 					Name:    "cpu",
 					Tags:    map[string]string{"host": "serverA"},
 					Columns: []string{"time", "count"},
-					Values: [][]interface{}{[]interface{}{
+					Values: [][]interface{}{{
 						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 						10.0,
 					}},
@@ -10691,7 +10692,7 @@ stream
 					Name:    "cpu",
 					Tags:    map[string]string{"host": "serverA"},
 					Columns: []string{"time", "count"},
-					Values: [][]interface{}{[]interface{}{
+					Values: [][]interface{}{{
 						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 						10.0,
 					}},
@@ -11145,7 +11146,7 @@ func TestStream_AlertSigma(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "sigma", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 								2.469916402324427,
 								16.0,
@@ -11170,7 +11171,7 @@ func TestStream_AlertSigma(t *testing.T) {
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
 							Columns: []string{"time", "sigma", "value"},
-							Values: [][]interface{}{[]interface{}{
+							Values: [][]interface{}{{
 								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 								0.3053477916297622,
 								93.4,
@@ -11233,7 +11234,7 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "value"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 							16.0,
 						}},
@@ -11680,7 +11681,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"resource":   "serviceA",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							2.0,
 							1000.0,
@@ -11695,7 +11696,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"resource":   "serviceB",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							20.0,
 							1000.0,
@@ -11714,7 +11715,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"resource":   "serviceA",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							3.0,
 							500.0,
@@ -11729,7 +11730,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"resource":   "serviceB",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							20.0,
 							500.0,
@@ -11785,7 +11786,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"deployment": "serviceA",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							2.0,
 							1000.0,
@@ -11797,7 +11798,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"deployment": "serviceB",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							20.0,
 							1000.0,
@@ -11813,7 +11814,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"deployment": "serviceA",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							3.0,
 							500.0,
@@ -11825,7 +11826,7 @@ func TestStream_Autoscale(t *testing.T) {
 							"deployment": "serviceB",
 						},
 						Columns: []string{"time", "new", "old"},
-						Values: [][]interface{}{[]interface{}{
+						Values: [][]interface{}{{
 							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 							20.0,
 							500.0,
@@ -11875,12 +11876,12 @@ func TestStream_Autoscale(t *testing.T) {
 		},
 	}
 	expUpdatesByService := map[string][]int{
-		"serviceA": []int{2, 1, 1000, 2},
-		"serviceB": []int{20, 1, 1000, 20},
+		"serviceA": {2, 1, 1000, 2},
+		"serviceB": {20, 1, 1000, 20},
 	}
 	expMinMaxUpdatesByService := map[string][]int{
-		"serviceA": []int{3, 500, 3},
-		"serviceB": []int{20, 3, 500, 20},
+		"serviceA": {3, 500, 3},
+		"serviceB": {20, 3, 500, 20},
 	}
 
 	var scriptTmpl = `
@@ -11993,7 +11994,7 @@ stream
 			{
 				Name:    "cpu",
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					4.0,
 				}},
@@ -12125,7 +12126,7 @@ stream
 			{
 				Name:    "cpu",
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					4.0,
 				}},
@@ -12677,7 +12678,7 @@ stream
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "another", "last"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					5.0,
 					95.3,
@@ -12818,21 +12819,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"derivative2": map[string]interface{}{
+		"derivative2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -12856,21 +12857,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"where2": map[string]interface{}{
+		"where2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -12894,21 +12895,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"sample2": map[string]interface{}{
+		"sample2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -12934,21 +12935,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"window2": map[string]interface{}{
+		"window2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -12973,21 +12974,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"max2": map[string]interface{}{
+		"max2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13015,28 +13016,28 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"window2": map[string]interface{}{
+		"window2": {
 			"emitted":             int64(81),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(90),
 		},
-		"max3": map[string]interface{}{
+		"max3": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13061,21 +13062,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"eval2": map[string]interface{}{
+		"eval2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13100,21 +13101,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"flatten2": map[string]interface{}{
+		"flatten2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13140,28 +13141,28 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"window2": map[string]interface{}{
+		"window2": {
 			"emitted":             int64(9),
 			"working_cardinality": int64(1),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(90),
 		},
-		"groupby3": map[string]interface{}{
+		"groupby3": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13185,21 +13186,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"alert2": map[string]interface{}{
+		"alert2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13229,21 +13230,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"http_out2": map[string]interface{}{
+		"http_out2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13269,21 +13270,21 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"k8s_autoscale2": map[string]interface{}{
+		"k8s_autoscale2": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
@@ -13345,28 +13346,28 @@ s2|join(s1)
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(180),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from2": map[string]interface{}{
+		"from2": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"join4": map[string]interface{}{
+		"join4": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(10),
 			"avg_exec_time_ns":    int64(0),
@@ -13391,21 +13392,21 @@ var s1 = stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"combine2": map[string]interface{}{
+		"combine2": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(9),
@@ -13434,49 +13435,49 @@ stream
 
 	// Expected Stats
 	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
+		"stream0": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"from1": map[string]interface{}{
+		"from1": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"where2": map[string]interface{}{
+		"where2": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(9),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"eval3": map[string]interface{}{
+		"eval3": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(9),
 			"collected":           int64(90),
 			"emitted":             int64(90),
 		},
-		"where4": map[string]interface{}{
+		"where4": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(9),
 			"collected":           int64(90),
 			"emitted":             int64(30),
 		},
-		"derivative5": map[string]interface{}{
+		"derivative5": {
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(3),
 			"collected":           int64(30),
 			"emitted":             int64(27),
 		},
-		"alert6": map[string]interface{}{
+		"alert6": {
 			"emitted":             int64(0),
 			"working_cardinality": int64(3),
 			"avg_exec_time_ns":    int64(0),

@@ -168,22 +168,22 @@ batch
 				Tags:    nil,
 				Columns: []string{"time", "a", "b"},
 				Values: [][]interface{}{
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 						"bad",
 						0.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						"good",
 						0.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 						"bad",
 						1.0,
 					},
-					[]interface{}{
+					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						"bad",
 						0.0,
@@ -638,7 +638,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -647,7 +647,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -656,7 +656,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -784,7 +784,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -793,7 +793,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -802,7 +802,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "count"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -836,7 +836,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -845,7 +845,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -854,7 +854,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					0.0,
 				}},
@@ -891,7 +891,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -900,7 +900,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -909,7 +909,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -946,7 +946,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"dc": "sfc"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 					444.0,
 				}},
@@ -980,7 +980,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"dc": "sfc", "cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					441.0,
 				}},
@@ -1020,7 +1020,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"dc": "sfc"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 					50.0,
 				}},
@@ -1057,7 +1057,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    nil,
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					50.0,
 				}},
@@ -1091,7 +1091,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					95.98484848485191,
 				}},
@@ -1125,7 +1125,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					8.97243107764031,
 				}},
@@ -1134,7 +1134,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					8.00000000002001,
 				}},
@@ -1143,7 +1143,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					6.49999999996908,
 				}},
@@ -1152,7 +1152,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					91.06416290101595,
 				}},
@@ -1161,7 +1161,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					85.08910891088406,
 				}},
@@ -1170,7 +1170,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					96.49999999996908,
 				}},
@@ -1204,7 +1204,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					9.90919811320221,
 				}},
@@ -1213,7 +1213,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					5.93434343435388,
 				}},
@@ -1222,7 +1222,7 @@ batch
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					6.54015887023496,
 				}},
@@ -1231,7 +1231,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					91.01699558842134,
 				}},
@@ -1240,7 +1240,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					85.93434343435388,
 				}},
@@ -1249,7 +1249,7 @@ batch
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
 					95.98484848485191,
 				}},
@@ -1805,7 +1805,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					3.0 / 2.0,
 				}},
@@ -1814,7 +1814,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					3.0 / 1.0,
 				}},
@@ -1823,7 +1823,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					2.0 / 1.0,
 				}},
@@ -1832,7 +1832,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					7.0 / 6.0,
 				}},
@@ -1841,7 +1841,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					7.0 / 4.0,
 				}},
@@ -1850,7 +1850,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "first.service": "auth", "second.service": "log"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					6.0 / 4.0,
 				}},
@@ -1885,7 +1885,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					2.0 / 1.0,
 				}},
@@ -1894,7 +1894,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "cart", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					2.0 / 3.0,
 				}},
@@ -1903,7 +1903,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "other.service": "log", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					6.0 / 4.0,
 				}},
@@ -1912,7 +1912,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "other.service": "cart", "auth.service": "auth"},
 				Columns: []string{"time", "ratio"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					6.0 / 7.0,
 				}},
@@ -1947,7 +1947,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth", "third.service": "log"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					6.0,
 				}},
@@ -1956,7 +1956,7 @@ batch
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "auth", "third.service": "log"},
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
 					17.0,
 				}},
@@ -2006,7 +2006,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -2056,7 +2056,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -2106,7 +2106,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -2157,7 +2157,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
@@ -2209,7 +2209,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					876.0,
 				}},
@@ -2262,7 +2262,7 @@ cpu0
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
-				Values: [][]interface{}{[]interface{}{
+				Values: [][]interface{}{{
 					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					1178.0,
 				}},

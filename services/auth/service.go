@@ -330,9 +330,9 @@ func (s *Service) GrantSubscriptionAccess(token, db, rp string) error {
 		Name:  username,
 		Admin: false,
 		Privileges: map[string][]Privilege{
-			writeResource: []Privilege{WritePrivilege},
-			pingResource:  []Privilege{AllPrivileges},
-			dbResource:    []Privilege{WritePrivilege},
+			writeResource: {WritePrivilege},
+			pingResource:  {AllPrivileges},
+			dbResource:    {WritePrivilege},
 		},
 	}
 	if err := s.users.Create(user); err != nil {

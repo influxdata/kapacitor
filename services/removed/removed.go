@@ -2,13 +2,14 @@ package removed
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
-	"strings"
 )
 
 var ServiceNames = map[string]struct{}{
-	HipChatName: struct{}{},
+	HipChatName: {},
 }
 
 const HipChatName = "hipchat"

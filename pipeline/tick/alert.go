@@ -264,7 +264,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("recipients", args(h.RecipientsList)...)
 	}
 
-	for _ = range a.TalkHandlers {
+	for range a.TalkHandlers {
 		n.Dot("talk")
 	}
 
