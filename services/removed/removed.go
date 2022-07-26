@@ -4,18 +4,16 @@ import (
 	"fmt"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"strings"
 )
-
-// sort the Removed services
-//func init() {
-//	sort.Strings(RemovedServices)
-//}
 
 var ServiceNames = map[string]struct{}{
 	HipChatName: struct{}{},
 }
 
 const HipChatName = "hipchat"
+
+var HipChatLCName = strings.ToLower(HipChatName)
 
 var ErrHipChatRemoved = ErrRemoved(HipChatName)
 
@@ -51,7 +49,7 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) Handle(event alert.Event) {
-	switch s.Name {
+	switch strings.ToLower(s.Name) {
 	case HipChatName:
 		s.diag.Error("failed to send event because service is removed", ErrHipChatRemoved)
 	default:
@@ -79,7 +77,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	switch o.Name {
+	switch strings.ToLower(o.Name) {
 	case HipChatName:
 		return ErrHipChatRemoved
 	default:

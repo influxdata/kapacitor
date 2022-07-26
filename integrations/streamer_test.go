@@ -13812,7 +13812,7 @@ func testStreamerNoOutput(
 	duration time.Duration,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
-	t.Helper()
+	//t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 	err := fastForwardTask(clock, et, replayErr, tm, duration)

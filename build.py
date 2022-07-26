@@ -200,6 +200,8 @@ def run_tests(race, parallel, timeout, verbose):
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
 
+
+
     test_command = "go test --failfast"
     if verbose:
         test_command += " -v"
@@ -209,10 +211,14 @@ def run_tests(race, parallel, timeout, verbose):
         test_command += " -parallel {}".format(parallel)
     if timeout is not None:
         test_command += " -timeout {}".format(timeout)
-    test_command += " ./..."
+    test_command += " -p 1 {}"
     logging.info("Running tests...")
     logging.info("Test command: " + test_command)
-    output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
+    packages = run("go list ./...", printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
+
+    for package in packages.split():
+        if package.strip() != "":
+            run(test_command.format(package), printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
 
 def package_udfs(version, dist_dir):

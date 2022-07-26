@@ -8024,13 +8024,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ts := ctxt.Value("server").(*removedtest.Server)
 				ts.Close()
 				got := ts.Requests()
-				exp := []removedtest.Request{{
-					URL:      "/1234567/notification?auth_token=testtoken1234567",
-					PostData: nil,
-				}}
-				if !reflect.DeepEqual(exp, got) {
-					return fmt.Errorf("unexpected hipchat request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				if len(got) != 0 {
+					fmt.Errorf("unexpected hipchat request, hipchat support has been removed:\ngot\n%+v\n", got)
 				}
+
 				return nil
 			},
 		},

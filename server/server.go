@@ -958,6 +958,7 @@ func (s *Server) appendRemovedServices() {
 	for name := range removed.ServiceNames {
 		srv := removed.NewService(name, vars.Info, s.DiagService.NewRemovedHandler(name))
 		s.AppendService(name, srv)
+		s.AlertService.RemovedService = srv
 		s.SetDynamicService(name, srv)
 	}
 }
