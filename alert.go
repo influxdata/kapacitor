@@ -19,7 +19,6 @@ import (
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -339,24 +338,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
-	for _, hc := range n.HipChatHandlers {
-		c := hipchat.HandlerConfig{
-			Room:  hc.Room,
-			Token: hc.Token,
-		}
-		h := et.tm.HipChatService.Handler(c, ctx...)
-		an.handlers = append(an.handlers, h)
-	}
-	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
-		c := hipchat.HandlerConfig{}
-		h := et.tm.HipChatService.Handler(c, ctx...)
-		an.handlers = append(an.handlers, h)
-	}
-	// If HipChat has been configured with state changes only set it.
-	if et.tm.HipChatService != nil &&
-		et.tm.HipChatService.Global() &&
-		et.tm.HipChatService.StateChangesOnly() {
-		n.IsStateChangesOnly = true
+	for range n.HipChatHandlers {
+		an.handlers = append(an.handlers, et.tm.RemovedService)
 	}
 
 	for _, k := range n.KafkaHandlers {

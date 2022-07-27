@@ -35,7 +35,7 @@ NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 # Home dir of the docker user
 HOME_DIR=/root
 # Go version
-GO_VERSION=1.18
+GO_VERSION=1.18.4
 # GOPATH
 GOPATH=/go
 

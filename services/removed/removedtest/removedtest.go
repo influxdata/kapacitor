@@ -1,4 +1,4 @@
-package hipchattest
+package removedtest
 
 import (
 	"encoding/json"
@@ -47,12 +47,5 @@ func (s *Server) Close() {
 
 type Request struct {
 	URL      string
-	PostData PostData
-}
-
-type PostData struct {
-	From    string `json:"from"`
-	Message string `json:"message"`
-	Color   string `json:"color"`
-	Notify  bool   `json:"notify"`
+	PostData map[string]any
 }

@@ -15,7 +15,7 @@ for file in $(go list -f '{{$dir := .Dir}}{{range .GoFiles}}{{printf "%s/%s\n" $
         # Only print this once.
         HAS_FMT_ERR=1
         echo 'Commit includes files that are not gofmt-ed' && \
-        echo 'run "make fmt"' && \
+        echo 'run "fmt ./..."' && \
         echo ''
       fi
       echo "$FMT_OUT" # Print output and continue, so developers don't fix one file at a t

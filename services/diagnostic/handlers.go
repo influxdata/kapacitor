@@ -20,7 +20,6 @@ import (
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/ec2"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
@@ -31,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
@@ -395,23 +395,6 @@ func (h *AlertaHandler) TemplateError(err error, kv keyvalue.T) {
 }
 
 func (h *AlertaHandler) Error(msg string, err error) {
-	h.l.Error(msg, Error(err))
-}
-
-// HipChat handler
-type HipChatHandler struct {
-	l Logger
-}
-
-func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
-	fields := logFieldsFromContext(ctx)
-
-	return &HipChatHandler{
-		l: h.l.With(fields...),
-	}
-}
-
-func (h *HipChatHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 
@@ -826,6 +809,23 @@ func (h *HTTPPostHandler) WithContext(ctx ...keyvalue.T) httppost.Diagnostic {
 	fields := logFieldsFromContext(ctx)
 
 	return &HTTPPostHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+// Removed handler
+type RemovedHandler struct {
+	l Logger
+}
+
+func (h *RemovedHandler) Error(msg string, err error, ctx ...keyvalue.T) {
+	Err(h.l, msg, err, ctx)
+}
+
+func (h *RemovedHandler) WithContext(ctx ...keyvalue.T) removed.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &RemovedHandler{
 		l: h.l.With(fields...),
 	}
 }

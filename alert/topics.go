@@ -392,6 +392,9 @@ type bufHandler struct {
 }
 
 func newHandler(h Handler, bufferSize int) *bufHandler {
+	if h == nil {
+		panic("here h is nil")
+	}
 	if bufferSize < MinimumEventBufferSize {
 		bufferSize = DefaultEventBufferSize
 	}

@@ -76,7 +76,7 @@ func (c *Config) Init() {
 	c.Name = "default"
 	c.URLs = []string{"http://localhost:8086"}
 	c.ExcludedSubscriptions = map[string][]string{
-		stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
+		stats.DefaultDatabse: {stats.DefaultRetentionPolicy},
 	}
 	c.UDPBuffer = udp.DefaultBuffer
 	c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)

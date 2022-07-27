@@ -29,7 +29,6 @@ import (
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
 	"github.com/influxdata/kapacitor/services/gce"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -44,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/removed"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/scraper"
@@ -96,7 +96,7 @@ type Config struct {
 	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
 	BigPanda   bigpanda.Config   `toml:"bigpanda" override:"bigpanda"`
 	Discord    discord.Configs   `toml:"discord" override:"discord,element-key=workspace"`
-	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
+	HipChat    removed.Config    `toml:"hipchat" override:"hipchat"`
 	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
 	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
 	OpsGenie   opsgenie.Config   `toml:"opsgenie" override:"opsgenie"`
@@ -172,7 +172,7 @@ func NewConfig() *Config {
 	c.Alerta = alerta.NewConfig()
 	c.BigPanda = bigpanda.NewConfig()
 	c.Discord = discord.Configs{discord.NewDefaultConfig()}
-	c.HipChat = hipchat.NewConfig()
+	c.HipChat = removed.NewConfig()
 	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
 	c.OpsGenie = opsgenie.NewConfig()

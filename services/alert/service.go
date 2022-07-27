@@ -16,7 +16,6 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/bigpanda"
 	"github.com/influxdata/kapacitor/services/discord"
-	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/kafka"
@@ -92,9 +91,6 @@ type Service struct {
 	BigPandaService interface {
 		Handler(bigpanda.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
-	HipChatService interface {
-		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
-	}
 	KafkaService interface {
 		Handler(kafka.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
@@ -118,6 +114,9 @@ type Service struct {
 	}
 	HTTPPostService interface {
 		Handler(httppost.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
+	RemovedService interface {
+		Handle(event alert.Event)
 	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
@@ -840,13 +839,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		h = NewExecHandler(c, handlerDiag)
 		h = newExternalHandler(h)
 	case "hipchat":
-		c := hipchat.HandlerConfig{}
-		err = decodeOptions(spec.Options, &c)
-		if err != nil {
-			return handler{}, err
-		}
-		h = s.HipChatService.Handler(c, ctx...)
-		h = newExternalHandler(h)
+		h = newExternalHandler(s.RemovedService)
 	case "kafka":
 		c := kafka.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
