@@ -10602,11 +10602,7 @@ stream
 }
 
 func TestStream_AlertLog(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "TestStream_AlertLog")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	normalPath := filepath.Join(tmpDir, "normal.log")
 	modePath := filepath.Join(tmpDir, "mode.log")
 

@@ -13,11 +13,7 @@ import (
 )
 
 func TestCommand_PIDFile(t *testing.T) {
-	tmpdir, err := ioutil.TempDir(os.TempDir(), "kapacitord-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Write out a config file that does not attempt to connect to influxdb.
 	configFile := filepath.Join(tmpdir, "kapacitor.conf")
