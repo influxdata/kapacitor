@@ -206,7 +206,7 @@ jobs:
             case "<< parameters.build_type >>"
             in
               nightly)
-                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/nightlies/CHANGELOG.md"
+                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/releases/nightly/CHANGELOG.md"
                 ;;
               release)
                 aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/releases/CHANGELOG.<< pipeline.git.tag >>.md"
