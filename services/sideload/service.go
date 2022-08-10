@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,8 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ghodss/yaml"
 	khttp "github.com/influxdata/kapacitor/http"
+
+	"github.com/ghodss/yaml"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -90,7 +92,7 @@ func (s *Service) Reload() error {
 	return nil
 }
 
-func (s *Service) Source(endpoint *httppost.Endpoint) (Source, error) {
+func (s *Service) Source(endpoint *httppost.Endpoint, ttl time.Duration) (Source, error) {
 	var src Source
 	buf := &bytes.Buffer{}
 	if err := endpoint.URL().Execute(buf, map[interface{}]string{}); err != nil {
@@ -109,6 +111,9 @@ func (s *Service) Source(endpoint *httppost.Endpoint) (Source, error) {
 	} else if u.Scheme == "http" || u.Scheme == "https" {
 		src, err = s.sourceHttp(endpoint, u.Scheme)
 	}
+	go func() {
+
+	}()
 
 	return src, err
 }
@@ -143,6 +148,7 @@ func (s *Service) sourceHttp(endpoint *httppost.Endpoint, scheme string) (Source
 
 	return src, nil
 }
+
 func (s *Service) sourceFile(path string) (Source, error) {
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("sideload source path must be absolute %q", path)
@@ -167,8 +173,8 @@ func (s *Service) sourceFile(path string) (Source, error) {
 	src.addToReferenceCount(1)
 
 	return src, nil
-
 }
+
 func (s *Service) removeSource(src *fileSource) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -192,6 +198,8 @@ type fileSource struct {
 	scheme         string
 	cache          map[string]map[string]interface{}
 	referenceCount int
+	ttl            time.Duration
+	lastChecked    time.Time
 }
 
 func (s *fileSource) addToReferenceCount(i int) int {
@@ -203,9 +211,20 @@ func (s *fileSource) Close() {
 	s.s.removeSource(s)
 }
 
+func (s *fileSource) isFresh() bool {
+	if s.ttl > 0 {
+		return s.lastChecked.Add(s.ttl).After(time.Now())
+	}
+	return true
+}
+
 func (s *fileSource) UpdateCache() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.updateCache()
+}
+
+func (s *fileSource) updateCache() error {
 	s.cache = make(map[string]map[string]interface{})
 	err := filepath.Walk(s.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -235,10 +254,17 @@ func (s *fileSource) UpdateCache() error {
 }
 
 func (s *fileSource) Lookup(order []string, key string) (value interface{}) {
-	key = filepath.Clean(key)
-
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	if !s.isFresh() {
+		s.updateCache()
+	}
+	return s.lookup(order, key)
+}
+
+func (s *fileSource) lookup(order []string, key string) (value interface{}) {
+	key = filepath.Clean(key)
 
 	for _, o := range order {
 		values, ok := s.cache[o]
@@ -260,12 +286,27 @@ type httpSource struct {
 	e *httppost.Endpoint
 }
 
+func (s *httpSource) Lookup(order []string, key string) (value interface{}) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.isFresh() {
+		s.updateCache()
+	}
+
+	return s.lookup(order, key)
+}
+
 func (s *httpSource) UpdateCache() error {
 	s.fileSource.mu.Lock()
 	defer s.fileSource.mu.Unlock()
+	return s.updateCache()
+}
+
+func (s *httpSource) updateCache() error {
 	s.fileSource.cache = make(map[string]map[string]interface{})
 
-	req, err := http.NewRequest("GET", s.dir, nil)
+	req, err := http.NewRequest("GET", url.JoinPath(s.dir, s.fileSource.), nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate request to update sideload cache for source %q", s.dir)
 	}
@@ -273,15 +314,20 @@ func (s *httpSource) UpdateCache() error {
 		req.SetBasicAuth(s.e.Auth.Username, s.e.Auth.Password)
 	}
 
-	client := khttp.NewDefaultClient(khttp.DefaultValidator)
+	client := khttp.DefaultClient
 	client.Timeout = time.Second * 10
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
-	values, err := loadValues(resp.Body)
+	contentType := resp.Header.Get("Content-Type")
+	mime, _, err := mime.ParseMediaType(contentType)
+	fmt.Println(mime)
+	if err != nil && err.Error() != "mime: no media type" {
+		return errors.Wrapf(err, "bad mime type")
+	}
+	values, err := loadValues(resp.Body, mime)
 	if err != nil {
 		return errors.Wrapf(err, "failed to load body to update sideload cache for source %q", s.dir)
 	}
@@ -318,14 +364,21 @@ func readValues(p string) (map[string]interface{}, error) {
 	return values, nil
 }
 
-func loadValues(resp io.ReadCloser) (map[string]map[string]interface{}, error) {
+func loadValues(resp io.ReadCloser, mimeType string) (map[string]map[string]interface{}, error) {
 	data, err := ioutil.ReadAll(resp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to read response body")
 	}
 	values := make(map[string]map[string]interface{})
-	if err := json.Unmarshal(data, &values); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal json values in response body")
+	switch mimeType {
+	case "application/yaml":
+		if err := yaml.Unmarshal(data, &values); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal yaml values in response body")
+		}
+	default:
+		if err := json.Unmarshal(data, &values); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal json values in response body")
+		}
 	}
 
 	return values, nil

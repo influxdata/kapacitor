@@ -72,6 +72,8 @@ func NewDefaultClientWithTLS(tlsConfig *tls.Config, urlValidator furl.Validator)
 	}
 }
 
+var DefaultClient = NewDefaultClient(DefaultValidator)
+
 // NewDefaultClient creates a client with sane defaults.
 func NewDefaultClient(urlValidator furl.Validator) *http.Client {
 

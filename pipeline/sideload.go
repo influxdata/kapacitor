@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // Sideload adds fields and tags to points based on hierarchical data from various sources.
@@ -44,7 +45,7 @@ import (
 type SideloadNode struct {
 	chainnode
 
-	// Source for the data, currently only `file://` based sources are supported
+	// Source for the data, currently only `file://` `http://`, and `https://`  based sources are supported
 	Source string `json:"source"`
 
 	// Order is a list of paths that indicate the hierarchical order.
@@ -56,9 +57,13 @@ type SideloadNode struct {
 	// Fields is a list of fields to load.
 	// tick:ignore
 	Fields map[string]interface{} `tick:"Field" json:"fields"`
+
 	// Tags is a list of tags to load.
 	// tick:ignore
 	Tags map[string]string `tick:"Tag" json:"tags"`
+
+	// TTL is a TTL for the source.  A zero means unlimited time to live.
+	TTL time.Duration `tick:"TTL" json:"ttl"`
 }
 
 func newSideloadNode(wants EdgeType) *SideloadNode {
