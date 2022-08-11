@@ -78,15 +78,15 @@ func (s *Server) Restart() {
 }
 
 // OpenServer opens a test server.
-func OpenDefaultServer() (*Server, *client.Client) {
-	c := NewConfig()
+func OpenDefaultServer(t *testing.T) (*Server, *client.Client) {
+	c := NewConfig(t)
 	s := OpenServer(c)
 	client := Client(s)
 	return s, client
 }
 
-func OpenLoadServer() (*Server, *server.Config, *client.Client) {
-	c := NewConfig()
+func OpenLoadServer(t *testing.T) (*Server, *server.Config, *client.Client) {
+	c := NewConfig(t)
 	if err := copyFiles("testdata/load", c.Load.Dir); err != nil {
 		panic(err)
 	}
@@ -260,29 +260,21 @@ func (s *Server) Stats() (stats, error) {
 }
 
 // NewConfig returns the default config with temporary paths.
-func NewConfig() *server.Config {
+func NewConfig(t *testing.T) *server.Config {
 	c := server.NewConfig()
 	c.MQTT = mqtt.Configs{}
 	c.Slack = slack.Configs{slack.NewConfig()}
 	c.Reporting.Enabled = false
-	c.Replay.Dir = MustTempDir()
-	c.Storage.BoltDBPath = filepath.Join(MustTempDir(), "bolt.db")
-	c.DataDir = MustTempDir()
+	c.Replay.Dir = t.TempDir()
+	c.Storage.BoltDBPath = filepath.Join(t.TempDir(), "bolt.db")
+	c.DataDir = t.TempDir()
 	c.HTTP.BindAddress = "127.0.0.1:0"
 	//c.HTTP.BindAddress = "127.0.0.1:9092"
 	//c.HTTP.GZIP = false
 	c.InfluxDB[0].Enabled = false
 	c.Load.Enabled = true
-	c.Load.Dir = MustTempDir()
+	c.Load.Dir = t.TempDir()
 	return c
-}
-
-func MustTempDir() string {
-	d, err := ioutil.TempDir("", "kapacitord-")
-	if err != nil {
-		panic(err)
-	}
-	return d
 }
 
 func configureLogging() {

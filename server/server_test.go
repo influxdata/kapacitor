@@ -182,7 +182,7 @@ func TestService_Authenticate(t *testing.T) {
 				}
 			}))
 			defer srv.Close()
-			c := NewConfig()
+			c := NewConfig(t)
 			c.Auth = auth.NewEnabledConfig()
 			kserver := OpenServer(c)
 			url, err := url.Parse(srv.URL)
@@ -208,7 +208,7 @@ func TestService_Authenticate(t *testing.T) {
 }
 
 func TestServer_Ping(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	_, version, err := cli.Ping()
 	if err != nil {
@@ -220,7 +220,7 @@ func TestServer_Ping(t *testing.T) {
 }
 
 func TestServer_Pprof_Index(t *testing.T) {
-	s, _ := OpenDefaultServer()
+	s, _ := OpenDefaultServer(t)
 	defer s.Close()
 	testCases := []struct {
 		path        string
@@ -269,7 +269,7 @@ func TestServer_Pprof_Index(t *testing.T) {
 	}
 }
 func TestServer_Authenticate_Fail(t *testing.T) {
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
 	cli, err := client.New(client.Config{
@@ -288,7 +288,7 @@ func TestServer_Authenticate_Fail(t *testing.T) {
 }
 
 func TestServer_Authenticate_User(t *testing.T) {
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
 	cli, err := client.New(client.Config{
@@ -327,7 +327,7 @@ func TestServer_Authenticate_Bearer_Fail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	// Use a different secret so the token is invalid
 	conf.HTTP.SharedSecret = secret + "extra secret"
@@ -366,7 +366,7 @@ func TestServer_Authenticate_Bearer_Expired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	conf.HTTP.SharedSecret = secret
 	s := OpenServer(conf)
@@ -404,7 +404,7 @@ func TestServer_Authenticate_Bearer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	conf.HTTP.SharedSecret = secret
 	s := OpenServer(conf)
@@ -430,7 +430,7 @@ func TestServer_Authenticate_Bearer(t *testing.T) {
 
 func TestServer_CreateUser(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
@@ -481,7 +481,7 @@ func TestServer_CreateUser(t *testing.T) {
 	}
 }
 func TestServer_CreateTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -541,7 +541,7 @@ func TestServer_CreateTask(t *testing.T) {
 }
 
 func TestServer_CreateTask_Quiet(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -602,7 +602,7 @@ func TestServer_CreateTask_Quiet(t *testing.T) {
 }
 
 func TestServer_CreateTaskImplicitStream(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -663,7 +663,7 @@ stream
 }
 
 func TestServer_CreateTaskBatch(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -718,7 +718,7 @@ batch
 }
 
 func TestServer_CreateTaskImplicitAndExplicit(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -750,7 +750,7 @@ stream
 }
 
 func TestServer_CreateTaskExplicitUpdateImplicit(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -855,7 +855,7 @@ stream
 }
 
 func TestServer_EnableTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -932,7 +932,7 @@ from1 [avg_exec_time_ns="0s" errors="0" working_cardinality="0" ];
 }
 
 func TestServer_EnableTaskOnCreate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -1002,7 +1002,7 @@ from1 [avg_exec_time_ns="0s" errors="0" working_cardinality="0" ];
 }
 
 func TestServer_DisableTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -1076,7 +1076,7 @@ func TestServer_DisableTask(t *testing.T) {
 }
 
 func TestServer_DeleteTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -1118,7 +1118,7 @@ func TestServer_DeleteTask(t *testing.T) {
 }
 
 func TestServer_TaskNums(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -1241,7 +1241,7 @@ func TestServer_TaskNums(t *testing.T) {
 
 }
 func TestServer_ListTasks(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	count := 10
 
@@ -1319,7 +1319,7 @@ func TestServer_ListTasks(t *testing.T) {
 }
 
 func TestServer_ListTasks_Fields(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	count := 100
 
@@ -1393,7 +1393,7 @@ func TestServer_ListTasks_Fields(t *testing.T) {
 }
 
 func TestServer_CreateTemplate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1440,7 +1440,7 @@ stream
 	}
 }
 func TestServer_UpdateTemplateID(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1525,7 +1525,7 @@ stream
 }
 
 func TestServer_CreateTemplateImplicitAndUpdateExplicitWithTasks(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1657,7 +1657,7 @@ stream
 	}
 }
 func TestServer_UpdateTemplateID_WithTasks(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1724,7 +1724,7 @@ stream
 	}
 }
 func TestServer_UpdateTemplateID_Fail(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1811,7 +1811,7 @@ stream
 	}
 }
 func TestServer_UpdateTemplateID_WithTasks_Fail(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1887,7 +1887,7 @@ stream
 }
 
 func TestServer_DeleteTemplate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -1917,7 +1917,7 @@ func TestServer_DeleteTemplate(t *testing.T) {
 }
 
 func TestServer_CreateTaskFromTemplate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTemplateID"
@@ -2030,7 +2030,7 @@ stream
 }
 
 func TestServer_DynamicStreamTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	testCases := []struct {
@@ -2100,7 +2100,7 @@ b
 }
 
 func TestServer_StreamTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testStreamTask"
@@ -2176,7 +2176,7 @@ test value=1 0000000011
 }
 
 func TestServer_StreamTask_NoRP(t *testing.T) {
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.DefaultRetentionPolicy = "myrp"
 	s := OpenServer(conf)
 	defer s.Close()
@@ -2255,7 +2255,7 @@ test value=1 0000000011
 }
 
 func TestServer_StreamTemplateTask(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2335,7 +2335,7 @@ test value=1 0000000011
 	}
 }
 func TestServer_StreamTemplateTask_MissingVar(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2376,7 +2376,7 @@ stream
 	}
 }
 func TestServer_StreamTemplateTask_AllTypes(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2520,7 +2520,7 @@ test,tag=abc,other=a value=1 0000000021
 }
 
 func TestServer_StreamTemplateTaskFromUpdate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2607,7 +2607,7 @@ test value=1 0000000011
 	}
 }
 func TestServer_StreamTemplateTask_UpdateTemplate(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2704,7 +2704,7 @@ test value=1 0000000011
 	}
 }
 func TestServer_StreamTemplateTask_UpdateTemplate_Rollback(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	templateId := "testStreamTemplate"
@@ -2855,7 +2855,7 @@ test value=1 0000000011
 }
 
 func TestServer_UpdateTaskID(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -2954,7 +2954,7 @@ func TestServer_UpdateTaskID(t *testing.T) {
 	}
 }
 func TestServer_UpdateTaskID_Fail(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -3059,7 +3059,7 @@ func TestServer_UpdateTaskID_Fail(t *testing.T) {
 	}
 }
 func TestServer_UpdateTaskID_Enabled(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testTaskID"
@@ -3157,7 +3157,7 @@ func TestServer_UpdateTaskID_Enabled(t *testing.T) {
 }
 
 func TestServer_StreamTask_AllMeasurements(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testStreamTask"
@@ -3232,7 +3232,7 @@ test0 value=1 0000000011
 }
 
 func TestServer_BatchTask(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	count := 0
 	stopTimeC := make(chan time.Time, 1)
@@ -3357,7 +3357,7 @@ func TestServer_BatchTask(t *testing.T) {
 	}
 }
 func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	count := 0
 	stopTimeC := make(chan time.Time, 1)
@@ -3508,7 +3508,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 }
 
 func TestServer_InvalidBatchTask(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		return nil
@@ -3558,7 +3558,7 @@ func TestServer_InvalidBatchTask(t *testing.T) {
 }
 
 func TestServer_RecordReplayStream(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testStreamTask"
@@ -3568,11 +3568,7 @@ func TestServer_RecordReplayStream(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `stream
     |from()
         .measurement('test')
@@ -3764,7 +3760,7 @@ test value=1 0000000012
 }
 
 func TestServer_RecordReplayStreamWithPost(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testStreamTask"
@@ -3774,11 +3770,7 @@ func TestServer_RecordReplayStreamWithPost(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `stream
     |from()
         .measurement('test')
@@ -3971,7 +3963,7 @@ test value=1 0000000012
 }
 
 func TestServer_RecordReplayBatch(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	value := 0
 	db := NewInfluxDB(func(q string) *iclient.Response {
@@ -4011,11 +4003,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `batch
     |query('SELECT value from mydb.myrp.cpu')
         .period(2s)
@@ -4027,7 +4015,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	_, err = cli.CreateTask(client.CreateTaskOptions{
+	_, err := cli.CreateTask(client.CreateTaskOptions{
 		ID:         id,
 		Type:       ttype,
 		DBRPs:      dbrps,
@@ -4209,7 +4197,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 }
 func TestServer_ReplayBatch(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	value := 0
 	db := NewInfluxDB(func(q string) *iclient.Response {
@@ -4249,11 +4237,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `batch
     |query('SELECT value from mydb.myrp.cpu')
         .period(2s)
@@ -4265,7 +4249,7 @@ func TestServer_ReplayBatch(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	_, err = cli.CreateTask(client.CreateTaskOptions{
+	_, err := cli.CreateTask(client.CreateTaskOptions{
 		ID:         id,
 		Type:       ttype,
 		DBRPs:      dbrps,
@@ -4410,7 +4394,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 }
 
 func TestServer_RecordReplayQuery(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		if len(q) > 6 && q[:6] == "SELECT" {
@@ -4478,11 +4462,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `batch
     |query('SELECT value from mydb.myrp.cpu')
         .period(2s)
@@ -4494,7 +4474,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	_, err = cli.CreateTask(client.CreateTaskOptions{
+	_, err := cli.CreateTask(client.CreateTaskOptions{
 		ID:         id,
 		Type:       ttype,
 		DBRPs:      dbrps,
@@ -4719,7 +4699,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 }
 
 func TestServer_ReplayQuery(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		if len(q) > 6 && q[:6] == "SELECT" {
@@ -4787,11 +4767,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 
-	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tick := `batch
     |query('SELECT value from mydb.myrp.cpu')
         .period(2s)
@@ -4803,7 +4779,7 @@ func TestServer_ReplayQuery(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	_, err = cli.CreateTask(client.CreateTaskOptions{
+	_, err := cli.CreateTask(client.CreateTaskOptions{
 		ID:         id,
 		Type:       ttype,
 		DBRPs:      dbrps,
@@ -4950,7 +4926,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 
 // Test for recording and replaying a stream query where data has missing fields and tags.
 func TestServer_RecordReplayQuery_Missing(t *testing.T) {
-	c := NewConfig()
+	c := NewConfig(t)
 	c.InfluxDB[0].Enabled = true
 	db := NewInfluxDB(func(q string) *iclient.Response {
 		if len(q) > 6 && q[:6] == "SELECT" {
@@ -5088,11 +5064,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 	}}
 
 	// setup temp dir for alert.log
-	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecordingReplay")
-	if err != nil {
-		t.Fatal(err)
-	}
-	//defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	tick := `stream
 	|from()
@@ -5454,11 +5426,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFStreamAgents(t *testing.T) {
-	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tdir)
+	tdir := t.TempDir()
 
 	agents := []struct {
 		buildFunc func() error
@@ -5526,7 +5494,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c := NewConfig()
+		c := NewConfig(t)
 		c.UDF.Functions = map[string]udf.FunctionConfig{
 			"movingAvg": agent.config,
 		}
@@ -5633,11 +5601,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping on windows as unix sockets are not available")
 	}
-	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tdir)
+	tdir := t.TempDir()
 
 	agents := []struct {
 		startFunc func() *exec.Cmd
@@ -5729,10 +5693,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 		cmd := agent.startFunc()
 		cmd.Start()
 		defer cmd.Process.Signal(os.Interrupt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c := NewConfig()
+		c := NewConfig(t)
 		c.UDF.Functions = map[string]udf.FunctionConfig{
 			"mirror": agent.config,
 		}
@@ -5821,11 +5782,7 @@ test,group=a value=0 0000000011
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFBatchAgents(t *testing.T) {
-	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tdir)
+	tdir := t.TempDir()
 
 	agents := []struct {
 		buildFunc func() error
@@ -5893,7 +5850,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c := NewConfig()
+		c := NewConfig(t)
 		c.UDF.Functions = map[string]udf.FunctionConfig{
 			"outliers": agent.config,
 		}
@@ -6064,7 +6021,7 @@ func testBatchAgent(t *testing.T, c *server.Config) {
 }
 
 func TestServer_CreateTask_Defaults(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	baseURL := s.URL()
 
 	body := `
@@ -6121,7 +6078,7 @@ func TestServer_CreateTask_Defaults(t *testing.T) {
 }
 
 func TestServer_ListTask_Defaults(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	baseURL := s.URL()
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
@@ -6182,7 +6139,7 @@ func TestServer_ListTask_Defaults(t *testing.T) {
 }
 
 func TestServer_CreateTask_ValidIDs(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	testCases := []struct {
@@ -6285,7 +6242,7 @@ func TestServer_CreateTask_ValidIDs(t *testing.T) {
 }
 
 func TestServer_CreateRecording_ValidIDs(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	ttype := client.StreamTask
 	dbrps := []client.DBRP{
@@ -6377,7 +6334,7 @@ func TestServer_CreateRecording_ValidIDs(t *testing.T) {
 }
 
 func TestServer_CreateReplay_ValidIDs(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	ttype := client.StreamTask
 	dbrps := []client.DBRP{
@@ -9074,7 +9031,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%s/%s-%d", tc.section, tc.element, i), func(t *testing.T) {
 			// Create default config
-			c := NewConfig()
+			c := NewConfig(t)
 			if tc.setDefaults != nil {
 				tc.setDefaults(c)
 			}
@@ -9108,7 +9065,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 }
 
 func TestServer_ListServiceTests(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	serviceTests, err := cli.ListServiceTests(nil)
 	if err != nil {
@@ -9554,7 +9511,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 }
 
 func TestServer_ListServiceTests_WithPattern(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 	serviceTests, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
 		Pattern: "s*",
@@ -9886,7 +9843,7 @@ func TestServer_DoServiceTest(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Create default config
-		c := NewConfig()
+		c := NewConfig(t)
 		if tc.setDefaults != nil {
 			tc.setDefaults(c)
 		}
@@ -10034,7 +9991,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		// Create default config
-		c := NewConfig()
+		c := NewConfig(t)
 		s := OpenServer(c)
 		cli := Client(s)
 		defer s.Close()
@@ -10145,7 +10102,7 @@ func TestServer_AlertHandlers_disable(t *testing.T) {
 			kind := tc.handler.Kind
 
 			// Create default config
-			c := NewConfig()
+			c := NewConfig(t)
 			var ctxt context.Context
 			if tc.setup != nil {
 				var err error
@@ -10397,7 +10354,7 @@ func TestServer_AlertJSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			// Create default config
-			c := NewConfig()
+			c := NewConfig(t)
 			var options map[string]interface{}
 			ctxt := context.Background()
 			var ts *httptest.Server
@@ -10753,7 +10710,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
-				tdir := MustTempDir()
+				tdir := t.TempDir()
 				p := filepath.Join(tdir, "alert.log")
 
 				ha.Options["path"] = p
@@ -11637,7 +11594,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			kind := tc.handler.Kind
 
 			// Create default config
-			c := NewConfig()
+			c := NewConfig(t)
 			var ctxt context.Context
 			if tc.setup != nil {
 				var err error
@@ -11719,7 +11676,7 @@ func TestServer_Alert_Duration(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -11834,7 +11791,7 @@ func TestServer_Alert_Aggregate(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -11984,7 +11941,7 @@ func TestServer_Alert_Publish(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -12113,7 +12070,7 @@ func TestServer_Alert_Match(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -12235,7 +12192,7 @@ func TestServer_AlertAnonTopic(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -12368,12 +12325,11 @@ func TestServer_AlertTopic_PersistedState(t *testing.T) {
 	}
 	defer ts.Close()
 
-	tmpDir := MustTempDir()
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	tmpPath := filepath.Join(tmpDir, "alert.log")
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -12491,7 +12447,7 @@ func TestServer_Alert_Inhibition(t *testing.T) {
 	//
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	closed := false
@@ -12962,7 +12918,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -13072,7 +13028,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 
 func TestServer_AlertTopic(t *testing.T) {
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -13111,7 +13067,7 @@ func TestServer_AlertListTopics(t *testing.T) {
 	defer ts.Close()
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 	s := OpenServer(c)
 	cli := Client(s)
 	defer s.Close()
@@ -13253,7 +13209,7 @@ func TestServer_AlertHandler_MultipleHandlers(t *testing.T) {
 	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	// Create default config
-	c := NewConfig()
+	c := NewConfig(t)
 
 	// Configure slack
 	slack := slacktest.NewServer()
@@ -13374,7 +13330,7 @@ stream
 }
 
 func TestStorage_Rebuild(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	storages, err := cli.ListStorage()
@@ -13394,7 +13350,7 @@ func TestStorage_Rebuild(t *testing.T) {
 }
 
 func TestStorage_Backup(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	// Create a task
@@ -13481,7 +13437,7 @@ func TestStorage_Backup(t *testing.T) {
 }
 
 func TestLoadService(t *testing.T) {
-	s, c, cli := OpenLoadServer()
+	s, c, cli := OpenLoadServer(t)
 
 	// If the list of test fixtures changes update this list
 	tasks := []string{"base", "cpu_alert", "implicit", "join", "other"}
@@ -13616,13 +13572,12 @@ options:
 }
 
 func TestSideloadService(t *testing.T) {
-	dir := MustTempDir()
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	if err := copyFiles("testdata/sideload", dir); err != nil {
 		t.Fatal(err)
 	}
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	id := "testSideloadTask"
@@ -13703,7 +13658,7 @@ cpu_usage_idle_warn: 8
 }
 
 func TestLogSessions_HeaderJSON(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	u := cli.BaseURL()
@@ -13731,7 +13686,7 @@ func TestLogSessions_HeaderJSON(t *testing.T) {
 }
 
 func TestLogSessions_HeaderGzip(t *testing.T) {
-	s, cli := OpenDefaultServer()
+	s, cli := OpenDefaultServer(t)
 	defer s.Close()
 
 	u := cli.BaseURL()
@@ -13756,7 +13711,7 @@ func TestLogSessions_HeaderGzip(t *testing.T) {
 }
 
 func TestFluxTasks_Basic(t *testing.T) {
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.FluxTask.Enabled = true
 	conf.FluxTask.TaskRunInfluxDB = "none"
 	s := OpenServer(conf)
@@ -13885,7 +13840,7 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 
 func TestServer_Authenticate_Fail_Enterprise(t *testing.T) {
 	t.Parallel()
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
@@ -13906,7 +13861,7 @@ func TestServer_Authenticate_Fail_Enterprise(t *testing.T) {
 
 func TestServer_Authenticate_User_Enterprise(t *testing.T) {
 	t.Parallel()
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
@@ -13952,7 +13907,7 @@ func TestServer_Authenticate_Bearer_Fail_Enterprise(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	// Use a different secret so the token is invalid
@@ -13993,7 +13948,7 @@ func TestServer_Authenticate_Bearer_Expired_Enteprise(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
 	conf.HTTP.SharedSecret = secret
 	s := OpenServer(conf)
@@ -14032,7 +13987,7 @@ func TestServer_Authenticate_Bearer_Enterprise(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	conf.HTTP.SharedSecret = secret
@@ -14079,7 +14034,7 @@ func TestServer_Authenticate_Bearer_PermissionDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	conf.HTTP.SharedSecret = secret
@@ -14134,7 +14089,7 @@ func TestServer_Authenticate_Bearer_PermissionDenied(t *testing.T) {
 
 func TestServer_Authenticate_User_PermissionDenied(t *testing.T) {
 	t.Parallel()
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
@@ -14189,7 +14144,7 @@ func TestServer_Authenticate_User_PermissionDenied(t *testing.T) {
 
 func TestServer_Authenticate_User_Multiple(t *testing.T) {
 	t.Parallel()
-	conf := NewConfig()
+	conf := NewConfig(t)
 	conf.Auth = auth.NewEnabledConfig()
 	conf.HTTP.AuthEnabled = true
 	s := OpenServer(conf)
@@ -14247,7 +14202,7 @@ func TestServer_Authenticate_User_Multiple(t *testing.T) {
 
 func TestServer_UpdateUser_EmptyPermissions(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
@@ -14307,7 +14262,7 @@ func TestServer_UpdateUser_EmptyPermissions(t *testing.T) {
 
 func TestServer_UpdateUser_Password_IgnorePerms(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
@@ -14374,7 +14329,7 @@ func TestServer_UpdateUser_Password_IgnorePerms(t *testing.T) {
 
 func TestServer_UpdateUser_Type(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
@@ -14431,7 +14386,7 @@ func TestServer_UpdateUser_Type(t *testing.T) {
 
 func TestServer_DeleteUser(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
@@ -14470,7 +14425,7 @@ func TestServer_DeleteUser(t *testing.T) {
 }
 func TestServer_ListUsers(t *testing.T) {
 	t.Parallel()
-	config := NewConfig()
+	config := NewConfig(t)
 	config.Auth = auth.NewEnabledConfig()
 	s := OpenServer(config)
 	cli := Client(s)
