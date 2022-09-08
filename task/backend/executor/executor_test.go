@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -301,9 +302,9 @@ func TestConcurrencyLimit(t *testing.T) {
 	tes := taskExecutorSystem(t)
 
 	testScript := `option task = {
-		concurrency: 1,
+		concurrency: 3,
 		name: %q,
-		every: 1m,
+		every: 1s,
 	}
 	from(bucket: "one") |> to(bucket: "two", orgID: "0000000000000000")`
 
@@ -313,31 +314,51 @@ func TestConcurrencyLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	forcedErr := errors.New("forced")
-	forcedQueryErr := taskmodel.ErrQueryError(forcedErr)
+	//forcedQueryErr := taskmodel.ErrQueryError(forcedErr)
 	tes.svc.FailNextQuery(forcedErr)
 
-	count := 0
+	var count int64
 	tes.ex.SetLimitFunc(func(*taskmodel.Task, *taskmodel.Run) error {
-		count++
-		if count < 2 {
-			return errors.New("not there yet")
+		fmt.Printf("limited %d\n", count)
+		atomic.AddInt64(&count, 1)
+		if count > 3 {
+			return fmt.Errorf("we only ran once at a time")
 		}
+		println("here 8")
 		return nil
 	})
+	tes.ex.log = zaptest.NewLogger(t)
 
-	promise, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
+	promise, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(128, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	//promise2, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//promise3, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//promise4, err := tes.ex.PromisedExecute(ctx, scheduler.ID(task.ID), time.Unix(123, 0), time.Unix(126, 0))
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//time.Sleep(10 * time.Second)
+	//
+	_ = promise
+	fmt.Println("here 0")
 	<-promise.Done()
 
-	if got := promise.Error(); got.Error() != forcedQueryErr.Error() {
-		t.Fatal("failed to get failure from forced error")
-	}
+	//if got := promise.Error(); got.Error() != forcedQueryErr.Error() {
+	//	t.Fatal("failed to get failure from forced error")
+	//}
+	fmt.Println("here 1")
 
-	if count != 2 {
+	if atomic.LoadInt64(&count) != 2 {
 		t.Fatalf("failed to call limitFunc enough times: %d", count)
 	}
 }

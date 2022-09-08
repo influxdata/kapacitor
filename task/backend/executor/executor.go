@@ -364,17 +364,21 @@ func (w *worker) work() {
 			return
 		}
 
+		println("here 5")
+
 		// check to make sure we are below the limits.
-		for {
-			err := w.e.limitFunc(prom.task, prom.run)
-			if err == nil {
-				break
-			}
+	limit:
+		println("here 6")
+
+		if err := w.e.limitFunc(prom.task, prom.run); err != nil {
+			println("here 7")
 
 			// add to the run log
 			w.e.tcs.AddRunLog(prom.ctx, prom.task.ID, prom.run.ID, time.Now().UTC(), fmt.Sprintf("Task limit reached: %s", err.Error()))
 
 			// sleep
+			timer := time.NewTimer(10 * time.Millisecond)
+			println("here 4")
 			select {
 			// If done the promise was canceled
 			case <-prom.ctx.Done():
@@ -382,16 +386,24 @@ func (w *worker) work() {
 				w.e.tcs.UpdateRunState(prom.ctx, prom.task.ID, prom.run.ID, time.Now().UTC(), taskmodel.RunCanceled)
 				prom.err = taskmodel.ErrRunCanceled
 				close(prom.done)
+				println("here 3")
+				timer.Stop()
 				return
-			case <-time.After(time.Second):
+			case <-timer.C:
+				println("here 2")
+				timer.Stop()
+				goto limit
 			}
 		}
+		println("here 9")
 
 		// execute the promise
 		w.executeQuery(prom)
+		println("here 10")
 
 		// close promise done channel and set appropriate error
 		close(prom.done)
+		println("here 11")
 
 		// remove promise from registry
 		w.e.currentPromises.Delete(prom.run.ID)
