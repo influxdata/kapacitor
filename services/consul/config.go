@@ -58,7 +58,7 @@ func (c Config) Prom(conf *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (c Config) PromConfig() *consul.SDConfig {
-	return &consul.SDConfig{
+	sdc := &consul.SDConfig{
 		Server:       c.Address,
 		Token:        config2.Secret(c.Token),
 		Datacenter:   c.Datacenter,
@@ -67,14 +67,31 @@ func (c Config) PromConfig() *consul.SDConfig {
 		Username:     c.Username,
 		Password:     config2.Secret(c.Password),
 		Services:     c.Services,
-		TLSConfig: config2.TLSConfig{
-			CAFile:             c.SSLCA,
-			CertFile:           c.SSLCert,
-			KeyFile:            c.SSLKey,
-			ServerName:         c.SSLServerName,
-			InsecureSkipVerify: c.InsecureSkipVerify,
+		HTTPClientConfig: config2.HTTPClientConfig{
+			BasicAuth:       nil,
+			Authorization:   nil,
+			OAuth2:          nil,
+			BearerToken:     config2.Secret(c.Token),
+			BearerTokenFile: "",
+			ProxyURL:        config2.URL{},
+			TLSConfig: config2.TLSConfig{
+				CAFile:             c.SSLCA,
+				CertFile:           c.SSLCert,
+				KeyFile:            c.SSLKey,
+				ServerName:         c.SSLServerName,
+				InsecureSkipVerify: c.InsecureSkipVerify,
+			},
+			FollowRedirects: false,
+			EnableHTTP2:     false,
 		},
 	}
+	if c.Username != "" || c.Password != "" {
+		sdc.HTTPClientConfig.BasicAuth = &config2.BasicAuth{
+			Username: c.Username,
+			Password: config2.Secret(c.Password),
+		}
+	}
+	return sdc
 }
 
 // Service return discoverer type

@@ -8,7 +8,7 @@ import (
 
 	"github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/scraper"
-	pec2 "github.com/prometheus/prometheus/discovery/ec2"
+	pec2 "github.com/prometheus/prometheus/discovery/aws"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -159,7 +159,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pec2.NewDiscovery(sd, s.diag)
+	discoverer := pec2.NewEC2Discovery(sd, s.diag)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*targetgroup.Group)

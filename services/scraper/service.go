@@ -10,12 +10,12 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
-	plog "github.com/prometheus/common/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
-	"github.com/prometheus/prometheus/pkg/exemplar"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/exemplar"
+	"github.com/prometheus/prometheus/model/labels"
+	pmeta "github.com/prometheus/prometheus/model/metadata"
 	"github.com/prometheus/prometheus/scrape"
 	"github.com/prometheus/prometheus/storage"
 )
@@ -25,9 +25,36 @@ var (
 	_ storage.Appender = &ServiceAppenderAdapter{}
 )
 
+type Logger interface {
+	Debug(...interface{})
+	Debugln(...interface{})
+	Debugf(string, ...interface{})
+
+	Info(...interface{})
+	Infoln(...interface{})
+	Infof(string, ...interface{})
+
+	Warn(...interface{})
+	Warnln(...interface{})
+	Warnf(string, ...interface{})
+
+	Error(...interface{})
+	Errorln(...interface{})
+	Errorf(string, ...interface{})
+
+	Fatal(...interface{})
+	Fatalln(...interface{})
+	Fatalf(string, ...interface{})
+
+	With(key string, value interface{}) Logger
+
+	SetFormat(string) error
+	SetLevel(string) error
+}
+
 // Prometheus logger
 type Diagnostic interface {
-	plog.Logger
+	Logger
 	Log(...interface{}) error
 }
 
@@ -77,7 +104,7 @@ func NewService(c []Config, d Diagnostic) *Service {
 	var ctxScrape context.Context
 	ctxScrape, s.cancelScrape = context.WithCancel(context.Background())
 	s.discoveryManager = discovery.NewManager(ctxScrape, d, discovery.Name("discoveryScrapeManager"))
-	s.scrapeManager = scrape.NewManager(d, &appendable{&ServiceAppenderAdapter{s}})
+	s.scrapeManager = scrape.NewManager(nil, d, &appendable{&ServiceAppenderAdapter{s}})
 
 	return s
 }
@@ -179,12 +206,12 @@ func (s *Service) scrape() {
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
-func (s *ServiceAppenderAdapter) Append(ref uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
+func (s *ServiceAppenderAdapter) Append(ref storage.SeriesRef, labels labels.Labels, timestamp int64, value float64) (storage.SeriesRef, error) {
 	return s.Wrapped.Append(ref, labels, timestamp, value)
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
-func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
+func (s *Service) Append(_ storage.SeriesRef, labels labels.Labels, timestamp int64, value float64) (storage.SeriesRef, error) {
 	// Remove all NaN values
 	// TODO: Add counter stat for this variable
 	if math.IsNaN(value) {
@@ -236,8 +263,12 @@ func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value 
 	))
 }
 
+func (s *ServiceAppenderAdapter) UpdateMetadata(ref storage.SeriesRef, l labels.Labels, m pmeta.Metadata) (storage.SeriesRef, error) {
+	panic("unimplemented")
+}
+
 // conforms to Appender interface
-func (s *ServiceAppenderAdapter) AppendExemplar(uint64, labels.Labels, exemplar.Exemplar) (uint64, error) {
+func (s *ServiceAppenderAdapter) AppendExemplar(storage.SeriesRef, labels.Labels, exemplar.Exemplar) (storage.SeriesRef, error) {
 	// We don't support exemplars
 	return 0, nil
 }

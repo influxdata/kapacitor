@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/servicenow"
 	"github.com/influxdata/kapacitor/services/sideload"
@@ -46,7 +47,6 @@ import (
 	"github.com/influxdata/kapacitor/services/zenoss"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/uuid"
-	plog "github.com/prometheus/common/log"
 )
 
 func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
@@ -1250,7 +1250,7 @@ func (h *ScraperHandler) Fatalf(s string, ctx ...interface{}) {
 	h.l.Error(fmt.Sprintf(s, ctx...))
 }
 
-func (h *ScraperHandler) With(key string, value interface{}) plog.Logger {
+func (h *ScraperHandler) With(key string, value interface{}) scraper.Logger {
 	var field Field
 
 	switch value.(type) {
