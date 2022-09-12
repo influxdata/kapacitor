@@ -1,5 +1,5 @@
 ARG GO_VERSION
-FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-906fbe93f953b47185818364a186604209dc8da0
+FROM quay.io/influxdb/cross-builder:go${GO_VERSION}-9c97f2f2903566a00bd4b00184aeca0c813adda0
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
