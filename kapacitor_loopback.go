@@ -9,10 +9,6 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
-const (
-	statsKapacitorLoopbackPointsWritten = "points_written"
-)
-
 type KapacitorLoopbackNode struct {
 	node
 	k *pipeline.KapacitorLoopbackNode

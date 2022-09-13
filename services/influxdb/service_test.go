@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -71,7 +70,6 @@ type tokenGrant struct {
 
 func TestService_Open_LinkSubscriptions(t *testing.T) {
 	type clusterInfo struct {
-		name  string
 		dbrps map[string][]string
 		// Map of db names to list of rp that have subs
 		subs map[string][]string
@@ -1305,13 +1303,6 @@ func (c influxDBClient) Update(config influxcli.Config) error {
 
 func (c influxDBClient) CreateBucketV2(bucket string, org string, orgID string) error {
 	return nil
-}
-
-type logSerivce struct {
-}
-
-func (logSerivce) NewLogger(p string, flags int) *log.Logger {
-	return log.New(os.Stderr, p, flags)
 }
 
 type httpdService struct {

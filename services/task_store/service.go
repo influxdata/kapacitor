@@ -72,12 +72,6 @@ type Service struct {
 	diag Diagnostic
 }
 
-type taskStore struct {
-	Name       string
-	Type       kapacitor.TaskType
-	TICKScript string
-}
-
 func NewService(conf Config, d Diagnostic) *Service {
 	return &Service{
 		snapshotInterval: time.Duration(conf.SnapshotInterval),
@@ -743,7 +737,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		// Set tick script
 		newTask.TICKscript = task.TICKscript
 		if newTask.TICKscript == "" {
-			httpd.HttpError(w, fmt.Sprintf("must provide TICKscript"), true, http.StatusBadRequest)
+			httpd.HttpError(w, "must provide TICKscript", true, http.StatusBadRequest)
 			return
 		}
 	}
@@ -1705,7 +1699,7 @@ func (ts *Service) handleCreateTemplate(w http.ResponseWriter, r *http.Request) 
 	// Set tick script
 	newTemplate.TICKscript = template.TICKscript
 	if newTemplate.TICKscript == "" {
-		httpd.HttpError(w, fmt.Sprintf("must provide TICKscript"), true, http.StatusBadRequest)
+		httpd.HttpError(w, "must provide TICKscript", true, http.StatusBadRequest)
 		return
 	}
 

@@ -62,10 +62,6 @@ type Service struct {
 	authCache map[string]authCred
 	authMU    sync.RWMutex
 
-	path string
-
-	retentionAutoCreate bool
-
 	// Plutonium Meta Control client
 	pmClient *meta.Client
 }
@@ -562,6 +558,10 @@ func (s *Service) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rawUsers, err := s.users.List(pattern, int(offset), int(limit))
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid pattern %q: %s", pattern, err), true, http.StatusBadRequest)
+	}
+
 	users := make([]map[string]interface{}, len(rawUsers))
 
 	for i, user := range rawUsers {
@@ -804,40 +804,6 @@ func (s *Service) convertToAuthUser(u User) (auth.User, error) {
 	}
 	au := auth.NewUser(u.Name, u.Hash, u.Admin, privileges)
 	return au, nil
-}
-
-// Convert an auth.User into a user for the store.
-func (s *Service) convertFromAuthUser(au auth.User) (User, error) {
-	u := User{
-		Name:  au.Name(),
-		Admin: au.IsAdmin(),
-		Hash:  au.Hash(),
-	}
-	if !u.Admin {
-		privileges := au.Privileges()
-		u.Privileges = make(map[string][]Privilege, len(privileges))
-		for r, ps := range privileges {
-			for _, p := range ps {
-				var priv Privilege
-				switch p {
-				case auth.NoPrivileges:
-					priv = NoPrivileges
-				case auth.ReadPrivilege:
-					priv = ReadPrivilege
-				case auth.WritePrivilege:
-					priv = WritePrivilege
-				case auth.DeletePrivilege:
-					priv = DeletePrivilege
-				case auth.AllPrivileges:
-					priv = AllPrivileges
-				default:
-					return User{}, fmt.Errorf("unknown auth.Privilege %v", p)
-				}
-				u.Privileges[r] = append(u.Privileges[r], priv)
-			}
-		}
-	}
-	return u, nil
 }
 
 // Convert a meta.User into a user for the store.

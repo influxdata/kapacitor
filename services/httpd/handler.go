@@ -576,11 +576,6 @@ func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
 	w.Write(b)
 }
 
-func resultError(w http.ResponseWriter, result query.Result, code int) {
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(&result)
-}
-
 // Filters and filter helpers
 
 // authenticate wraps a handler and ensures that if user credentials are passed in

@@ -320,7 +320,7 @@ func (s *Service) Test(options interface{}) error {
 
 	// Get client and ping the cluster
 	cli := cluster.NewClient()
-	_, _, err := cli.Ping(nil)
+	_, _, err := cli.Ping(context.Background())
 	if err != nil {
 		return errors.Wrapf(err, "failed to ping the influxdb cluster %q", o.Cluster)
 	}
@@ -388,7 +388,6 @@ type influxdbCluster struct {
 	clusterName              string
 	influxdbConfig           influxdb.Config
 	client                   influxdb.ClientUpdater
-	i                        int
 	configSubs               map[subEntry]bool
 	exConfigSubs             map[subEntry]bool
 	hostname                 string
@@ -738,7 +737,7 @@ func (c *influxdbCluster) watchSubs() {
 		c.subSyncTicker = time.NewTicker(c.subscriptionSyncInterval)
 		ticker := c.subSyncTicker
 		go func() {
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.LinkSubscriptions()
 			}
 		}()

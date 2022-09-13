@@ -12,7 +12,6 @@ import (
 type LogNode struct {
 	node
 
-	key    string
 	level  string
 	prefix string
 	buf    bytes.Buffer

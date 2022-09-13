@@ -79,7 +79,6 @@ type {{.name}}PointEmitter struct {
 	baseReduceContext
 	emitter query.{{.Name}}PointEmitter
 	isSimpleSelector bool
-    byName bool
 }
 
 func (e *{{.name}}PointEmitter) EmitPoint() (edge.PointMessage, error) {

@@ -3,6 +3,7 @@ package influxdb
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -116,7 +117,7 @@ func TestClient_Ping(t *testing.T) {
 	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
 
-	_, _, err := c.Ping(nil)
+	_, _, err := c.Ping(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
@@ -133,7 +134,7 @@ func TestClient_Update(t *testing.T) {
 	config := Config{URLs: []string{ts0.URL}}
 	c, _ := NewHTTPClient(config)
 
-	_, _, err := c.Ping(nil)
+	_, _, err := c.Ping(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
@@ -147,7 +148,7 @@ func TestClient_Update(t *testing.T) {
 	config.URLs = []string{ts1.URL}
 	c.Update(config)
 
-	_, _, err = c.Ping(nil)
+	_, _, err = c.Ping(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
@@ -194,7 +195,7 @@ func TestClient_Concurrent_Use(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < n; i++ {
-			c.Ping(nil)
+			c.Ping(context.Background())
 		}
 	}()
 	wg.Wait()
@@ -402,7 +403,7 @@ func TestClient_UserAgent(t *testing.T) {
 
 		receivedUserAgent = ""
 		code = http.StatusNoContent
-		_, _, err = c.Ping(nil)
+		_, _, err = c.Ping(context.Background())
 		if err != nil {
 			t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 		}

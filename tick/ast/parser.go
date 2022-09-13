@@ -44,7 +44,7 @@ func ParseLambda(text string) (*LambdaNode, error) {
 }
 
 func (p *parser) hasNewLine(start, end int) bool {
-	return strings.IndexRune(p.text[start:end], '\n') != -1
+	return strings.ContainsRune(p.text[start:end], '\n')
 }
 
 // --------------------
@@ -174,7 +174,6 @@ func (p *parser) recover(errp *error) {
 		}
 		*errp = e.(error)
 	}
-	return
 }
 
 // stopParse terminates parsing.

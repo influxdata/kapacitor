@@ -580,12 +580,6 @@ func newEc2AutoscaleNode(et *ExecutingTask, n *pipeline.Ec2AutoscaleNode, d Node
 	)
 }
 
-type ec2ResourceID string
-
-func (id ec2ResourceID) ID() string {
-	return string(id)
-}
-
 func (a *ec2Autoscaler) ResourceIDFromTags(tags models.Tags) (resourceID, error) {
 	// Get the name of the resource
 	var name string

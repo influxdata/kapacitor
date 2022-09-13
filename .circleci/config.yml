@@ -146,6 +146,9 @@ jobs:
       - run:
           name: go vet
           command: go vet ./...
+      - run:
+          name: staticcheck
+          command:  go run honnef.co/go/tools/cmd/staticcheck ./...
 
   release:
     executor: cross-builder

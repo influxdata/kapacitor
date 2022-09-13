@@ -21,14 +21,6 @@ func (b BasicAuth) valid() bool {
 	return b.Username != "" && b.Password != ""
 }
 
-func (b BasicAuth) validate() error {
-	if !b.valid() {
-		return errors.New("basic-auth must set both \"username\" and \"password\" parameters")
-	}
-
-	return nil
-}
-
 // Config is the configuration for a single [[httppost]] section of the kapacitor
 // configuration file.
 type Config struct {

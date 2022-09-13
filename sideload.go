@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/url"
 	"strconv"
-	"text/template"
 	text "text/template"
 
 	"github.com/influxdata/kapacitor/bufpool"
@@ -94,13 +93,13 @@ type orderTmpl struct {
 	bufferPool *bufpool.Pool
 }
 
-func newOrderTmpl(text string, bp *bufpool.Pool) (orderTmpl, error) {
-	t, err := template.New("order").Parse(text)
+func newOrderTmpl(tmpl string, bp *bufpool.Pool) (orderTmpl, error) {
+	t, err := text.New("order").Parse(tmpl)
 	if err != nil {
 		return orderTmpl{}, err
 	}
 	return orderTmpl{
-		raw:        text,
+		raw:        tmpl,
 		tmpl:       t,
 		bufferPool: bp,
 	}, nil

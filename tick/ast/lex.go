@@ -397,7 +397,7 @@ func lexToken(l *lexer) stateFn {
 const unaryOperatorChars = "-!"
 
 func isUnaryOperatorChar(r rune) bool {
-	return strings.IndexRune(unaryOperatorChars, r) != -1
+	return strings.ContainsRune(unaryOperatorChars, r)
 }
 
 func lexUnaryOperator(l *lexer) stateFn {
@@ -513,7 +513,7 @@ func isSpace(r rune) bool {
 const durationUnits = "uµsmhdw"
 
 func isDurUnit(r rune) bool {
-	return strings.IndexRune(durationUnits, r) != -1
+	return strings.ContainsRune(durationUnits, r)
 }
 
 func lexNumberOrDurationOrDot(l *lexer) stateFn {

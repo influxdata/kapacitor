@@ -20,7 +20,6 @@ type Diagnostic interface {
 }
 
 type SessionService struct {
-	diag   Diagnostic
 	routes []httpd.Route
 
 	SessionsStore SessionsStore

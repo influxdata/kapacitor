@@ -165,8 +165,7 @@ func (r noopReceiver) Done() {
 }
 
 func BenchmarkConsumer(b *testing.B) {
-	var msg edge.Message
-	msg = batch
+	var msg edge.Message = batch
 	count := defaultEdgeBufferSize * 10
 	b.ReportAllocs()
 	b.ResetTimer()

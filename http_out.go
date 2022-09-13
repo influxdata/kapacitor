@@ -138,7 +138,6 @@ func (n *HTTPOutNode) deleteGroup(idx int) {
 
 type httpOutGroup struct {
 	n      *HTTPOutNode
-	id     models.GroupID
 	idx    int
 	buffer *edge.BatchBuffer
 }

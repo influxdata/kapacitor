@@ -1161,11 +1161,7 @@ func (s *Server) startServices() error {
 
 // Watch if something dies
 func (s *Server) watchServices() {
-	var err error
-	select {
-	case err = <-s.HTTPDService.Err():
-	}
-	s.err <- err
+	s.err <- <-s.HTTPDService.Err()
 }
 
 func (s *Server) watchConfigUpdates() {
@@ -1367,11 +1363,6 @@ func (s *Server) stopProfile() {
 		s.Diag.Info("mem profile stopped")
 	}
 }
-
-type tcpaddr struct{ host string }
-
-func (a *tcpaddr) Network() string { return "tcp" }
-func (a *tcpaddr) String() string  { return a.host }
 
 type Queryexecutor struct{}
 

@@ -76,9 +76,6 @@ func Test_HashPartitioners(t *testing.T) {
 }
 
 func Test_murmur2Hash(t *testing.T) {
-	type args struct {
-		data []byte
-	}
 	tests := []struct {
 		data string
 		want int32 // this has to be int because the java library uses signed ints

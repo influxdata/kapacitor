@@ -1,7 +1,6 @@
 package kapacitor
 
 import (
-	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -16,7 +15,6 @@ type UnionNode struct {
 	sources []*CircularQueue[timeMessage]
 	// the low water marks for each source.
 	lowMarks []time.Time
-	lock     sync.Mutex
 	rename   string
 }
 

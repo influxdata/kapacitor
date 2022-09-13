@@ -19,7 +19,7 @@ func Test_TypeOf(t *testing.T) {
 		{value: int64(0), valueType: ast.TInt},
 		{value: "Kapacitor Rulz", valueType: ast.TString},
 		{value: true, valueType: ast.TBool},
-		{value: regexp.MustCompile("\\d"), valueType: ast.TRegex},
+		{value: regexp.MustCompile(`\d`), valueType: ast.TRegex},
 		{value: time.Duration(5), valueType: ast.TDuration},
 		{value: time.Time{}, valueType: ast.TTime},
 		{value: ast.MissingValue, valueType: ast.TMissing},

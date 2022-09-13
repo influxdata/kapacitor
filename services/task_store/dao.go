@@ -466,6 +466,9 @@ func (d *templateKV) List(pattern string, offset, limit int) (templates []Templa
 				return err
 			}
 			t, err := d.decodeTemplate(data.Value)
+			if err != nil {
+				return err
+			}
 			templates[i] = t
 		}
 		return nil

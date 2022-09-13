@@ -81,7 +81,6 @@ type floatPointEmitter struct {
 	baseReduceContext
 	emitter          query.FloatPointEmitter
 	isSimpleSelector bool
-	byName           bool
 }
 
 func (e *floatPointEmitter) EmitPoint() (edge.PointMessage, error) {
@@ -239,7 +238,6 @@ type integerPointEmitter struct {
 	baseReduceContext
 	emitter          query.IntegerPointEmitter
 	isSimpleSelector bool
-	byName           bool
 }
 
 func (e *integerPointEmitter) EmitPoint() (edge.PointMessage, error) {
@@ -397,7 +395,6 @@ type stringPointEmitter struct {
 	baseReduceContext
 	emitter          query.StringPointEmitter
 	isSimpleSelector bool
-	byName           bool
 }
 
 func (e *stringPointEmitter) EmitPoint() (edge.PointMessage, error) {
@@ -555,7 +552,6 @@ type booleanPointEmitter struct {
 	baseReduceContext
 	emitter          query.BooleanPointEmitter
 	isSimpleSelector bool
-	byName           bool
 }
 
 func (e *booleanPointEmitter) EmitPoint() (edge.PointMessage, error) {

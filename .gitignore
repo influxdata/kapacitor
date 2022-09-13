@@ -26,3 +26,7 @@ kapacitor*.zip
 
 # Ignore go vendor directory
 /vendor
+
+#don't ignore staticcheck.conf files
+!/staticcheck.conf
+

@@ -194,7 +194,6 @@ func (n *InfluxDBOutNode) write(db, rp string, batch edge.BufferedBatchMessage) 
 type writeBuffer struct {
 	size          int
 	flushInterval time.Duration
-	errC          chan error
 	queue         chan queueEntry
 	buffer        map[influxdb.BatchPointsConfig]influxdb.BatchPoints
 
