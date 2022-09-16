@@ -12,10 +12,7 @@ func (c Client) Client(string) (client.Client, error) {
 	return c, nil
 }
 func (c Client) Scales(namespace string) client.ScalesInterface {
-	return Scales{
-		ScalesGetFunc:    c.ScalesGetFunc,
-		ScalesUpdateFunc: c.ScalesUpdateFunc,
-	}
+	return Scales(c)
 }
 
 func (c Client) Versions() (client.APIVersions, error) {

@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -23,9 +22,7 @@ type HTTPPostNode struct {
 	node
 	c        *pipeline.HTTPPostNode
 	endpoint *httppost.Endpoint
-	mu       sync.RWMutex
 	timeout  time.Duration
-	hc       *http.Client
 }
 
 // Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint

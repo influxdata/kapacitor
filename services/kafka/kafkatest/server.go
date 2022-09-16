@@ -262,7 +262,7 @@ func (s *Server) readProduceRequest(request []byte) (string, []produceResponse, 
 	pos += n
 
 	// Read array len
-	arrayLen := readInt32(request[pos:])
+	_ = readInt32(request[pos:])
 	pos += 4
 
 	// Read partition ID
@@ -293,7 +293,7 @@ func (s *Server) readProduceRequest(request []byte) (string, []produceResponse, 
 	pos += 2 // skip poducer epoch
 	pos += 4 // skip base Sequence
 
-	arrayLen = readInt32(request[pos:])
+	arrayLen := readInt32(request[pos:])
 	pos += 4
 
 	_, n = binary.Varint(request[pos:]) // skip over the length of bytes of the message
@@ -355,17 +355,7 @@ func readStr(buf []byte) (string, int) {
 	n := int(int16(binary.BigEndian.Uint16(buf[:2])))
 	return string(buf[2 : 2+n]), n + 2
 }
-func readByteArray(buf []byte) ([]byte, int) {
-	n := int(int32(binary.BigEndian.Uint32(buf[:4])))
-	if n == -1 {
-		return nil, n + 4
-	}
-	return buf[4 : 4+n], n + 4
-}
 
-func readInt16(buf []byte) int16 {
-	return int16(binary.BigEndian.Uint16(buf[:2]))
-}
 func readInt32(buf []byte) int32 {
 	return int32(binary.BigEndian.Uint32(buf[:4]))
 }

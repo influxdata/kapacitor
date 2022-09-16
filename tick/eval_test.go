@@ -15,7 +15,7 @@ import (
 )
 
 //Test structure for evaluating a DSL
-
+//lint:ignore U1000 // we need this for an accurate test
 type structA struct {
 	s *structB
 }
@@ -902,6 +902,7 @@ func (a *A) HiddenChainMethod() *A {
 	return new(A)
 }
 
+//lint:ignore U1000 // we need this for an accurate test
 func (a *A) privateMethod() {}
 
 // Type that embeds A

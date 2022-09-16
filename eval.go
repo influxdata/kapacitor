@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -19,8 +18,6 @@ type EvalNode struct {
 	refVarList  [][]string
 	scopePool   stateful.ScopePool
 	tags        map[string]bool
-
-	evalErrors *expvar.Int
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.

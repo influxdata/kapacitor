@@ -38,7 +38,7 @@ func (w *wallclock) Zero() time.Time {
 }
 
 func (w *wallclock) Until(t time.Time) {
-	time.Sleep(t.Sub(time.Now()))
+	time.Sleep(time.Until(t))
 }
 
 func (w *wallclock) Set(t time.Time) {}

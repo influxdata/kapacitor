@@ -43,7 +43,6 @@ func (q *CircularQueue[T]) Enqueue(v T) {
 	}
 	q.Len++
 	q.tail++
-	return
 }
 
 // Dequeue removes n items from the queue. If n is longer than the number of the items in the queue it will clear them all out.
@@ -80,7 +79,6 @@ func (q *CircularQueue[T]) Dequeue(n int) {
 		q.head = 0
 		q.tail = 0
 	}
-	return
 }
 
 // Peek peeks i ahead of the current head of queue.  It should be used in conjunction with .Len() to prevent a panic.

@@ -29,15 +29,13 @@ func NewFluxQueryResponse(r io.Reader) (*Response, error) {
 // Delimiter:   ",",
 // Header:      true,
 type responseBuilder struct {
-	colNames       []string
-	colNamesMap    map[string]int
-	tags           []int
-	measurementCol int
-	fields         []int
-	defaultVals    []string
-	Err            error
-	buf            []imodels.Row
-	seriesBuf      *imodels.Row
+	colNames    []string
+	colNamesMap map[string]int
+	tags        []int
+	fields      []int
+	Err         error
+	buf         []imodels.Row
+	seriesBuf   *imodels.Row
 }
 
 func (q *responseBuilder) TableStart(meta FluxTableMetaData, firstRow []string) {

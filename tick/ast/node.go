@@ -151,7 +151,7 @@ func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteString(strconv.FormatInt(n.Int64, n.Base))
 	} else {
 		s := strconv.FormatFloat(n.Float64, 'f', -1, 64)
-		if strings.IndexRune(s, '.') == -1 {
+		if !strings.ContainsRune(s, '.') {
 			s += ".0"
 		}
 		buf.WriteString(s)

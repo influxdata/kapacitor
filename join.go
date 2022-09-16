@@ -549,7 +549,6 @@ type joinset struct {
 
 	expected int
 	size     int
-	finished int
 
 	first int
 
@@ -760,12 +759,4 @@ BATCH_POINT:
 		newPoints,
 		edge.NewEndBatchMessage(),
 	), nil
-}
-
-type durationVar struct {
-	expvar.Int
-}
-
-func (d *durationVar) String() string {
-	return time.Duration(d.IntValue()).String()
 }

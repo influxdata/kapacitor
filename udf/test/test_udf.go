@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
@@ -13,12 +12,9 @@ import (
 
 var diagService *diagnostic.Service
 
-var kapacitorDiag kapacitor.Diagnostic
-
 func init() {
 	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
 	diagService.Open()
-	kapacitorDiag = diagService.NewKapacitorHandler()
 }
 
 // IO implements a UDF process communication.

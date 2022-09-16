@@ -42,7 +42,7 @@ var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
 var kapacitordURL = mainFlags.String("url", "", "The URL http(s)://host:port of the kapacitord server. Defaults to the KAPACITOR_URL environment variable or "+defaultURL+" if not set.")
 var skipVerify = mainFlags.Bool("skipVerify", false, "Disable SSL verification (note, this is insecure). Defaults to the KAPACITOR_UNSAFE_SSL environment variable or "+strconv.FormatBool(defaultSkipVerify)+" if not set.")
 
-var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
+var _ = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
 var kCli *client.Client
 
@@ -100,7 +100,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if *skipVerify != false {
+	if *skipVerify {
 		skipSSL = *skipVerify
 	}
 
@@ -223,7 +223,7 @@ func main() {
 
 	err = commandF(commandArgs)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, fmt.Sprintf("Error: %s", err.Error()))
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		os.Exit(3)
 	}
 }
@@ -244,15 +244,6 @@ func init() {
 }
 
 // helper methods
-
-type responseError struct {
-	Err string `json:"Error"`
-}
-
-func (e responseError) Error() string {
-	return e.Err
-}
-
 func connect(url string, skipSSL bool) (*client.Client, error) {
 	return client.New(client.Config{
 		URL:                url,
@@ -2281,16 +2272,6 @@ func doVars(args []string) error {
 	defer r.Body.Close()
 	io.Copy(os.Stdout, r.Body)
 	return nil
-}
-
-// Service-Test
-func serviceTestUsage() {
-	var u = `Usage: kapacitor service-tests <service name...>
-
-	Perform the service test using defaults.
-	The service name can be a glob style pattern.
-`
-	fmt.Fprintln(os.Stderr, u)
 }
 
 func doServiceTest(args []string) error {

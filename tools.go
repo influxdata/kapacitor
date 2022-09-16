@@ -13,4 +13,5 @@ import (
 	// so we can use the rust dependencies of flux
 	_ "github.com/influxdata/pkg-config"
 	_ "github.com/mailru/easyjson/easyjson"
+	_ "honnef.co/go/tools/cmd/staticcheck"
 )

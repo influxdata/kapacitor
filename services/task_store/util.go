@@ -25,14 +25,13 @@ func newProgramNodeFromTickscript(tickscript string) (*ast.ProgramNode, error) {
 }
 
 func dbrpsFromProgram(n *ast.ProgramNode) []client.DBRP {
-	dbrps := []client.DBRP{}
+	var dbrps []client.DBRP
 	for _, nn := range n.Nodes {
-		switch nn.(type) {
+		switch nn := nn.(type) {
 		case *ast.DBRPNode:
-			dbrpn := nn.(*ast.DBRPNode)
 			dbrpc := client.DBRP{
-				Database:        dbrpn.DB.Reference,
-				RetentionPolicy: dbrpn.RP.Reference,
+				Database:        nn.DB.Reference,
+				RetentionPolicy: nn.RP.Reference,
 			}
 			dbrps = append(dbrps, dbrpc)
 		default:
@@ -51,11 +50,11 @@ func taskTypeFromProgram(n *ast.ProgramNode) client.TaskType {
 			n := node.Right
 		DeclLoop:
 			for {
-				switch n.(type) {
+				switch nInner := n.(type) {
 				case *ast.ChainNode:
-					n = n.(*ast.ChainNode).Left
+					n = nInner.Left
 				case *ast.IdentifierNode:
-					if ident := n.(*ast.IdentifierNode).Ident; ident == "batch" || ident == "stream" {
+					if ident := nInner.Ident; ident == "batch" || ident == "stream" {
 						tts = append(tts, ident)
 					}
 					break DeclLoop
@@ -67,11 +66,11 @@ func taskTypeFromProgram(n *ast.ProgramNode) client.TaskType {
 			n := node.Left
 		ChainLoop:
 			for {
-				switch n.(type) {
+				switch nInner := n.(type) {
 				case *ast.ChainNode:
-					n = n.(*ast.ChainNode).Left
+					n = nInner.Left
 				case *ast.IdentifierNode:
-					if ident := n.(*ast.IdentifierNode).Ident; ident == "batch" || ident == "stream" {
+					if ident := nInner.Ident; ident == "batch" || ident == "stream" {
 						tts = append(tts, ident)
 					}
 					break ChainLoop

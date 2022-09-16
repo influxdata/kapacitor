@@ -314,7 +314,7 @@ func getConstructor(target string, sources ...*Node) *Method {
 
 	for _, source := range sources {
 		for _, meth := range source.Methods {
-			if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
+			if strings.EqualFold(meth.Name, target) {
 				return meth
 			}
 		}
@@ -584,7 +584,7 @@ func (n *Node) renderPropertiesTable(buf *bytes.Buffer, nodes map[string]*Node) 
 		props := make([]string, len(n.Properties))
 		i := 0
 
-		for name, _ := range n.Properties {
+		for name := range n.Properties {
 			props[i] = name
 			i++
 		}
@@ -687,7 +687,7 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 func renderProperties(buf *bytes.Buffer, r Renderer, properties map[string]*Property, nodes map[string]*Node, header int, node, namePrefix string) {
 	props := make([]string, len(properties))
 	i := 0
-	for name, _ := range properties {
+	for name := range properties {
 		props[i] = name
 		i++
 	}

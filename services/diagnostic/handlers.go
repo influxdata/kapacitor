@@ -1253,15 +1253,15 @@ func (h *ScraperHandler) Fatalf(s string, ctx ...interface{}) {
 func (h *ScraperHandler) With(key string, value interface{}) plog.Logger {
 	var field Field
 
-	switch value.(type) {
+	switch value := value.(type) {
 	case int:
-		field = Int(key, value.(int))
+		field = Int(key, value)
 	case float64:
-		field = Float64(key, value.(float64))
+		field = Float64(key, value)
 	case string:
-		field = String(key, value.(string))
+		field = String(key, value)
 	case time.Duration:
-		field = Duration(key, value.(time.Duration))
+		field = Duration(key, value)
 	default:
 		field = String(key, fmt.Sprintf("%v", value))
 	}

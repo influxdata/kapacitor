@@ -36,12 +36,15 @@ type boltDB struct {
 }
 
 func (b boltDB) Close() {
-	b.db.Close()
+	_ = b.db.Close()
 	os.RemoveAll(b.dir)
 }
 
 func newBolt() (storeCloser, error) {
 	tmpDir, err := ioutil.TempDir("", "storage-bolt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %v", err)
+	}
 	db, err := bolt.Open(filepath.Join(tmpDir, "bolt.db"), 0600, nil)
 	if err != nil {
 		return boltDB{}, err

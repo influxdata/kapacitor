@@ -25,7 +25,6 @@ type Service struct {
 	registry scraper.Registry
 
 	diag Diagnostic
-	open bool
 }
 
 // NewService creates a new unopened service

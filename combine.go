@@ -76,8 +76,6 @@ type combineBuffer struct {
 	points      []edge.FieldsTagsTimeSetter
 	expressions []stateful.Expression
 	c           combination
-
-	begin edge.BeginBatchMessage
 }
 
 func (b *combineBuffer) BeginBatch(begin edge.BeginBatchMessage) error {

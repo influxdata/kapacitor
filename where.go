@@ -12,8 +12,7 @@ import (
 
 type WhereNode struct {
 	node
-	w        *pipeline.WhereNode
-	endpoint string
+	w *pipeline.WhereNode
 
 	expression stateful.Expression
 	scopePool  stateful.ScopePool

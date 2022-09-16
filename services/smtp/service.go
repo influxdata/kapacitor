@@ -110,11 +110,7 @@ func (s *Service) StateChangesOnly() bool {
 
 func (s *Service) dialer() (d *gomail.Dialer, idleTimeout time.Duration) {
 	c := s.config()
-	if c.Username == "" {
-		d = &gomail.Dialer{Host: c.Host, Port: c.Port}
-	} else {
-		d = gomail.NewPlainDialer(c.Host, c.Port, c.Username, c.Password)
-	}
+	d = &gomail.Dialer{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password}
 	if c.NoVerify {
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}

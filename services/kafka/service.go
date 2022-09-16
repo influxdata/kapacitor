@@ -191,7 +191,6 @@ func (c *Cluster) Close() {
 	for _, w := range c.writers {
 		w.Close()
 	}
-	return
 }
 
 func (c *Cluster) Update(cfg Config) error {

@@ -39,7 +39,6 @@ const (
 // Keeps a running average of timing values.
 type timer struct {
 	sampleRate float64
-	i          int64
 
 	start   time.Time
 	current time.Duration
@@ -78,7 +77,7 @@ func (t *timer) Pause() {
 	if t.state != Started {
 		return
 	}
-	t.current += time.Now().Sub(t.start)
+	t.current += time.Since(t.start)
 	t.state = Paused
 }
 
@@ -97,7 +96,7 @@ func (t *timer) Stop() {
 	if t.state != Started {
 		return
 	}
-	t.current += time.Now().Sub(t.start)
+	t.current += time.Since(t.start)
 	// Use float64 precision when performing movavg calculations.
 	avg := t.avg.update(float64(t.current))
 	t.current = 0
@@ -136,22 +135,4 @@ func (m *movavg) update(value float64) float64 {
 	}
 	m.history[m.idx] = value
 	return m.avg
-}
-
-type update struct {
-	part  int
-	value int64
-}
-
-type part struct {
-	id       int
-	updates  chan<- update
-	stopping chan struct{}
-}
-
-func (p part) Set(v int64) {
-	select {
-	case <-p.stopping:
-	case p.updates <- update{part: p.id, value: v}:
-	}
 }

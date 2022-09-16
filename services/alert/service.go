@@ -279,13 +279,11 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 		}
 		s.diag.FoundHandlerRows(len(kvs))
 
-		var oldKeys []string
 		for _, kv := range kvs {
 			if !oldKeyPattern.MatchString(kv.Key) {
 				s.diag.FoundNewHandler(kv.Key)
 				continue
 			}
-			oldKeys = append(oldKeys, kv.Key)
 			var old oldHandlerSpec
 			err := storage.VersionJSONDecode(kv.Value, func(version int, dec *json.Decoder) error {
 				if version != 1 {

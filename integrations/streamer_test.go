@@ -107,6 +107,8 @@ func init() {
 	diagService.Open()
 }
 
+type testCtxStr string
+
 var dbrps = []kapacitor.DBRP{
 	{
 		Database:        "dbname",
@@ -11761,7 +11763,7 @@ func TestStream_Autoscale(t *testing.T) {
 			},
 			setup: func(tm *kapacitor.TaskMaster) context.Context {
 				scaleUpdates := make(chan k8s.Scale, 100)
-				ctx := context.WithValue(context.Background(), "updates", scaleUpdates)
+				ctx := context.WithValue(context.Background(), testCtxStr("updates"), scaleUpdates)
 				k8sAutoscale := k8stest.Client{}
 				k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
 					var replicas int32
@@ -11788,7 +11790,7 @@ func TestStream_Autoscale(t *testing.T) {
 				return ctx
 			},
 			updatesByService: func(ctx context.Context) map[string][]int {
-				scaleUpdates := ctx.Value("updates").(chan k8s.Scale)
+				scaleUpdates := ctx.Value(testCtxStr("updates")).(chan k8s.Scale)
 				close(scaleUpdates)
 				updatesByService := make(map[string][]int)
 				for scale := range scaleUpdates {
@@ -11857,7 +11859,7 @@ func TestStream_Autoscale(t *testing.T) {
 			},
 			setup: func(tm *kapacitor.TaskMaster) context.Context {
 				serviceUpdates := make(chan swarm.Service, 100)
-				ctx := context.WithValue(context.Background(), "updates", serviceUpdates)
+				ctx := context.WithValue(context.Background(), testCtxStr("updates"), serviceUpdates)
 				swarmAutoscale := swarmtest.Client{}
 				swarmAutoscale.ServiceFunc = func(name string) (*swarm.Service, error) {
 					var replicas uint64
@@ -11886,7 +11888,7 @@ func TestStream_Autoscale(t *testing.T) {
 				return ctx
 			},
 			updatesByService: func(ctx context.Context) map[string][]int {
-				updates := ctx.Value("updates").(chan swarm.Service)
+				updates := ctx.Value(testCtxStr("updates")).(chan swarm.Service)
 				close(updates)
 				updatesByService := make(map[string][]int)
 				for service := range updates {
@@ -12537,7 +12539,7 @@ stream
 	if precision != "s" {
 		t.Errorf("got %v exp %v", precision, "s")
 	}
-	if 1 != len(points) {
+	if len(points) != 1 {
 		t.Errorf("got %v exp %v", len(points), 1)
 	} else {
 		p := points[0]
@@ -13822,7 +13824,6 @@ func testStreamerWithInputChannel(
 		}
 
 		t.Log(string(et.Task.Dot()))
-		return
 	}
 	return
 }
@@ -13998,10 +13999,7 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 
 	if cmpF == nil {
 		cmpF = func(got, exp interface{}) bool {
-			if !reflect.DeepEqual(got, exp) {
-				return false
-			}
-			return true
+			return reflect.DeepEqual(got, exp)
 		}
 	}
 

@@ -3,15 +3,8 @@ package httpd
 import (
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
-
-type loggingResponseWriter interface {
-	http.ResponseWriter
-	Status() int
-	Size() int
-}
 
 // responseLogger is wrapper of http.ResponseWriter that keeps track of its HTTP status
 // code and body size
@@ -178,9 +171,4 @@ func parseUsername(r *http.Request) string {
 		}
 	}
 	return username
-}
-
-// Sanitize passwords from query string for logging.
-func sanitize(r *http.Request, s string) {
-	r.URL.RawQuery = strings.Replace(r.URL.RawQuery, s, "[REDACTED]", -1)
 }

@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	jwt "github.com/golang-jwt/jwt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux/fluxinit"
@@ -87,6 +86,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type testCtxStr string
 
 var udfDir string
 
@@ -10079,14 +10080,14 @@ func TestServer_AlertHandlers_disable(t *testing.T) {
 		},
 		setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 			ts := alertatest.NewServer()
-			ctxt := context.WithValue(context.Background(), "server", ts)
+			ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 			c.Alerta.Enabled = true
 			c.Alerta.URL = ts.URL
 			return ctxt, nil
 		},
 		result: func(ctxt context.Context) error {
-			ts := ctxt.Value("server").(*alertatest.Server)
+			ts := ctxt.Value(testCtxStr("server")).(*alertatest.Server)
 			ts.Close()
 			got := ts.Requests()
 			exp := []alertatest.Request(nil)
@@ -10119,7 +10120,7 @@ func TestServer_AlertHandlers_disable(t *testing.T) {
 					s.Close()
 				}
 			}()
-			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
+			ctxt = context.WithValue(ctxt, testCtxStr("kapacitorURL"), s.URL())
 
 			if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
 				ID:      "testAlertHandlers",
@@ -10356,7 +10357,6 @@ func TestServer_AlertJSON(t *testing.T) {
 			// Create default config
 			c := NewConfig(t)
 			var options map[string]interface{}
-			ctxt := context.Background()
 			var ts *httptest.Server
 			var err error
 			ts, options, err = tc.setup(t, c, tc.expected)
@@ -10369,7 +10369,6 @@ func TestServer_AlertJSON(t *testing.T) {
 			defer func() {
 				s.Close()
 			}()
-			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
 
 			_, err = cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
 				ID:      "testJSONHandlers",
@@ -10450,14 +10449,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alertatest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Alerta.Enabled = true
 				c.Alerta.URL = ts.URL
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*alertatest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*alertatest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []alertatest.Request{{
@@ -10490,7 +10489,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := bigpandatest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.BigPanda.Enabled = true
 				c.BigPanda.Token = "my-token-123"
@@ -10500,7 +10499,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*bigpandatest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*bigpandatest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []bigpandatest.Request{{
@@ -10532,14 +10531,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := discordtest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Discord[0].Enabled = true
 				c.Discord[0].URL = ts.URL + "/test/discord/url"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*discordtest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*discordtest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []discordtest.Request{{
@@ -10573,12 +10572,12 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				te := alerttest.NewExec()
-				ctxt := context.WithValue(context.Background(), "exec", te)
+				ctxt := context.WithValue(context.Background(), testCtxStr("exec"), te)
 				c.Commander = te.Commander
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				te := ctxt.Value("exec").(*alerttest.Exec)
+				te := ctxt.Value(testCtxStr("exec")).(*alerttest.Exec)
 				expData := []*commandtest.Command{{
 					Spec: command.Spec{
 						Prog: "/bin/alert-handler.sh",
@@ -10611,14 +10610,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := hipchattest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.HipChat.Enabled = true
 				c.HipChat.URL = ts.URL
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*hipchattest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*hipchattest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []hipchattest.Request{{
@@ -10649,7 +10648,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Kafka = kafka.Configs{{
 					Enabled: true,
@@ -10659,7 +10658,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*kafkatest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*kafkatest.Server)
 				defer ts.Close()
 				got, err := ts.Messages()
 				if err != nil {
@@ -10717,14 +10716,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				l := alerttest.NewLog(p)
 
-				ctxt := context.WithValue(context.Background(), "tdir", tdir)
-				ctxt = context.WithValue(ctxt, "log", l)
+				ctxt := context.WithValue(context.Background(), testCtxStr("tdir"), tdir)
+				ctxt = context.WithValue(ctxt, testCtxStr("log"), l)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				tdir := ctxt.Value("tdir").(string)
+				tdir := ctxt.Value(testCtxStr("tdir")).(string)
 				defer os.RemoveAll(tdir)
-				l := ctxt.Value("log").(*alerttest.Log)
+				l := ctxt.Value(testCtxStr("log")).(*alerttest.Log)
 				expData := []alert.Data{alertData}
 				expMode := os.FileMode(LogFileExpectedMode)
 
@@ -10756,7 +10755,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
-				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
+				ctxt := context.WithValue(context.Background(), testCtxStr("clientCreator"), cc)
 				cfg := &mqtt.Config{
 					Enabled: true,
 					Name:    "test",
@@ -10769,7 +10768,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				s := ctxt.Value("clientCreator").(*mqtttest.ClientCreator)
+				s := ctxt.Value(testCtxStr("clientCreator")).(*mqtttest.ClientCreator)
 				if got, exp := len(s.Clients), 1; got != exp {
 					return fmt.Errorf("unexpected number of clients created : exp %d got: %d", exp, got)
 				}
@@ -10803,7 +10802,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
-				ctxt := context.WithValue(context.Background(), "clientCreator", cc)
+				ctxt := context.WithValue(context.Background(), testCtxStr("clientCreator"), cc)
 				cfg := &mqtt.Config{
 					Enabled: true,
 					Name:    "test",
@@ -10816,7 +10815,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				s := ctxt.Value("clientCreator").(*mqtttest.ClientCreator)
+				s := ctxt.Value(testCtxStr("clientCreator")).(*mqtttest.ClientCreator)
 				if got, exp := len(s.Clients), 1; got != exp {
 					return fmt.Errorf("unexpected number of clients created : exp %d got: %d", exp, got)
 				}
@@ -10849,7 +10848,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenietest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.OpsGenie.Enabled = true
 				c.OpsGenie.URL = ts.URL
@@ -10857,7 +10856,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*opsgenietest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*opsgenietest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []opsgenietest.Request{{
@@ -10893,7 +10892,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenie2test.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.OpsGenie2.Enabled = true
 				c.OpsGenie2.Details = false
@@ -10903,7 +10902,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*opsgenie2test.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*opsgenie2test.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []opsgenie2test.Request{{
@@ -10944,15 +10943,15 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerdutytest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.PagerDuty.Enabled = true
 				c.PagerDuty.URL = ts.URL
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*pagerdutytest.Server)
-				kapacitorURL := ctxt.Value("kapacitorURL").(string)
+				ts := ctxt.Value(testCtxStr("server")).(*pagerdutytest.Server)
+				kapacitorURL := ctxt.Value(testCtxStr("kapacitorURL")).(string)
 				ts.Close()
 				got := ts.Requests()
 				exp := []pagerdutytest.Request{{
@@ -10991,15 +10990,15 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerduty2test.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.PagerDuty2.Enabled = true
 				c.PagerDuty2.URL = ts.URL
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*pagerduty2test.Server)
-				kapacitorURL := ctxt.Value("kapacitorURL").(string)
+				ts := ctxt.Value(testCtxStr("server")).(*pagerduty2test.Server)
+				kapacitorURL := ctxt.Value(testCtxStr("kapacitorURL")).(string)
 				ts.Close()
 				got := ts.Requests()
 				exp := []pagerduty2test.Request{{
@@ -11053,11 +11052,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"url": ts.URL}
 
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*alerttest.PostServer)
+				ts := ctxt.Value(testCtxStr("server")).(*alerttest.PostServer)
 				ts.Close()
 				exp := []alert.Data{alertData}
 				got := ts.Data()
@@ -11076,7 +11075,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := httpposttest.NewAlertServer(nil, true)
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 				c.HTTPPost = httppost.Configs{{
 					Endpoint:      "test",
 					URLTemplate:   ts.URL,
@@ -11085,7 +11084,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*httpposttest.AlertServer)
+				ts := ctxt.Value(testCtxStr("server")).(*httpposttest.AlertServer)
 				exp := []httpposttest.AlertRequest{{
 					MatchingHeaders: true,
 					Raw:             []byte("message"),
@@ -11104,7 +11103,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pushovertest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Pushover.Enabled = true
 				c.Pushover.URL = ts.URL
@@ -11113,7 +11112,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*pushovertest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*pushovertest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []pushovertest.Request{{
@@ -11146,7 +11145,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Sensu.Enabled = true
 				c.Sensu.Addr = ts.Addr
@@ -11154,7 +11153,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*sensutest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*sensutest.Server)
 				ts.Close()
 				exp := []sensutest.Request{{
 					Source: "Kapacitor",
@@ -11182,7 +11181,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := servicenowtest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.ServiceNow.Enabled = true
 				c.ServiceNow.URL = ts.URL + "/api/global/em/jsonv2"
@@ -11190,7 +11189,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*servicenowtest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*servicenowtest.Server)
 				ts.Close()
 				exp := []servicenowtest.Request{{
 					URL: "/api/global/em/jsonv2",
@@ -11221,14 +11220,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := slacktest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Slack[0].Enabled = true
 				c.Slack[0].URL = ts.URL + "/test/slack/url"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*slacktest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*slacktest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []slacktest.Request{{
@@ -11265,7 +11264,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.SMTP.Enabled = true
 				c.SMTP.Host = ts.Host
@@ -11274,7 +11273,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*smtptest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*smtptest.Server)
 				ts.Close()
 
 				errors := ts.Errors()
@@ -11330,7 +11329,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if err != nil {
 					return nil, err
 				}
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.SNMPTrap.Enabled = true
 				c.SNMPTrap.Addr = ts.Addr
@@ -11339,7 +11338,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*snmptraptest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*snmptraptest.Server)
 				ts.Close()
 				got := ts.Traps()
 				exp := []snmptraptest.Trap{{
@@ -11382,7 +11381,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := talktest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Talk.Enabled = true
 				c.Talk.URL = ts.URL
@@ -11390,7 +11389,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*talktest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*talktest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []talktest.Request{{
@@ -11419,11 +11418,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 				ha.Options = map[string]interface{}{"address": ts.Addr}
 
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*alerttest.TCPServer)
+				ts := ctxt.Value(testCtxStr("server")).(*alerttest.TCPServer)
 				ts.Close()
 				exp := []alert.Data{alertData}
 				got := ts.Data()
@@ -11439,14 +11438,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := teamstest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Teams.Enabled = true
 				c.Teams.ChannelURL = ts.URL
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*teamstest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*teamstest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []teamstest.Request{{
@@ -11476,7 +11475,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := telegramtest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Telegram.Enabled = true
 				c.Telegram.URL = ts.URL + "/bot"
@@ -11484,7 +11483,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*telegramtest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*telegramtest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []telegramtest.Request{{
@@ -11512,7 +11511,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := victoropstest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.VictorOps.Enabled = true
 				c.VictorOps.URL = ts.URL
@@ -11520,7 +11519,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*victoropstest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*victoropstest.Server)
 				ts.Close()
 				got := ts.Requests()
 				exp := []victoropstest.Request{{
@@ -11552,7 +11551,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := zenosstest.NewServer()
-				ctxt := context.WithValue(context.Background(), "server", ts)
+				ctxt := context.WithValue(context.Background(), testCtxStr("server"), ts)
 
 				c.Zenoss.Enabled = true
 				c.Zenoss.URL = ts.URL + "/zport/dmd/evconsole_router"
@@ -11560,7 +11559,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*zenosstest.Server)
+				ts := ctxt.Value(testCtxStr("server")).(*zenosstest.Server)
 				ts.Close()
 				exp := []zenosstest.Request{{
 					URL: "/zport/dmd/evconsole_router",
@@ -11611,7 +11610,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					s.Close()
 				}
 			}()
-			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
+			ctxt = context.WithValue(ctxt, testCtxStr("kapacitorURL"), s.URL())
 
 			if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
 				ID:      "testAlertHandlers",
@@ -12428,7 +12427,7 @@ stream
 		if err := cli.DeleteTopic(l); err != nil {
 			t.Fatal(err)
 		}
-		te, err = cli.ListTopicEvents(l, nil)
+		_, err = cli.ListTopicEvents(l, nil)
 		if err == nil {
 			t.Fatalf("expected error for deleted topic %q", topic)
 		}
@@ -13528,6 +13527,9 @@ func TestLoadService(t *testing.T) {
 		path.Join(c.Load.Dir, "templates", "new.tick"),
 		path.Join(c.Load.Dir, "templates", "base_template.tick"),
 	)
+	if err != nil {
+		t.Fatalf("failed file rename: %v", err)
+	}
 
 	// add a new handler
 	f, err := os.Create(path.Join(c.Load.Dir, "handlers", "new.tick"))
@@ -13807,35 +13809,6 @@ http.post(url: "http://localhost:%d")
 	query("DELETE", selfPath, "")
 	assert.Equal(t, `{"links":{"self":"/kapacitor/v1/api/v2/tasks?limit=100"},"tasks":[]}`, query("GET", basePath, ""))
 
-}
-
-func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) bool) error {
-	if len(got) != len(exp) {
-		return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
-	}
-
-	if cmpF == nil {
-		cmpF = func(got, exp interface{}) bool {
-			if !reflect.DeepEqual(got, exp) {
-				return false
-			}
-			return true
-		}
-	}
-
-	for _, e := range exp {
-		found := false
-		for _, g := range got {
-			if cmpF(g, e) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
-		}
-	}
-	return nil
 }
 
 func TestServer_Authenticate_Fail_Enterprise(t *testing.T) {

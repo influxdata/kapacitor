@@ -281,10 +281,10 @@ func (s *Service) loadTasks() error {
 
 func (s *Service) loadTask(f string) error {
 	file, err := os.Open(f)
-	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -355,10 +355,12 @@ func (s *Service) loadTemplates() error {
 
 func (s *Service) loadTemplate(f string) error {
 	file, err := os.Open(f)
-	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
+
+	defer file.Close()
+
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
@@ -402,10 +404,10 @@ func (s *Service) loadTemplate(f string) error {
 
 func (s *Service) loadVars(f string) error {
 	file, err := os.Open(f)
-	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -492,10 +494,10 @@ func (s *Service) loadHandlers() error {
 
 func (s *Service) loadHandler(f string) error {
 	file, err := os.Open(f)
-	defer file.Close()
 	if err != nil {
 		return fmt.Errorf("failed to open file %v: %v", f, err)
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {

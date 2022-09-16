@@ -524,7 +524,7 @@ func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
 	if ctx != nil {
 		if dl, ok := ctx.Deadline(); ok {
 			v := url.Values{}
-			v.Set("wait_for_leader", fmt.Sprintf("%.0fs", time.Now().Sub(dl).Seconds()))
+			v.Set("wait_for_leader", fmt.Sprintf("%.0fs", time.Since(dl).Seconds()))
 			u.RawQuery = v.Encode()
 		}
 	}
@@ -696,6 +696,10 @@ func (c *HTTPClient) buildFluxRequest(q FluxQuery) (*http.Request, error) {
 			Header:      true,
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err

@@ -42,13 +42,12 @@ type reduceContext interface {
 }
 
 type baseReduceContext struct {
-	as            string
-	field         string
-	name          string
-	groupInfo     edge.GroupInfo
-	time          time.Time
-	pointTimes    bool
-	topBottomInfo *pipeline.TopBottomCallInfo
+	as         string
+	field      string
+	name       string
+	groupInfo  edge.GroupInfo
+	time       time.Time
+	pointTimes bool
 }
 
 func (n *InfluxQLNode) runInfluxQL([]byte) error {
@@ -95,7 +94,6 @@ type influxqlGroup struct {
 	rc reduceContext
 
 	batchSize int
-	name      string
 	begin     edge.BeginBatchMessage
 }
 

@@ -508,6 +508,9 @@ func TestTreeScheduler_LongPanicTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	_ = ts // so we don't have parts of the race detection elided.
+
 	badSchedule, ts, err := NewSchedule("0 0 1 12 *", now.Add(-1*time.Second))
 	if err != nil {
 		t.Fatal(err)

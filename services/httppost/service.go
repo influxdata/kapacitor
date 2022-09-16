@@ -50,7 +50,6 @@ func (e *Endpoint) Close() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.closed = true
-	return
 }
 
 func (e *Endpoint) Update(c Config) error {
@@ -245,7 +244,9 @@ func (s *Service) Test(options interface{}) error {
 		headers:     o.Headers,
 	}
 	req, err = e.NewHTTPRequest(body, ad)
-
+	if err != nil {
+		return fmt.Errorf("failed to create http request: %v", err)
+	}
 	// Execute the request
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -278,8 +279,6 @@ type handler struct {
 	timeout time.Duration
 
 	skipSSLVerification bool
-
-	hc *http.Client
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
