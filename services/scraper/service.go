@@ -68,6 +68,8 @@ func (a *appendable) Appender(ctx context.Context) storage.Appender {
 	return a.svc
 }
 
+var scrapemanagerLock = sync.Mutex{} // promethius calling scrape.NewManager is not concurrency safe.
+
 // NewService creates a new scraper service
 func NewService(c []Config, d Diagnostic) *Service {
 	s := &Service{
@@ -77,8 +79,9 @@ func NewService(c []Config, d Diagnostic) *Service {
 	var ctxScrape context.Context
 	ctxScrape, s.cancelScrape = context.WithCancel(context.Background())
 	s.discoveryManager = discovery.NewManager(ctxScrape, d, discovery.Name("discoveryScrapeManager"))
+	scrapemanagerLock.Lock()
 	s.scrapeManager = scrape.NewManager(d, &appendable{&ServiceAppenderAdapter{s}})
-
+	scrapemanagerLock.Unlock()
 	return s
 }
 

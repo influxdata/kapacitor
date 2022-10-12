@@ -17,6 +17,21 @@ type Event struct {
 	previousState EventState
 }
 
+func (e Event) MarshalBinary() (data []byte, err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (e Event) UnmarshalBinary(data []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (e Event) ObjectID() string {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (e Event) AlertData() Data {
 	return Data{
 		ID:            e.State.ID,

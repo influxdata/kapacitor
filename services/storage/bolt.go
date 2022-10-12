@@ -9,13 +9,38 @@ import (
 // Bolt implementation of Store
 type Bolt struct {
 	db     *bolt.DB
-	bucket []byte
+	bucket [][]byte
 }
 
-func NewBolt(db *bolt.DB, bucket string) *Bolt {
+func NewBolt(db *bolt.DB, bucket ...[]byte) *Bolt {
 	return &Bolt{
 		db:     db,
-		bucket: []byte(bucket),
+		bucket: bucket,
+	}
+}
+
+func (b *Bolt) deleteBucket() error {
+	if len(b.bucket) == 0 {
+		return nil
+	}
+	return b.db.Update(func(tx *bolt.Tx) error {
+		var bucket *bolt.Bucket
+		i := 0
+		for i = range b.bucket {
+			bucket = tx.Bucket(b.bucket[i])
+			if bucket == nil {
+				return nil
+			}
+		}
+		return tx.DeleteBucket(b.bucket[i])
+	})
+
+}
+
+func (b *Bolt) Bucket(bucket []byte) *Bolt {
+	return &Bolt{
+		db:     b.db,
+		bucket: append(b.bucket, bucket),
 	}
 }
 
@@ -28,15 +53,15 @@ func (b *Bolt) Update(f func(tx Tx) error) error {
 }
 
 func (b *Bolt) put(tx *bolt.Tx, key string, value []byte) error {
-	bucket, err := tx.CreateBucketIfNotExists(b.bucket)
-	if err != nil {
-		return err
+	var bucket *bolt.Bucket
+	var err error
+	for i := range b.bucket {
+		bucket, err = tx.CreateBucketIfNotExists(b.bucket[i])
+		if err != nil {
+			return err
+		}
 	}
-	err = bucket.Put([]byte(key), value)
-	if err != nil {
-		return err
-	}
-	return nil
+	return bucket.Put([]byte(key), value)
 }
 
 func (b *Bolt) Put(key string, value []byte) error {
@@ -46,11 +71,13 @@ func (b *Bolt) Put(key string, value []byte) error {
 }
 
 func (b *Bolt) get(tx *bolt.Tx, key string) (*KeyValue, error) {
-	bucket := tx.Bucket(b.bucket)
-	if bucket == nil {
-		return nil, ErrNoKeyExists
+	var bucket *bolt.Bucket
+	for i := range b.bucket {
+		bucket = tx.Bucket(b.bucket[i])
+		if bucket == nil {
+			return nil, ErrNoKeyExists
+		}
 	}
-
 	val := bucket.Get([]byte(key))
 	if val == nil {
 		return nil, ErrNoKeyExists
@@ -72,9 +99,12 @@ func (b *Bolt) Get(key string) (kv *KeyValue, err error) {
 }
 
 func (b *Bolt) delete(tx *bolt.Tx, key string) error {
-	bucket := tx.Bucket(b.bucket)
-	if bucket == nil {
-		return nil
+	var bucket *bolt.Bucket
+	for i := range b.bucket {
+		bucket = tx.Bucket(b.bucket[i])
+		if bucket == nil {
+			return nil
+		}
 	}
 	return bucket.Delete([]byte(key))
 }
@@ -86,7 +116,14 @@ func (b *Bolt) Delete(key string) error {
 }
 
 func (b *Bolt) exists(tx *bolt.Tx, key string) (bool, error) {
-	bucket := tx.Bucket(b.bucket)
+	var bucket *bolt.Bucket
+	for i := range b.bucket {
+		bucket = tx.Bucket(b.bucket[i])
+		if bucket == nil {
+			return false, nil
+		}
+	}
+
 	if bucket == nil {
 		return false, nil
 	}
@@ -104,9 +141,12 @@ func (b *Bolt) Exists(key string) (exists bool, err error) {
 }
 
 func (b *Bolt) list(tx *bolt.Tx, prefixStr string) (kvs []*KeyValue, err error) {
-	bucket := tx.Bucket(b.bucket)
-	if bucket == nil {
-		return
+	var bucket *bolt.Bucket
+	for i := range b.bucket {
+		bucket = tx.Bucket(b.bucket[i])
+		if bucket == nil {
+			return
+		}
 	}
 
 	cursor := bucket.Cursor()
@@ -137,7 +177,11 @@ func (b *Bolt) BeginTx() (Tx, error) {
 }
 
 func (b *Bolt) BeginReadOnlyTx() (ReadOnlyTx, error) {
-	return b.newTx(false)
+	tx, err := b.newTx(false)
+	if err != nil {
+		return nil, err
+	}
+	return &boltTXReadOnly{*tx}, nil
 }
 
 func (b *Bolt) newTx(write bool) (*boltTx, error) {
@@ -151,10 +195,29 @@ func (b *Bolt) newTx(write bool) (*boltTx, error) {
 	}, nil
 }
 
+type boltTXReadOnly struct {
+	boltTx
+}
+
+func (t *boltTXReadOnly) Bucket(name []byte) ReadOnlyTx {
+	return &boltTXReadOnly{
+		boltTx{
+			b:  t.b.Bucket(name),
+			tx: t.tx,
+		}}
+}
+
 // BoltTx wraps an underlying bolt.Tx type to implement the Tx interface.
 type boltTx struct {
 	b  *Bolt
 	tx *bolt.Tx
+}
+
+func (t *boltTx) Bucket(name []byte) Tx {
+	return &boltTx{
+		b:  t.b.Bucket(name),
+		tx: t.tx,
+	}
 }
 
 func (t *boltTx) Get(key string) (*KeyValue, error) {

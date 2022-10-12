@@ -21,7 +21,7 @@ type Service struct {
 	stores map[string]Interface
 	mu     sync.Mutex
 
-	registrar StoreActionerRegistrar
+	registrar *StoreActionerRegistrar
 	apiServer *APIServer
 
 	versions Versions
@@ -102,7 +102,7 @@ func (s *Service) store(name string) Interface {
 	if store, ok := s.stores[name]; ok {
 		return store
 	} else {
-		store = NewBolt(s.boltdb, name)
+		store = NewBolt(s.boltdb, []byte(name))
 		s.stores[name] = store
 		return store
 	}
