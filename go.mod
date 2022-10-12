@@ -50,7 +50,7 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
 	github.com/zeebo/mwc v0.0.4
-	go.etcd.io/bbolt v1.3.5
+	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/tools v0.1.11-0.20220513221640-090b14e8501f
@@ -262,3 +262,5 @@ replace k8s.io/client-go => k8s.io/client-go v0.20.5
 replace k8s.io/api => k8s.io/api v0.20.5
 
 replace github.com/dgrijalva/jwt-go => github.com/Waterdrips/jwt-go v3.2.1-0.20200915121943-f6506928b72e+incompatible
+
+replace go.etcd.io/bbolt => github.com/0x0177b11f/bbolt v1.3.7-0.20220308103559-afc583528bb7

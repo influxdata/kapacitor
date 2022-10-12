@@ -19,6 +19,7 @@ type ReadOperator interface {
 
 // WriteOperator provides an interface for performing write operations.
 type WriteOperator interface {
+
 	// Store a value.
 	Put(key string, value []byte) error
 	// Delete a key.
@@ -30,6 +31,9 @@ type WriteOperator interface {
 type ReadOnlyTx interface {
 	ReadOperator
 
+	// Bucket returns a ReadOnlyTx for that bucket. If the bucket doesn't exist Tx should be nil.
+	Bucket(name []byte) ReadOnlyTx
+
 	// Rollback signals that the transaction is complete.
 	// If the transaction was not committed, then all changes are reverted.
 	// Rollback must always be called for every transaction.
@@ -38,12 +42,20 @@ type ReadOnlyTx interface {
 
 // Tx provides an interface for performing read and write storage operations in a single transaction.
 type Tx interface {
-	ReadOnlyTx
+	ReadOperator
 	WriteOperator
+
+	// Bucket returns a Tx for that bucket.  If the bucket doesn't exist Tx should be nil.
+	Bucket(name []byte) Tx
 
 	// Commit finalizes the transaction.
 	// Once a transaction is committed, rolling back the transaction has no effect.
 	Commit() error
+
+	// Rollback signals that the transaction is complete.
+	// If the transaction was not committed, then all changes are reverted.
+	// Rollback must always be called for every transaction.
+	Rollback() error
 }
 
 type TxOperator interface {

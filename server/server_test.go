@@ -2857,7 +2857,7 @@ test value=1 0000000011
 func TestServer_UpdateTaskID(t *testing.T) {
 	s, cli := OpenDefaultServer(t)
 	defer s.Close()
-
+	println("here")
 	id := "testTaskID"
 	ttype := client.StreamTask
 	dbrps := []client.DBRP{

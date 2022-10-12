@@ -36,6 +36,8 @@ NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 HOME_DIR=/root
 # GOPATH
 GOPATH=/go
+# PROTO VERSION
+PROTO_VERSION=3.18.3
 
 no_uncomitted_arg="$no_uncommitted_arg"
 if [ ! $NO_UNCOMMITTED ]
@@ -67,7 +69,7 @@ function run_test_docker {
     imagename="$imagename-$BUILD_NUM"
 
     echo "Building docker image $imagename"
-    docker build -f "$dockerfile" --build-arg -t "$imagename" .
+    docker build -f "$dockerfile" --build-arg  PROTO_VERSION=$PROTO_VERSION -t "$imagename" .
 
     echo "Running test in docker $name with args $@"
 
