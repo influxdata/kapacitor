@@ -13,13 +13,14 @@ import (
 // `top10`, then the data can be requested from `/kapacitor/v1/tasks/<task_id>/top10`.
 //
 // Example:
-//    stream
-//        |window()
-//            .period(10s)
-//            .every(5s)
-//        |top('value', 10)
-//        //Publish the top 10 results over the last 10s updated every 5s.
-//        |httpOut('top10')
+//
+//	stream
+//	    |window()
+//	        .period(10s)
+//	        .every(5s)
+//	    |top('value', 10)
+//	    //Publish the top 10 results over the last 10s updated every 5s.
+//	    |httpOut('top10')
 //
 // Beware of adding a final slash ‘/’ to the URL. This will result in a 404 error for a
 // task that does not exist.
@@ -27,7 +28,6 @@ import (
 // Note that the example script above comes from the
 // [scores](https://github.com/influxdata/kapacitor/tree/master/examples/scores) example.
 // See the complete scores example for a concrete demonstration.
-//
 type HTTPOutNode struct {
 	chainnode
 

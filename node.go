@@ -107,7 +107,7 @@ type Node interface {
 	stats() map[string]interface{}
 }
 
-//implementation of Node
+// implementation of Node
 type node struct {
 	pipeline.Node
 	et         *ExecutingTask

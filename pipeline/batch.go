@@ -115,15 +115,16 @@ func (b *BatchNode) dot(buf *bytes.Buffer) {
 //
 // Example:
 // batch
-//     |query('''
-//         SELECT mean("value")
-//         FROM "telegraf"."default".cpu_usage_idle
-//         WHERE "host" = 'serverA'
-//     ''')
-//         .period(1m)
-//         .every(20s)
-//         .groupBy(time(10s), 'cpu')
-//     ...
+//
+//	|query('''
+//	    SELECT mean("value")
+//	    FROM "telegraf"."default".cpu_usage_idle
+//	    WHERE "host" = 'serverA'
+//	''')
+//	    .period(1m)
+//	    .every(20s)
+//	    .groupBy(time(10s), 'cpu')
+//	...
 //
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
 // spans 1 minute and is grouped into 10 second buckets.
@@ -277,23 +278,25 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 // Use group by time when your period is longer than your group by time interval.
 //
 // Example:
-//    batch
-//        |query(...)
-//            .period(1m)
-//            .every(1m)
-//            .groupBy(time(10s), 'tag1', 'tag2'))
-//            .align()
+//
+//	batch
+//	    |query(...)
+//	        .period(1m)
+//	        .every(1m)
+//	        .groupBy(time(10s), 'tag1', 'tag2'))
+//	        .align()
 //
 // A group by time offset is also possible.
 //
 // Example:
-//    batch
-//        |query(...)
-//            .period(1m)
-//            .every(1m)
-//            .groupBy(time(10s, -5s), 'tag1', 'tag2'))
-//            .align()
-//            .offset(5s)
+//
+//	batch
+//	    |query(...)
+//	        .period(1m)
+//	        .every(1m)
+//	        .groupBy(time(10s, -5s), 'tag1', 'tag2'))
+//	        .align()
+//	        .offset(5s)
 //
 // It is recommended to use QueryNode.Align and QueryNode.Offset in conjunction with
 // group by time dimensions so that the time bounds match up with the group by intervals.
@@ -302,13 +305,14 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 // the groupBy time period is longer than the query frequency.
 //
 // Example:
-//    batch
-//        |query(...)
-//            .period(5m)
-//            .every(30s)
-//            .groupBy(time(1m), 'tag1', 'tag2')
-//            .align()
-//            .alignGroup()
+//
+//	batch
+//	    |query(...)
+//	        .period(5m)
+//	        .every(30s)
+//	        .groupBy(time(1m), 'tag1', 'tag2')
+//	        .align()
+//	        .alignGroup()
 //
 // For the above example, without QueryNode.AlignGroup, every other query issued by Kapacitor
 // (at :30 past the minute) will align to :00 seconds instead of the desired :30 seconds,
@@ -331,9 +335,10 @@ func (b *QueryNode) GroupBy(d ...interface{}) *QueryNode {
 //
 // Example:
 // batch
-//      |query('SELECT sum("value") FROM "telegraf"."autogen"./process_.*/')
-//          .groupByMeasurement()
-//          .groupBy('host')
+//
+//	|query('SELECT sum("value") FROM "telegraf"."autogen"./process_.*/')
+//	    .groupByMeasurement()
+//	    .groupBy('host')
 //
 // The above example selects data from several measurements matching `/process_.*/ and
 // then each point is grouped by the host tag and measurement name.
@@ -365,17 +370,18 @@ func (b *QueryNode) AlignGroup() *QueryNode {
 //
 // Example:
 // batch
-//     |fluxQuery('''
-//         from(bucket: "example-bucket")
-//         |> range(start: -1m)
-//         |> filter(fn: (r) =>
-//           r._measurement == "example-measurement" and
-//           r._field == "example-field"
-//         )
-//     ''')
-//         .period(1m)
-//         .every(20s)
-//     ...
+//
+//	|fluxQuery('''
+//	    from(bucket: "example-bucket")
+//	    |> range(start: -1m)
+//	    |> filter(fn: (r) =>
+//	      r._measurement == "example-measurement" and
+//	      r._field == "example-field"
+//	    )
+//	''')
+//	    .period(1m)
+//	    .every(20s)
+//	...
 //
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
 type QueryFluxNode struct {

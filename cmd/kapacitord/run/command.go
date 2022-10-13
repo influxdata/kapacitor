@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -234,7 +233,7 @@ func (cmd *Command) writePIDFile(path string) error {
 
 	// Retrieve the PID and write it.
 	pid := strconv.Itoa(os.Getpid())
-	if err := ioutil.WriteFile(path, []byte(pid), 0666); err != nil {
+	if err := os.WriteFile(path, []byte(pid), 0666); err != nil {
 		return fmt.Errorf("write file: %s", err)
 	}
 

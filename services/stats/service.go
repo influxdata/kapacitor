@@ -4,9 +4,10 @@
 // If you want to persist the data to InfluxDB just add a task like so:
 //
 // Example:
-//    stream
-//        .from()
-//        .influxDBOut()
+//
+//	stream
+//	    .from()
+//	    .influxDBOut()
 //
 // Assuming using default database and retetion policy run:
 // `kapacitor define -name _stats -type stream -tick path/to/above/script.tick -dbrp _kapacitor.default`
@@ -16,10 +17,10 @@
 // Example:
 //
 // [influxdb]
-//     ...
-//     [influxdb.excluded-subscriptions]
-//         _kapacitor = [ "default" ]
 //
+//	...
+//	[influxdb.excluded-subscriptions]
+//	    _kapacitor = [ "default" ]
 package stats
 
 import (

@@ -142,7 +142,7 @@ func (c *Coordinator) TaskUpdated(ctx context.Context, from, to *taskmodel.Task)
 	return nil
 }
 
-//TaskDeleted asks the scheduler to release the deleted task
+// TaskDeleted asks the scheduler to release the deleted task
 func (c *Coordinator) TaskDeleted(ctx context.Context, id platform.ID) error {
 	tid := scheduler.ID(id)
 	if err := c.sch.Release(tid); err != nil && err != taskmodel.ErrTaskNotClaimed {

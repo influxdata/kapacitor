@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-//Platform dependent constants for tests on windows
+// Platform dependent constants for tests on windows
 package server_test
 
 const (

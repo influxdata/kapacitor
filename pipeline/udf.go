@@ -25,27 +25,29 @@ import (
 // UDFs are configured via Kapacitor's main configuration file.
 //
 // Example:
-//    [udf]
-//    [udf.functions]
-//        # Example moving average UDF.
-//        [udf.functions.movingAverage]
-//            prog = "/path/to/executable/moving_avg"
-//            args = []
-//            timeout = "10s"
+//
+//	[udf]
+//	[udf.functions]
+//	    # Example moving average UDF.
+//	    [udf.functions.movingAverage]
+//	        prog = "/path/to/executable/moving_avg"
+//	        args = []
+//	        timeout = "10s"
 //
 // UDFs are first class objects in TICKscripts and are referenced via their configuration name.
 //
 // Example:
-//     // Given you have a UDF that computes a moving average
-//     // The UDF can define what its options are and then can be
-//     // invoked via a TICKscript like so:
-//     stream
-//         |from()...
-//         @movingAverage()
-//             .field('value')
-//             .size(100)
-//             .as('mavg')
-//         |httpOut('movingaverage')
+//
+//	// Given you have a UDF that computes a moving average
+//	// The UDF can define what its options are and then can be
+//	// invoked via a TICKscript like so:
+//	stream
+//	    |from()...
+//	    @movingAverage()
+//	        .field('value')
+//	        .size(100)
+//	        .as('mavg')
+//	    |httpOut('movingaverage')
 //
 // NOTE: The UDF process runs as the same user as the Kapacitor daemon.
 // As a result, make sure the user is properly secured, as well as the configuration file.

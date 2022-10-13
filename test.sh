@@ -34,8 +34,6 @@ TIMEOUT=${TIMEOUT-1000s}
 NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
 # Home dir of the docker user
 HOME_DIR=/root
-# Go version
-GO_VERSION=1.18.6
 # GOPATH
 GOPATH=/go
 
@@ -69,7 +67,7 @@ function run_test_docker {
     imagename="$imagename-$BUILD_NUM"
 
     echo "Building docker image $imagename"
-    docker build -f "$dockerfile" --build-arg GO_VERSION=$GO_VERSION -t "$imagename" .
+    docker build -f "$dockerfile" --build-arg -t "$imagename" .
 
     echo "Running test in docker $name with args $@"
 

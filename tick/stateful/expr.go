@@ -36,8 +36,9 @@ type expression struct {
 // in order to achieve better runtime performance.
 //
 // For example:
-// 	Given a BinaryNode{ReferNode("value"), NumberNode{Float64:10}} during runtime
-// 	we can find the type of "value" and find the most matching comparison function - (float64,float64) or (int64,float64)
+//
+//	Given a BinaryNode{ReferNode("value"), NumberNode{Float64:10}} during runtime
+//	we can find the type of "value" and find the most matching comparison function - (float64,float64) or (int64,float64)
 func NewExpression(node ast.Node) (Expression, error) {
 	nodeEvaluator, err := createNodeEvaluator(node)
 	if err != nil {

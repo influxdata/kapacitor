@@ -1089,7 +1089,7 @@ func (c *count) Signature() map[Domain]ast.ValueType {
 	return countFuncSignature
 }
 
-//NewRand creates a new rng.  We do it this way so we can override it so tests are deterministic.
+// NewRand creates a new rng.  We do it this way so we can override it so tests are deterministic.
 var NewRand = func() *Rand {
 	return (*Rand)(mwc.Rand())
 }

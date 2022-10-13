@@ -20,11 +20,12 @@ import (
 // node receives.)
 //
 // Example:
-//    stream
-//        |window()
-//            .period(10m)
-//            .every(5m)
-//        |httpOut('recent')
+//
+//	stream
+//	    |window()
+//	        .period(10m)
+//	        .every(5m)
+//	    |httpOut('recent')
 //
 // This example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
 // Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of

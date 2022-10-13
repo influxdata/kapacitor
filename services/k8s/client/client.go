@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -45,7 +44,7 @@ type Config struct {
 // The secret is expected to be stored under secretsPath.
 func loadPodSecret(secret string) (value []byte, err error) {
 	p := filepath.Join(secretsPath, secret)
-	value, err = ioutil.ReadFile(p)
+	value, err = os.ReadFile(p)
 	return
 }
 

@@ -56,7 +56,8 @@ type ErrSide struct {
 type evaluationFn func(scope *Scope, executionState ExecutionState, left, right NodeEvaluator) (resultContainer, *ErrSide)
 
 // EvalBinaryNode is stateful expression which
-//  is evaluated using "expression trees" instead of stack based interpreter
+//
+//	is evaluated using "expression trees" instead of stack based interpreter
 type EvalBinaryNode struct {
 	operator ast.TokenType
 

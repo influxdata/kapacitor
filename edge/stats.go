@@ -23,7 +23,7 @@ type StatsEdge interface {
 	ReadGroupStats(func(*GroupStats))
 }
 
-//  GroupStats represents the statistics for a specific group.
+// GroupStats represents the statistics for a specific group.
 type GroupStats struct {
 	GroupInfo GroupInfo
 	Collected int64

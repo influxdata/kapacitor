@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	text "text/template"
@@ -250,7 +249,7 @@ func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle stri
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}

@@ -8,13 +8,13 @@ import (
 // A node that logs all data that passes through the node.
 //
 // Example:
-//    stream.from()...
-//      |window()
-//          .period(10s)
-//          .every(10s)
-//      |log()
-//      |count('value')
 //
+//	stream.from()...
+//	  |window()
+//	      .period(10s)
+//	      .every(10s)
+//	  |log()
+//	  |count('value')
 type LogNode struct {
 	chainnode
 

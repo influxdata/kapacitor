@@ -4,7 +4,7 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1256,7 +1256,7 @@ func (s *Server) readID(file string) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 	defer f.Close()
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return uuid.Nil, err
 	}

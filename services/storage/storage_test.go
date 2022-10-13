@@ -3,7 +3,6 @@ package storage_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,7 +40,7 @@ func (b boltDB) Close() {
 }
 
 func newBolt() (storeCloser, error) {
-	tmpDir, err := ioutil.TempDir("", "storage-bolt")
+	tmpDir, err := os.MkdirTemp("", "storage-bolt")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %v", err)
 	}

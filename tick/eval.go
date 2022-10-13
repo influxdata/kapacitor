@@ -570,16 +570,16 @@ func evalFunc(f *ast.FunctionNode, scope *stateful.Scope, stck *stack, args []in
 // See NewReflectionDescriber for providing explicit chain methods in this case.
 //
 // Example:
-//     type MyType struct {
-//         UseX `tick:"X"`
-//     }
-//     func (m *MyType) X() *MyType{
-//         m.UseX = true
-//         return m
-//     }
+//
+//	type MyType struct {
+//	    UseX `tick:"X"`
+//	}
+//	func (m *MyType) X() *MyType{
+//	    m.UseX = true
+//	    return m
+//	}
 //
 // UseX will be ignored as a property and the method X will become a property method.
-//
 //
 // Expects that all callable methods are pointer receiver methods.
 type ReflectionDescriber struct {
@@ -598,29 +598,29 @@ type ReflectionDescriber struct {
 // that should be considered chain methods even if an embedded type declares them as property methods
 //
 // Example:
-//     type MyType struct {
-//         UseX `tick:"X"`
-//     }
-//     func (m *MyType) X() *MyType{
-//         m.UseX = true
-//         return m
-//     }
 //
-//     type AnotherType struct {
-//         MyType
-//     }
-//     func (a *AnotherType) X() *YetAnotherType {
-//         // do chain method work here...
-//     }
+//	type MyType struct {
+//	    UseX `tick:"X"`
+//	}
+//	func (m *MyType) X() *MyType{
+//	    m.UseX = true
+//	    return m
+//	}
 //
-//     // Now create NewReflectionDescriber with X as a chain method and property method
-//     at := new(AnotherType)
-//     rd := NewReflectionDescriber(at, map[string]reflect.Value{
-//         "X": reflect.ValueOf(at.X),
-//     })
-//     rd.HasProperty("x") // true
-//     rd.HasChainMethod("x") // true
+//	type AnotherType struct {
+//	    MyType
+//	}
+//	func (a *AnotherType) X() *YetAnotherType {
+//	    // do chain method work here...
+//	}
 //
+//	// Now create NewReflectionDescriber with X as a chain method and property method
+//	at := new(AnotherType)
+//	rd := NewReflectionDescriber(at, map[string]reflect.Value{
+//	    "X": reflect.ValueOf(at.X),
+//	})
+//	rd.HasProperty("x") // true
+//	rd.HasChainMethod("x") // true
 func NewReflectionDescriber(obj interface{}, chainMethods map[string]reflect.Value) (*ReflectionDescriber, error) {
 	r := &ReflectionDescriber{
 		obj: obj,

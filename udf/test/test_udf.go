@@ -3,7 +3,6 @@ package udf_test
 import (
 	"bufio"
 	"io"
-	"io/ioutil"
 
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/udf"
@@ -13,7 +12,7 @@ import (
 var diagService *diagnostic.Service
 
 func init() {
-	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
 	diagService.Open()
 }
 

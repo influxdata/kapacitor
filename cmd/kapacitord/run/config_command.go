@@ -67,11 +67,11 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 
 // FindConfigPath returns the config path specified or searches for a valid config path.
 // It will return a path by searching in this order:
-//   1. The given configPath
-//   2. The environment variable KAPACITOR_CONFIG_PATH
-//   3. The first non empty kapacitor.conf file in the path:
-//        - ~/.kapacitor/
-//        - /etc/kapacitor/
+//  1. The given configPath
+//  2. The environment variable KAPACITOR_CONFIG_PATH
+//  3. The first non empty kapacitor.conf file in the path:
+//     - ~/.kapacitor/
+//     - /etc/kapacitor/
 func FindConfigPath(configPath string) string {
 	if configPath != "" {
 		if configPath == os.DevNull {

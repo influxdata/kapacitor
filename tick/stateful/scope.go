@@ -35,7 +35,7 @@ type Scope struct {
 	dynamicFuncs   map[string]*DynamicFunc
 }
 
-//Initialize a new Scope object.
+// Initialize a new Scope object.
 func NewScope() *Scope {
 	return &Scope{
 		variables:      make(map[string]interface{}),

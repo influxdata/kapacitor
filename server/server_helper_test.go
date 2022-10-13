@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -42,7 +41,7 @@ func NewServer(c *server.Config, disabled map[string]struct{}) *Server {
 		Branch:  "testBranch",
 	}
 	c.HTTP.LogEnabled = testing.Verbose()
-	ds := diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	ds := diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
 	ds.Open()
 	srv, err := server.New(c, buildInfo, ds, disabled)
 	if err != nil {
@@ -196,7 +195,7 @@ func (s *Server) HTTPGetRetry(url, exp string, retries int, sleep time.Duration)
 
 // MustReadAll reads r. Panic on error.
 func MustReadAll(r io.Reader) []byte {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		panic(err)
 	}
@@ -316,7 +315,7 @@ func (i *InfluxDB) Close() {
 }
 
 func copyFiles(src, dst string) error {
-	fs, err := ioutil.ReadDir(src)
+	fs, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}

@@ -11,13 +11,13 @@ import (
 // detects the points at which the series field
 // changes from one value to another.
 //
-//
 // Example:
-//     stream
-//         |from()
-//             .measurement('packets')
-//         |changeDetect('value')
-//         ...
+//
+//	stream
+//	    |from()
+//	        .measurement('packets')
+//	    |changeDetect('value')
+//	    ...
 //
 // with source data:
 // packets value="bad" 0000000000
@@ -40,11 +40,12 @@ import (
 // It is also possible to provide a list of many fields and if any field changes the point will be emitted.
 //
 // Example:
-//     stream
-//         |from()
-//             .measurement('packets')
-//         |changeDetect('in','out')
-//         ...
+//
+//	stream
+//	    |from()
+//	        .measurement('packets')
+//	    |changeDetect('in','out')
+//	    ...
 //
 // with source data:
 // packets in=0,out=0 0000000000

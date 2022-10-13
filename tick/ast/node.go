@@ -896,7 +896,7 @@ func (n *ChainNode) Equal(o interface{}) bool {
 	return false
 }
 
-//Holds the textual representation of an identifier
+// Holds the textual representation of an identifier
 type IdentifierNode struct {
 	position
 	Ident   string // The identifier
@@ -965,7 +965,7 @@ func (n *IdentifierNode) Equal(o interface{}) bool {
 	return false
 }
 
-//Holds the textual representation of an identifier
+// Holds the textual representation of an identifier
 type ReferenceNode struct {
 	position
 	Reference string // The field reference
@@ -1057,7 +1057,7 @@ func (n *ReferenceNode) Equal(o interface{}) bool {
 	return false
 }
 
-//Holds the textual representation of a string literal
+// Holds the textual representation of a string literal
 type StringNode struct {
 	position
 	Literal      string // The string literal
@@ -1173,7 +1173,7 @@ func (n *StringNode) Equal(o interface{}) bool {
 	return false
 }
 
-//Holds the list of other nodes
+// Holds the list of other nodes
 type ListNode struct {
 	position
 	Nodes   []Node
@@ -1260,7 +1260,7 @@ func (n *ListNode) Equal(o interface{}) bool {
 	return false
 }
 
-//Holds the textual representation of a regex literal
+// Holds the textual representation of a regex literal
 type RegexNode struct {
 	position
 	Regex   *regexp.Regexp
@@ -1459,7 +1459,7 @@ func NewFuncType(typ string) (FuncType, error) {
 	}
 }
 
-//Holds the a function call with its args
+// Holds the a function call with its args
 type FunctionNode struct {
 	position
 	Type      FuncType
@@ -1650,7 +1650,7 @@ func (n *LambdaNode) ExpressionString() string {
 	return buf.String()
 }
 
-//Holds a function call with its args
+// Holds a function call with its args
 type ProgramNode struct {
 	position
 	Nodes []Node

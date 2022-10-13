@@ -210,7 +210,7 @@ func (p *parser) parseLambda(text string) (n *LambdaNode, err error) {
 	return
 }
 
-//parse a complete program
+// parse a complete program
 func (p *parser) program() Node {
 	l := newProgram(p.position(0))
 	var s Node
@@ -231,7 +231,7 @@ func (p *parser) program() Node {
 	}
 }
 
-//parse a statement
+// parse a statement
 func (p *parser) statement() Node {
 	switch t := p.peek().typ; t {
 	case TokenVar:
@@ -243,7 +243,7 @@ func (p *parser) statement() Node {
 	}
 }
 
-//parse a dbrp statement
+// parse a dbrp statement
 func (p *parser) dbrp() Node {
 	dbrpTok := p.expect(TokenDBRP)
 	dbrpC := p.consumeComment()
@@ -254,7 +254,7 @@ func (p *parser) dbrp() Node {
 	return newDBRP(p.position(dbrpTok.pos), db.(*ReferenceNode), rp.(*ReferenceNode), dbrpC)
 }
 
-//parse a declaration statement
+// parse a declaration statement
 func (p *parser) declaration() Node {
 	varTok := p.expect(TokenVar)
 	declC := p.consumeComment()
@@ -269,7 +269,7 @@ func (p *parser) declaration() Node {
 	}
 }
 
-//parse an expression
+// parse an expression
 func (p *parser) expression() Node {
 	switch p.peek().typ {
 	case TokenIdent:
@@ -301,7 +301,7 @@ func (p *parser) expression() Node {
 	}
 }
 
-//parse a function or identifier invocation chain
+// parse a function or identifier invocation chain
 // '|', '.' operators are left-associative.
 func (p *parser) chain(lhs Node) Node {
 	if t := p.peek().typ; t == TokenDot || t == TokenPipe || t == TokenAt {
@@ -334,14 +334,14 @@ func (p *parser) funcOrIdent(ft FuncType) (n Node) {
 	return
 }
 
-//parse an identifier
+// parse an identifier
 func (p *parser) identifier() *IdentifierNode {
 	ident := p.expect(TokenIdent)
 	n := newIdent(p.position(ident.pos), ident.val, p.consumeComment())
 	return n
 }
 
-//parse a function call
+// parse a function call
 func (p *parser) function(ft FuncType) Node {
 	ident := p.expect(TokenIdent)
 	c := p.consumeComment()
@@ -356,7 +356,7 @@ func (p *parser) function(ft FuncType) Node {
 	return n
 }
 
-//parse a parameter list
+// parse a parameter list
 func (p *parser) parameters() (args []Node) {
 	for {
 		if p.peek().typ == TokenRParen {
@@ -374,7 +374,7 @@ func (p *parser) parameter() (n Node) {
 	return p.expression()
 }
 
-//parse a string list
+// parse a string list
 func (p *parser) stringList() Node {
 	t := p.expect(TokenLSBracket)
 	c := p.consumeComment()
@@ -459,7 +459,7 @@ func (p *parser) precedence(lhs Node, minP int) Node {
 	return lhs
 }
 
-//parse a function call in a lambda expr
+// parse a function call in a lambda expr
 func (p *parser) lfunction() Node {
 	ident := p.expect(TokenIdent)
 	p.expect(TokenLParen)
@@ -474,7 +474,7 @@ func (p *parser) lfunction() Node {
 	return n
 }
 
-//parse a parameter list in a lfunction
+// parse a parameter list in a lfunction
 func (p *parser) lparameters() (args []Node) {
 	for {
 		if p.peek().typ == TokenRParen {
@@ -553,7 +553,7 @@ func (p *parser) primary() Node {
 	}
 }
 
-//parse a duration literal
+// parse a duration literal
 func (p *parser) duration() Node {
 	token := p.expect(TokenDuration)
 	num, err := newDur(p.position(token.pos), token.val, p.consumeComment())
@@ -563,7 +563,7 @@ func (p *parser) duration() Node {
 	return num
 }
 
-//parse a number literal
+// parse a number literal
 func (p *parser) number() Node {
 	token := p.expect(TokenNumber)
 	num, err := newNumber(p.position(token.pos), token.val, p.consumeComment())
@@ -573,14 +573,14 @@ func (p *parser) number() Node {
 	return num
 }
 
-//parse a string literal
+// parse a string literal
 func (p *parser) string() Node {
 	token := p.expect(TokenString)
 	s := newString(p.position(token.pos), token.val, p.consumeComment())
 	return s
 }
 
-//parse a regex literal
+// parse a regex literal
 func (p *parser) regex() Node {
 	token := p.expect(TokenRegex)
 	r, err := newRegex(p.position(token.pos), token.val, p.consumeComment())
@@ -596,7 +596,7 @@ func (p *parser) star() Node {
 	return newStar(p.position(tok.pos), p.consumeComment())
 }
 
-//parse a reference literal
+// parse a reference literal
 func (p *parser) reference() Node {
 	token := p.expect(TokenReference)
 	r := newReference(p.position(token.pos), token.val, p.consumeComment())

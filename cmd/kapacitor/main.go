@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -677,7 +676,7 @@ func doDefine(args []string) error {
 			return err
 		}
 		defer file.Close()
-		data, err := ioutil.ReadAll(file)
+		data, err := io.ReadAll(file)
 		if err != nil {
 			return err
 		}
@@ -699,7 +698,7 @@ func doDefine(args []string) error {
 			return errors.Wrapf(err, "failed to open file %s", *dvars)
 		}
 		defer f.Close()
-		data, err := ioutil.ReadAll(f)
+		data, err := io.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read task vars file %q", *dvars)
 		}
@@ -724,7 +723,7 @@ func doDefine(args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to open file %s", *dfile)
 		}
-		data, err := ioutil.ReadAll(f)
+		data, err := io.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read task vars file %q", *dfile)
 		}
@@ -884,7 +883,7 @@ func doDefineTemplate(args []string) error {
 			return err
 		}
 		defer file.Close()
-		data, err := ioutil.ReadAll(file)
+		data, err := io.ReadAll(file)
 		if err != nil {
 			return err
 		}
@@ -955,7 +954,7 @@ func doDefineTopicHandler(args []string) error {
 	ext := path.Ext(p)
 	switch ext {
 	case ".yaml", ".yml":
-		data, err := ioutil.ReadAll(f)
+		data, err := io.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read handler file %q", p)
 		}

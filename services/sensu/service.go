@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"regexp"
 	"sync/atomic"
@@ -115,7 +115,7 @@ func (s *Service) Alert(name, source, output string, handlers []string, metadata
 	if err != nil {
 		return err
 	}
-	resp, err := ioutil.ReadAll(conn)
+	resp, err := io.ReadAll(conn)
 	if err != nil {
 		return err
 	}

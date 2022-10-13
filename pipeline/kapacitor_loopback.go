@@ -10,21 +10,20 @@ import (
 // To write data to a remote Kapacitor instance use the InfluxDBOut node.
 //
 // Example:
-//        |kapacitorLoopback()
-//            .database('mydb')
-//            .retentionPolicy('myrp')
-//            .measurement('errors')
-//            .tag('kapacitor', 'true')
-//            .tag('version', '0.2')
 //
+//	|kapacitorLoopback()
+//	    .database('mydb')
+//	    .retentionPolicy('myrp')
+//	    .measurement('errors')
+//	    .tag('kapacitor', 'true')
+//	    .tag('version', '0.2')
 //
 // NOTE: It is possible to create infinite loops using this node.
 // Take care to ensure you do not chain tasks together creating a loop.
 //
 // Available Statistics:
 //
-//    * points_written -- number of points written back to Kapacitor
-//
+//   - points_written -- number of points written back to Kapacitor
 type KapacitorLoopbackNode struct {
 	node `json:"-"`
 

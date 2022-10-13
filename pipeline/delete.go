@@ -8,18 +8,18 @@ import (
 // Deletes fields and tags from data points.
 //
 // Example:
-//    stream
-//        |delete()
-//            .field('value')
-//            .tag('host')
+//
+//	stream
+//	    |delete()
+//	        .field('value')
+//	        .tag('host')
 //
 // The above example will remove the field `value` and the tag `host`, from each point.
 //
 // Available Statistics:
 //
-//    * fields_deleted -- number of fields that were deleted. Only counts if the field already existed.
-//    * tags_deleted -- number of tags that were deleted. Only counts if the tag already existed.
-//
+//   - fields_deleted -- number of fields that were deleted. Only counts if the field already existed.
+//   - tags_deleted -- number of tags that were deleted. Only counts if the tag already existed.
 type DeleteNode struct {
 	chainnode `json:"-"`
 

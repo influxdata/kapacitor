@@ -8,19 +8,19 @@ import (
 // Defaults fields and tags on data points.
 //
 // Example:
-//    stream
-//        |default()
-//            .field('value', 0.0)
-//            .tag('host', '')
+//
+//	stream
+//	    |default()
+//	        .field('value', 0.0)
+//	        .tag('host', '')
 //
 // The above example will set the field `value` to float64(0) if it does not already exist
 // It will also set the tag `host` to string("") if it does not already exist.
 //
 // Available Statistics:
 //
-//    * fields_defaulted -- number of fields that were missing
-//    * tags_defaulted -- number of tags that were missing
-//
+//   - fields_defaulted -- number of fields that were missing
+//   - tags_defaulted -- number of tags that were missing
 type DefaultNode struct {
 	chainnode `json:"-"`
 

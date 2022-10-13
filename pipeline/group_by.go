@@ -14,9 +14,10 @@ import (
 // all other tags are dropped.
 //
 // Example:
-//    stream
-//        |groupBy('service', 'datacenter')
-//        ...
+//
+//	stream
+//	    |groupBy('service', 'datacenter')
+//	    ...
 //
 // The above example groups the data along two dimensions `service` and `datacenter`.
 // Groups are dynamically created as new data arrives and each group is processed
@@ -113,9 +114,10 @@ func validateDimensions(dimensions []interface{}, excludedDimensions []string) e
 // Along with any other group by dimensions.
 //
 // Example:
-//     ...
-//     |groupBy('host')
-//         .byMeasurement()
+//
+//	...
+//	|groupBy('host')
+//	    .byMeasurement()
 //
 // The above example groups points by their host tag and measurement name.
 //
@@ -123,7 +125,8 @@ func validateDimensions(dimensions []interface{}, excludedDimensions []string) e
 // then groupBy all existing dimensions but without specifying 'byMeasurement'.
 //
 // Example:
-//    |groupBy(*)
+//
+//	|groupBy(*)
 //
 // The above removes the group by measurement name if any.
 // tick:property

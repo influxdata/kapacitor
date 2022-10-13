@@ -61,8 +61,9 @@ func redactPassword(r *http.Request) {
 // buildLogLine creates a common log format
 // in addition to the common fields, we also append referrer, user agent,
 // request ID and response time (microseconds)
-//  ie, in apache mod_log_config terms:
-//     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
+//
+//	ie, in apache mod_log_config terms:
+//	   %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
 //
 // Common Log Format: http://en.wikipedia.org/wiki/Common_Log_Format
 func buildLogLine(d Diagnostic, l *responseLogger, r *http.Request, start time.Time) {

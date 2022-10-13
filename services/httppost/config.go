@@ -3,8 +3,8 @@ package httppost
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"text/template"
@@ -114,7 +114,7 @@ func GetTemplate(tmpl, tpath string) (*template.Template, error) {
 		return t, errors.Wrap(err, "failed to parse template")
 	}
 	if tpath != "" {
-		data, err := ioutil.ReadFile(tpath)
+		data, err := os.ReadFile(tpath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read template file %q", tpath)
 		}

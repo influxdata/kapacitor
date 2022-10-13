@@ -131,7 +131,7 @@ func init() {
 	}
 }
 
-//String representation of an TokenType
+// String representation of an TokenType
 func (t TokenType) String() string {
 	switch {
 	case t == TokenError:
@@ -296,7 +296,7 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	return nil
 }
 
-//Backup the lexer to the previous rune
+// Backup the lexer to the previous rune
 func (l *lexer) backup() {
 	l.pos -= l.width
 }
@@ -308,7 +308,7 @@ func (l *lexer) peek() rune {
 	return r
 }
 
-//Backup the lexer to the previous rune
+// Backup the lexer to the previous rune
 func (l *lexer) current() string {
 	return l.input[l.start:l.pos]
 }

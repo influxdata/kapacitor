@@ -33,11 +33,9 @@ type Diagnostic interface {
 	ClosedService()
 }
 
-//
 // Service represents here an UDP service
 // that will listen for incoming packets
 // formatted with the inline protocol
-//
 type Service struct {
 	conn    *net.UDPConn
 	addr    *net.UDPAddr

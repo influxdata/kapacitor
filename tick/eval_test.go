@@ -14,7 +14,8 @@ import (
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
-//Test structure for evaluating a DSL
+// Test structure for evaluating a DSL
+//
 //lint:ignore U1000 // we need this for an accurate test
 type structA struct {
 	s *structB

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"sync"
 
@@ -88,7 +87,7 @@ func (c *Command) Start() error {
 	c.Lock()
 	defer c.Unlock()
 	c.Started = true
-	data, err := ioutil.ReadAll(c.stdin)
+	data, err := io.ReadAll(c.stdin)
 	if err != nil {
 		return err
 	}

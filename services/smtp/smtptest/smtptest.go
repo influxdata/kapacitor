@@ -2,7 +2,7 @@ package smtptest
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/mail"
 	"net/textproto"
@@ -124,7 +124,7 @@ func (s *Server) handleConn(conn net.Conn) {
 			if err != nil {
 				goto FAIL
 			}
-			body, err = ioutil.ReadAll(message.Body)
+			body, err = io.ReadAll(message.Body)
 			if err != nil {
 				goto FAIL
 			}

@@ -12,12 +12,10 @@ BUILD_NUM=${BUILD_NUM-$RANDOM}
 # Home dir of the docker user
 HOME_DIR=/root
 
-GO_VERSION=1.17.1
-
 imagename=kapacitor-builder-img-$BUILD_NUM
 
 # Build new docker image
-docker build -f Dockerfile_build_ubuntu64 -t $imagename --build-arg GO_VERSION=${GO_VERSION} $DIR
+docker build -f Dockerfile_build_ubuntu64 -t $imagename $DIR
 
 echo "Running build.py"
 # Run docker

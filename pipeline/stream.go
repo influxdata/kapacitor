@@ -73,23 +73,23 @@ func (n *StreamNode) UnmarshalJSON(data []byte) error {
 // independent forks of the data stream.
 //
 // Example:
-//    // Select the 'cpu' measurement from just the database 'mydb'
-//    // and retention policy 'myrp'.
-//    var cpu = stream
-//        |from()
-//            .database('mydb')
-//            .retentionPolicy('myrp')
-//            .measurement('cpu')
-//    // Select the 'load' measurement from any database and retention policy.
-//    var load = stream
-//        |from()
-//            .measurement('load')
-//    // Join cpu and load streams and do further processing.
-//    cpu
-//        |join(load)
-//            .as('cpu', 'load')
-//        ...
 //
+//	// Select the 'cpu' measurement from just the database 'mydb'
+//	// and retention policy 'myrp'.
+//	var cpu = stream
+//	    |from()
+//	        .database('mydb')
+//	        .retentionPolicy('myrp')
+//	        .measurement('cpu')
+//	// Select the 'load' measurement from any database and retention policy.
+//	var load = stream
+//	    |from()
+//	        .measurement('load')
+//	// Join cpu and load streams and do further processing.
+//	cpu
+//	    |join(load)
+//	        .as('cpu', 'load')
+//	    ...
 func (s *StreamNode) From() *FromNode {
 	f := newFromNode()
 	s.linkChild(f)
@@ -100,14 +100,15 @@ func (s *StreamNode) From() *FromNode {
 // The stream node allows you to select which portion of the stream you want to process.
 //
 // Example:
-//    stream
-//        |from()
-//           .database('mydb')
-//           .retentionPolicy('myrp')
-//           .measurement('mymeasurement')
-//           .where(lambda: "host" =~ /logger\d+/)
-//        |window()
-//        ...
+//
+//	stream
+//	    |from()
+//	       .database('mydb')
+//	       .retentionPolicy('myrp')
+//	       .measurement('mymeasurement')
+//	       .where(lambda: "host" =~ /logger\d+/)
+//	    |window()
+//	    ...
 //
 // The above example selects only data points from the database `mydb`
 // and retention policy `myrp` and measurement `mymeasurement` where
@@ -237,23 +238,23 @@ func (n *FromNode) ChainMethods() map[string]reflect.Value {
 // independent forks of the data stream.
 //
 // Example:
-//    // Select the 'cpu' measurement from just the database 'mydb'
-//    // and retention policy 'myrp'.
-//    var cpu = stream
-//        |from()
-//            .database('mydb')
-//            .retentionPolicy('myrp')
-//            .measurement('cpu')
-//    // Select the 'load' measurement from any database and retention policy.
-//    var load = stream
-//        |from()
-//            .measurement('load')
-//    // Join cpu and load streams and do further processing.
-//    cpu
-//        |join(load)
-//            .as('cpu', 'load')
-//        ...
 //
+//	// Select the 'cpu' measurement from just the database 'mydb'
+//	// and retention policy 'myrp'.
+//	var cpu = stream
+//	    |from()
+//	        .database('mydb')
+//	        .retentionPolicy('myrp')
+//	        .measurement('cpu')
+//	// Select the 'load' measurement from any database and retention policy.
+//	var load = stream
+//	    |from()
+//	        .measurement('load')
+//	// Join cpu and load streams and do further processing.
+//	cpu
+//	    |join(load)
+//	        .as('cpu', 'load')
+//	    ...
 func (s *FromNode) From() *FromNode {
 	f := newFromNode()
 	s.linkChild(f)
@@ -268,56 +269,59 @@ func (s *FromNode) From() *FromNode {
 // Multiple calls to the Where method will `AND` together each expression.
 //
 // Example:
-//    stream
-//       |from()
-//          .where(lambda: condition1)
-//          .where(lambda: condition2)
+//
+//	stream
+//	   |from()
+//	      .where(lambda: condition1)
+//	      .where(lambda: condition2)
 //
 // The above is equivalent to this
 // Example:
-//    stream
-//       |from()
-//          .where(lambda: condition1 AND condition2)
 //
+//	stream
+//	   |from()
+//	      .where(lambda: condition1 AND condition2)
 //
 // NOTE: Becareful to always use `|from` if you want multiple different streams.
 //
 // Example:
-//  var data = stream
-//      |from()
-//          .measurement('cpu')
-//  var total = data
-//      .where(lambda: "cpu" == 'cpu-total')
-//  var others = data
-//      .where(lambda: "cpu" != 'cpu-total')
+//
+//	var data = stream
+//	    |from()
+//	        .measurement('cpu')
+//	var total = data
+//	    .where(lambda: "cpu" == 'cpu-total')
+//	var others = data
+//	    .where(lambda: "cpu" != 'cpu-total')
 //
 // The example above is equivalent to the example below,
 // which is obviously not what was intended.
 //
 // Example:
-//  var data = stream
-//      |from()
-//          .measurement('cpu')
-//          .where(lambda: "cpu" == 'cpu-total' AND "cpu" != 'cpu-total')
-//  var total = data
-//  var others = total
+//
+//	var data = stream
+//	    |from()
+//	        .measurement('cpu')
+//	        .where(lambda: "cpu" == 'cpu-total' AND "cpu" != 'cpu-total')
+//	var total = data
+//	var others = total
 //
 // The example below will create two different streams each selecting
 // a different subset of the original stream.
 //
 // Example:
-//  var data = stream
-//      |from()
-//          .measurement('cpu')
-//  var total = stream
-//      |from()
-//          .measurement('cpu')
-//          .where(lambda: "cpu" == 'cpu-total')
-//  var others = stream
-//      |from()
-//          .measurement('cpu')
-//          .where(lambda: "cpu" != 'cpu-total')
 //
+//	var data = stream
+//	    |from()
+//	        .measurement('cpu')
+//	var total = stream
+//	    |from()
+//	        .measurement('cpu')
+//	        .where(lambda: "cpu" == 'cpu-total')
+//	var others = stream
+//	    |from()
+//	        .measurement('cpu')
+//	        .where(lambda: "cpu" != 'cpu-total')
 //
 // If empty then all data points are considered to match.
 // tick:property
@@ -338,9 +342,11 @@ func (s *FromNode) Where(lambda *ast.LambdaNode) *FromNode {
 //
 // Can pass literal * to group by all dimensions.
 // Example:
-//  stream
-//      |from()
-//          .groupBy(*)
+//
+//	stream
+//	    |from()
+//	        .groupBy(*)
+//
 // tick:property
 func (s *FromNode) GroupBy(tag ...interface{}) *FromNode {
 	s.Dimensions = tag
@@ -352,10 +358,11 @@ func (s *FromNode) GroupBy(tag ...interface{}) *FromNode {
 //
 // Example:
 // stream
-//      |from()
-//          .database('mydb')
-//          .groupByMeasurement()
-//          .groupBy('host')
+//
+//	|from()
+//	    .database('mydb')
+//	    .groupByMeasurement()
+//	    .groupBy('host')
 //
 // The above example selects all measurements from the database 'mydb' and
 // then each point is grouped by the host tag and measurement name.

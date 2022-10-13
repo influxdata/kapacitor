@@ -2,7 +2,6 @@ package run_test
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +34,7 @@ func TestCommand_PIDFile(t *testing.T) {
 	if err := configTemplate.Execute(&buf, map[string]string{"TempDir": tmpdir}); err != nil {
 		t.Fatalf("unable to generate config file: %s", err)
 	}
-	if err := ioutil.WriteFile(configFile, buf.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(configFile, buf.Bytes(), 0600); err != nil {
 		t.Fatalf("unable to write %s: %s", configFile, err)
 	}
 

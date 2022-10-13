@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"
@@ -264,7 +263,7 @@ func (c *Client) do(method, host, path string, query url.Values, ct string, body
 		// Set the body to a copy of the original body passed in.
 		// This allows us to reuse it each time.
 		if body != nil {
-			body = ioutil.NopCloser(bytes.NewReader(buf.Bytes()))
+			body = io.NopCloser(bytes.NewReader(buf.Bytes()))
 		}
 
 		req, err := http.NewRequest(method, location, body)

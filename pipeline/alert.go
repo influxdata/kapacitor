@@ -38,38 +38,38 @@ type AlertNode struct{ *AlertNodeData }
 //
 // Available event handlers:
 //
-//    * log -- log alert data to file.
-//    * post -- HTTP POST data to a specified URL.
-//    * tcp -- Send data to a specified address via raw TCP.
-//    * email -- Send and email with alert data.
-//    * exec -- Execute a command passing alert data over STDIN.
-//    * HipChat -- Post alert message to HipChat room.
-//    * Alerta -- Post alert message to Alerta.
-//    * Sensu -- Post alert message to Sensu client.
-//    * Slack -- Post alert message to Slack channel.
-//    * SNMPTraps -- Trigger SNMP traps.
-//    * OpsGenie -- Send alert to OpsGenie.
-//    * VictorOps -- Send alert to VictorOps.
-//    * PagerDuty -- Send alert to PagerDuty.
-//    * Pushover -- Send alert to Pushover.
-//    * Talk -- Post alert message to Talk client.
-//    * Telegram -- Post alert message to Telegram client.
-//    * MQTT -- Post alert message to MQTT.
-//    * Teams -- Post alert message to Microsoft Teams.
-//    * Discord -- Post alert message to Discord webhook.
-//    * ServiceNow -- Post alert message to ServiceNow.
+//   - log -- log alert data to file.
+//   - post -- HTTP POST data to a specified URL.
+//   - tcp -- Send data to a specified address via raw TCP.
+//   - email -- Send and email with alert data.
+//   - exec -- Execute a command passing alert data over STDIN.
+//   - HipChat -- Post alert message to HipChat room.
+//   - Alerta -- Post alert message to Alerta.
+//   - Sensu -- Post alert message to Sensu client.
+//   - Slack -- Post alert message to Slack channel.
+//   - SNMPTraps -- Trigger SNMP traps.
+//   - OpsGenie -- Send alert to OpsGenie.
+//   - VictorOps -- Send alert to VictorOps.
+//   - PagerDuty -- Send alert to PagerDuty.
+//   - Pushover -- Send alert to Pushover.
+//   - Talk -- Post alert message to Talk client.
+//   - Telegram -- Post alert message to Telegram client.
+//   - MQTT -- Post alert message to MQTT.
+//   - Teams -- Post alert message to Microsoft Teams.
+//   - Discord -- Post alert message to Discord webhook.
+//   - ServiceNow -- Post alert message to ServiceNow.
 //
 // See below for more details on configuring each handler.
 //
 // Each event that gets sent to a handler contains the following alert data:
 //
-//    * ID -- the ID of the alert, user defined.
-//    * Message -- the alert message, user defined.
-//    * Details -- the alert details, user defined HTML content.
-//    * Time -- the time the alert occurred.
-//    * Duration -- the duration of the alert in nanoseconds.
-//    * Level -- one of OK, INFO, WARNING or CRITICAL.
-//    * Data -- influxql.Result containing the data that triggered the alert.
+//   - ID -- the ID of the alert, user defined.
+//   - Message -- the alert message, user defined.
+//   - Details -- the alert details, user defined HTML content.
+//   - Time -- the time the alert occurred.
+//   - Duration -- the duration of the alert in nanoseconds.
+//   - Level -- one of OK, INFO, WARNING or CRITICAL.
+//   - Data -- influxql.Result containing the data that triggered the alert.
 //
 // Events are sent to handlers if the alert is in a state other than 'OK'
 // or the alert just changed to the 'OK' state from a non 'OK' state (a.k.a. the alert recovered).
@@ -79,19 +79,19 @@ type AlertNode struct{ *AlertNodeData }
 // It is valid to configure multiple alert handlers, even with the same type.
 //
 // Example:
-//   stream
-//           .groupBy('service')
-//       |alert()
-//           .id('kapacitor/{{ index .Tags "service" }}')
-//           .message('{{ .ID }} is {{ .Level }} value:{{ index .Fields "value" }}')
-//           .info(lambda: "value" > 10)
-//           .warn(lambda: "value" > 20)
-//           .crit(lambda: "value" > 30)
-//           .post("http://example.com/api/alert")
-//           .post("http://another.example.com/api/alert")
-//           .tcp("exampleendpoint.com:5678")
-//           .email('oncall@example.com')
 //
+//	stream
+//	        .groupBy('service')
+//	    |alert()
+//	        .id('kapacitor/{{ index .Tags "service" }}')
+//	        .message('{{ .ID }} is {{ .Level }} value:{{ index .Fields "value" }}')
+//	        .info(lambda: "value" > 10)
+//	        .warn(lambda: "value" > 20)
+//	        .crit(lambda: "value" > 30)
+//	        .post("http://example.com/api/alert")
+//	        .post("http://another.example.com/api/alert")
+//	        .tcp("exampleendpoint.com:5678")
+//	        .email('oncall@example.com')
 //
 // Each expression maintains its own state.
 // The order of execution for the expressions is not considered to be deterministic.
@@ -102,32 +102,35 @@ type AlertNode struct{ *AlertNodeData }
 // This way when an alert enters a state, it can only be lowered in severity if its reset expression evaluates to true.
 //
 // Example:
-//   stream
-//       |from()
-//           .measurement('cpu')
-//           .where(lambda: "host" == 'serverA')
-//           .groupBy('host')
-//       |alert()
-//           .info(lambda: "value" > 60)
-//           .infoReset(lambda: "value" < 50)
-//           .warn(lambda: "value" > 70)
-//           .warnReset(lambda: "value" < 60)
-//           .crit(lambda: "value" > 80)
-//           .critReset(lambda: "value" < 70)
+//
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	        .where(lambda: "host" == 'serverA')
+//	        .groupBy('host')
+//	    |alert()
+//	        .info(lambda: "value" > 60)
+//	        .infoReset(lambda: "value" < 50)
+//	        .warn(lambda: "value" > 70)
+//	        .warnReset(lambda: "value" < 60)
+//	        .crit(lambda: "value" > 80)
+//	        .critReset(lambda: "value" < 70)
 //
 // For example given the following values:
-//     61 73 64 85 62 56 47
+//
+//	61 73 64 85 62 56 47
+//
 // The corresponding alert states are:
-//     INFO WARNING WARNING CRITICAL INFO INFO OK
+//
+//	INFO WARNING WARNING CRITICAL INFO INFO OK
 //
 // Available Statistics:
 //
-//    * alerts_triggered -- Total number of alerts triggered
-//    * oks_triggered -- Number of OK alerts triggered
-//    * infos_triggered -- Number of Info alerts triggered
-//    * warns_triggered -- Number of Warn alerts triggered
-//    * crits_triggered -- Number of Crit alerts triggered
-//
+//   - alerts_triggered -- Total number of alerts triggered
+//   - oks_triggered -- Number of OK alerts triggered
+//   - infos_triggered -- Number of Info alerts triggered
+//   - warns_triggered -- Number of Warn alerts triggered
+//   - crits_triggered -- Number of Crit alerts triggered
 type AlertNodeData struct {
 	chainnode
 
@@ -504,16 +507,17 @@ func (n *AlertNodeData) NoRecoveries() *AlertNodeData {
 // are considered different states.
 //
 // Example:
-//   stream
-//       |from()
-//           .measurement('cpu')
-//       |window()
-//            .period(10s)
-//            .every(10s)
-//       |alert()
-//           .crit(lambda: "value" > 10)
-//           .stateChangesOnly()
-//           .slack()
+//
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	    |window()
+//	         .period(10s)
+//	         .every(10s)
+//	    |alert()
+//	        .crit(lambda: "value" > 10)
+//	        .stateChangesOnly()
+//	        .slack()
 //
 // If the "value" is greater than 10 for a total of 60s, then
 // only two events will be sent. First, when the value crosses
@@ -527,16 +531,17 @@ func (n *AlertNodeData) NoRecoveries() *AlertNodeData {
 // since the last alert.
 //
 // Example:
-//   stream
-//       |from()
-//           .measurement('cpu')
-//       |window()
-//            .period(10s)
-//            .every(10s)
-//       |alert()
-//           .crit(lambda: "value" > 10)
-//           .stateChangesOnly(10m)
-//           .slack()
+//
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	    |window()
+//	         .period(10s)
+//	         .every(10s)
+//	    |alert()
+//	        .crit(lambda: "value" > 10)
+//	        .stateChangesOnly(10m)
+//	        .slack()
 //
 // The above usage will only trigger alerts to slack on state changes or at least every 10 minutes.
 //
@@ -575,22 +580,23 @@ func (n *AlertNodeData) Flapping(low, high float64) *AlertNodeData {
 // The following two TICKscripts demonstrate how to use the inhibit feature.
 //
 // Example:
-//    //cpu_alert.tick
-//    stream
-//        |from()
-//            .measurement('cpu')
-//            .groupBy('host')
-//        |alert()
-//            .category('system_alerts')
-//            .crit(lambda: "usage_idle" < 10.0)
 //
-//    //host_alert.tick
-//    stream
-//        |from()
-//            .measurement('uptime')
-//            .groupBy('host')
-//        |deadman(0.0, 1m)
-//            .inhibit('system_alerts', 'host')
+//	//cpu_alert.tick
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	        .groupBy('host')
+//	    |alert()
+//	        .category('system_alerts')
+//	        .crit(lambda: "usage_idle" < 10.0)
+//
+//	//host_alert.tick
+//	stream
+//	    |from()
+//	        .measurement('uptime')
+//	        .groupBy('host')
+//	    |deadman(0.0, 1m)
+//	        .inhibit('system_alerts', 'host')
 //
 // The deadman is a kind of alert node and so can be used to inhibit all alerts in the `system_alerts` category when it triggers.
 // The 'host` argument to the inhibit function says that the host tag must be equal between the cpu alert and the host alert in order for it to be inhibited.
@@ -615,15 +621,17 @@ type Inhibitor struct {
 // HTTP POST JSON alert data to a specified URL.
 //
 // Example:
-//    stream
-//         |alert()
-//             .post()
-//                 .endpoint('example')
+//
+//	stream
+//	     |alert()
+//	         .post()
+//	             .endpoint('example')
 //
 // Example:
-//    stream
-//         |alert()
-//             .post('http://example.com')
+//
+//	stream
+//	     |alert()
+//	         .post('http://example.com')
 //
 // tick:property
 func (n *AlertNodeData) Post(urls ...string) *AlertHTTPPostHandler {
@@ -669,11 +677,13 @@ type AlertHTTPPostHandler struct {
 // please use the configuration file to specify sensitive headers.
 //
 // Example:
-//    stream
-//         |alert()
-//             .post()
-//                 .endpoint('example')
-//                 .header('a','b')
+//
+//	stream
+//	     |alert()
+//	         .post()
+//	             .endpoint('example')
+//	             .header('a','b')
+//
 // tick:property
 func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 	if a.Headers == nil {
@@ -694,11 +704,13 @@ func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 
 // SkipSSLVerification disables ssl verification for the POST request
 // Example:
-//    stream
-//         |alert()
-//             .post()
-//                 .endpoint('https'://user@pw/example/resource')
-//                 .skipSSLVerification()
+//
+//	stream
+//	     |alert()
+//	         .post()
+//	             .endpoint('https'://user@pw/example/resource')
+//	             .skipSSLVerification()
+//
 // tick:property
 func (a *AlertHTTPPostHandler) SkipSSLVerification() *AlertHTTPPostHandler {
 	a.SkipSSLVerificationFlag = true
@@ -745,36 +757,41 @@ type TcpHandler struct {
 // in the TICKscript.
 //
 // Example:
-//    |alert()
-//       .id('{{ .Name }}')
-//       // Email subject
-//       .message('{{ .ID }}:{{ .Level }}')
-//       //Email body as HTML
-//       .details('''
-//<h1>{{ .ID }}</h1>
-//<b>{{ .Message }}</b>
-//Value: {{ index .Fields "value" }}
-//''')
-//       .email()
+//
+//	|alert()
+//	   .id('{{ .Name }}')
+//	   // Email subject
+//	   .message('{{ .ID }}:{{ .Level }}')
+//	   //Email body as HTML
+//	   .details('''
+//
+// <h1>{{ .ID }}</h1>
+// <b>{{ .Message }}</b>
+// Value: {{ index .Fields "value" }}
+// ”')
+//
+//	.email()
 //
 // Send an email with custom subject and body.
 //
 // Example:
-//     [smtp]
-//       enabled = true
-//       host = "localhost"
-//       port = 25
-//       username = ""
-//       password = ""
-//       from = "kapacitor@example.com"
-//       to = ["oncall@example.com"]
-//       # Set global to true so all alert trigger emails.
-//       global = true
-//       state-changes-only =  true
+//
+//	[smtp]
+//	  enabled = true
+//	  host = "localhost"
+//	  port = 25
+//	  username = ""
+//	  password = ""
+//	  from = "kapacitor@example.com"
+//	  to = ["oncall@example.com"]
+//	  # Set global to true so all alert trigger emails.
+//	  global = true
+//	  state-changes-only =  true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send email to 'oncall@example.com' from 'kapacitor@example.com'
 //
@@ -807,19 +824,22 @@ type EmailHandler struct {
 // If empty uses the addresses from the configuration.
 //
 // Example:
-//    |alert()
-//       .id('{{ .Name }}')
-//       // Email subject
-//       .message('{{ .ID }}:{{ .Level }}')
-//       //Email body as HTML
-//       .details('''
-//<h1>{{ .ID }}</h1>
-//<b>{{ .Message }}</b>
-//Value: {{ index .Fields "value" }}
-//''')
-//       .email('admin@example.com')
-//         .to('oncall@example.com')
-//         .to('support@example.com')
+//
+//	|alert()
+//	   .id('{{ .Name }}')
+//	   // Email subject
+//	   .message('{{ .ID }}:{{ .Level }}')
+//	   //Email body as HTML
+//	   .details('''
+//
+// <h1>{{ .ID }}</h1>
+// <b>{{ .Message }}</b>
+// Value: {{ index .Fields "value" }}
+// ”')
+//
+//	.email('admin@example.com')
+//	  .to('oncall@example.com')
+//	  .to('support@example.com')
 //
 // All three email addresses will receive the alert message.
 //
@@ -835,18 +855,21 @@ func (h *EmailHandler) To(to ...string) *EmailHandler {
 // If empty uses the addresses from the configuration.
 //
 // Example:
-//    |alert()
-//       .id('{{ .Name }}')
-//       // Email subject
-//       .message('{{ .ID }}:{{ .Level }}')
-//       //Email body as HTML
-//       .details('''
-//<h1>{{ .ID }}</h1>
-//<b>{{ .Message }}</b>
-//Value: {{ index .Fields "value" }}
-//''')
-//       .email('admin@example.com')
-//         .toTemplates('oncall@example.com')
+//
+//	|alert()
+//	   .id('{{ .Name }}')
+//	   // Email subject
+//	   .message('{{ .ID }}:{{ .Level }}')
+//	   //Email body as HTML
+//	   .details('''
+//
+// <h1>{{ .ID }}</h1>
+// <b>{{ .Message }}</b>
+// Value: {{ index .Fields "value" }}
+// ”')
+//
+//	.email('admin@example.com')
+//	  .toTemplates('oncall@example.com')
 //
 // All three email addresses will receive the alert message.
 //
@@ -881,15 +904,18 @@ type ExecHandler struct {
 // Must specify the absolute path to the log file.
 // It will be created if it does not exist.
 // Example:
-//    stream
-//         |alert()
-//             .log('/tmp/alert')
+//
+//	stream
+//	     |alert()
+//	         .log('/tmp/alert')
 //
 // Example:
-//    stream
-//         |alert()
-//             .log('/tmp/alert')
-//             .mode(0644)
+//
+//	stream
+//	     |alert()
+//	         .log('/tmp/alert')
+//	         .mode(0644)
+//
 // tick:property
 func (n *AlertNodeData) Log(filepath string) *LogHandler {
 	log := &LogHandler{
@@ -920,25 +946,28 @@ type LogHandler struct {
 // Then place the API key from the URL into the 'victorops' section of the Kapacitor configuration.
 //
 // Example:
-//    [victorops]
-//      enabled = true
-//      api-key = "xxxxx"
-//      routing-key = "everyone"
+//
+//	[victorops]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  routing-key = "everyone"
 //
 // With the correct configuration you can now use VictorOps in TICKscripts.
 //
 // Example:
-//    stream
-//         |alert()
-//             .victorOps()
+//
+//	stream
+//	     |alert()
+//	         .victorOps()
 //
 // Send alerts to VictorOps using the routing key in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .victorOps()
-//             .routingKey('team_rocket')
+//
+//	stream
+//	     |alert()
+//	         .victorOps()
+//	         .routingKey('team_rocket')
 //
 // Send alerts to VictorOps with routing key 'team_rocket'
 //
@@ -947,15 +976,17 @@ type LogHandler struct {
 // in the TICKscript.
 //
 // Example:
-//    [victorops]
-//      enabled = true
-//      api-key = "xxxxx"
-//      routing-key = "everyone"
-//      global = true
+//
+//	[victorops]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  routing-key = "everyone"
+//	  global = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to VictorOps using the default routing key, found in the configuration.
 // tick:property
@@ -981,38 +1012,42 @@ type VictorOpsHandler struct {
 //
 // From https://developer.pagerduty.com/documentation/integration/events
 //
-//    1. In your account, under the Services tab, click "Add New Service".
-//    2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
-//    3. Click the "Add Service" button.
-//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
+//  1. In your account, under the Services tab, click "Add New Service".
+//  2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
+//  3. Click the "Add Service" button.
+//  4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
 //
 // Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'.
 //
 // Example:
-//    [pagerduty]
-//      enabled = true
-//      service-key = "xxxxxxxxx"
+//
+//	[pagerduty]
+//	  enabled = true
+//	  service-key = "xxxxxxxxx"
 //
 // With the correct configuration you can now use PagerDuty in TICKscripts.
 //
 // Example:
-//    stream
-//         |alert()
-//             .pagerDuty()
+//
+//	stream
+//	     |alert()
+//	         .pagerDuty()
 //
 // If the 'pagerduty' section in the configuration has the option: global = true
 // then all alerts are sent to PagerDuty without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [pagerduty]
-//      enabled = true
-//      service-key = "xxxxxxxxx"
-//      global = true
+//
+//	[pagerduty]
+//	  enabled = true
+//	  service-key = "xxxxxxxxx"
+//	  global = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to PagerDuty.
 // tick:property
@@ -1039,38 +1074,42 @@ type PagerDutyHandler struct {
 //
 // From https://developer.pagerduty.com/documentation/integration/events
 //
-//    1. In your account, under the Services tab, click "Add New Service".
-//    2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
-//    3. Click the "Add Service" button.
-//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Integration key", which is needed to access the API
+//  1. In your account, under the Services tab, click "Add New Service".
+//  2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
+//  3. Click the "Add Service" button.
+//  4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Integration key", which is needed to access the API
 //
 // Place the 'integration key' into the 'pagerduty' section of the Kapacitor configuration as the option 'routing-key'.
 //
 // Example:
-//    [pagerduty2]
-//      enabled = true
-//      routing-key = "xxxxxxxxx"
+//
+//	[pagerduty2]
+//	  enabled = true
+//	  routing-key = "xxxxxxxxx"
 //
 // With the correct configuration you can now use PagerDuty in TICKscripts.
 //
 // Example:
-//    stream
-//         |alert()
-//             .pagerDuty2()
+//
+//	stream
+//	     |alert()
+//	         .pagerDuty2()
 //
 // If the 'pagerduty' section in the configuration has the option: global = true
 // then all alerts are sent to PagerDuty without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [pagerduty2]
-//      enabled = true
-//      routing-key = "xxxxxxxxx"
-//      global = true
+//
+//	[pagerduty2]
+//	  enabled = true
+//	  routing-key = "xxxxxxxxx"
+//	  global = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to PagerDuty API v2.
 // tick:property
@@ -1112,12 +1151,14 @@ func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
 // Set a link to be reported to pagerduty
 //
 // Example:
-//    stream
-//      |alert()
-//        .pagerduty2()
-//          .link('https://grafana.example.com/dashboard/db/thechart', 'Overview Graph')
-//          .link('https://grafana.example.com/dashboard/db/service_{{ .index Tags "service" }}', 'Service Graph')
-//          .link('https://grafana.example.com/')
+//
+//	stream
+//	  |alert()
+//	    .pagerduty2()
+//	      .link('https://grafana.example.com/dashboard/db/thechart', 'Overview Graph')
+//	      .link('https://grafana.example.com/dashboard/db/service_{{ .index Tags "service" }}', 'Service Graph')
+//	      .link('https://grafana.example.com/')
+//
 // tick:property
 func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handler {
 	linkText := ""
@@ -1139,48 +1180,52 @@ func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handle
 // information on how to get your room id and tokens.
 //
 // Example:
-//    [hipchat]
-//      enabled = true
-//      url = "https://orgname.hipchat.com/v2/room"
-//      room = "4189212"
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//
+//	[hipchat]
+//	  enabled = true
+//	  url = "https://orgname.hipchat.com/v2/room"
+//	  room = "4189212"
+//	  token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the room.
 //
 // Example:
-//    stream
-//         |alert()
-//             .hipChat()
+//
+//	stream
+//	     |alert()
+//	         .hipChat()
 //
 // Send alerts to HipChat room in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .hipChat()
-//             .room('Kapacitor')
+//
+//	stream
+//	     |alert()
+//	         .hipChat()
+//	         .room('Kapacitor')
 //
 // Send alerts to HipChat room 'Kapacitor'
-//
 //
 // If the 'hipchat' section in the configuration has the option: global = true
 // then all alerts are sent to HipChat without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [hipchat]
-//      enabled = true
-//      url = "https://orgname.hipchat.com/v2/room"
-//      room = "Test Room"
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//      global = true
-//      state-changes-only = true
+//
+//	[hipchat]
+//	  enabled = true
+//	  url = "https://orgname.hipchat.com/v2/room"
+//	  room = "Test Room"
+//	  token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to HipChat using default room 'Test Room'.
 // tick:property
@@ -1208,12 +1253,13 @@ type HipChatHandler struct {
 // Send the alert to Alerta.
 //
 // Example:
-//    [alerta]
-//      enabled = true
-//      url = "https://alerta.yourdomain"
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//      environment = "Production"
-//      origin = "Kapacitor"
+//
+//	[alerta]
+//	  enabled = true
+//	  url = "https://alerta.yourdomain"
+//	  token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//	  environment = "Production"
+//	  origin = "Kapacitor"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
@@ -1222,23 +1268,25 @@ type HipChatHandler struct {
 // Send alerts to Alerta. The resource and event properties are required.
 //
 // Example:
-//    stream
-//         |alert()
-//             .alerta()
-//                 .resource('Hostname or service')
-//                 .event('Something went wrong')
+//
+//	stream
+//	     |alert()
+//	         .alerta()
+//	             .resource('Hostname or service')
+//	             .event('Something went wrong')
 //
 // Alerta also accepts optional alert information.
 //
 // Example:
-//    stream
-//         |alert()
-//             .alerta()
-//                 .resource('Hostname or service')
-//                 .event('Something went wrong')
-//                 .environment('Development')
-//                 .group('Dev. Servers')
-//                 .timeout(5m)
+//
+//	stream
+//	     |alert()
+//	         .alerta()
+//	             .resource('Hostname or service')
+//	             .event('Something went wrong')
+//	             .environment('Development')
+//	             .group('Dev. Servers')
+//	             .timeout(5m)
 //
 // NOTE: Alerta cannot be configured globally because of its required properties.
 // tick:property
@@ -1363,26 +1411,29 @@ type MQTTHandler struct {
 // Send the alert to Sensu.
 //
 // Example:
-//    [sensu]
-//      enabled = true
-//      addr = "sensu:3030"
-//      source = "Kapacitor"
-//      handlers = ["sns","slack"]
+//
+//	[sensu]
+//	  enabled = true
+//	  addr = "sensu:3030"
+//	  source = "Kapacitor"
+//	  handlers = ["sns","slack"]
 //
 // Example:
-//    stream
-//         |alert()
-//             .sensu()
+//
+//	stream
+//	     |alert()
+//	         .sensu()
 //
 // Send alerts to Sensu client.
 //
 // Example:
-//    stream
-//         |alert()
-//             .sensu()
-//             .handlers('sns','slack')
 //
-// Send alerts to Sensu specifying the handlers
+//	stream
+//	     |alert()
+//	         .sensu()
+//	         .handlers('sns','slack')
+//
+// # Send alerts to Sensu specifying the handlers
 //
 // tick:property
 func (n *AlertNodeData) Sensu() *SensuHandler {
@@ -1443,23 +1494,25 @@ func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
 // Critical - Sends a 1 priority level.
 //
 // Example:
-//    [pushover]
-//      enabled = true
-//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//      user-key = "Pushover"
+//
+//	[pushover]
+//	  enabled = true
+//	  token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//	  user-key = "Pushover"
 //
 // Example:
-//    stream
-//         |alert()
-//             .pushover()
-//              .sound('siren')
-//              .userKey('other user key or delivery group key')
-//              .device('mydev')
-//              .title('mytitle')
-//              .URL('myurl')
-//              .URLTitle('mytitle')
 //
-// If the userKey() is omitted from above, the default userKey is used from the global pushover configuration
+//	stream
+//	     |alert()
+//	         .pushover()
+//	          .sound('siren')
+//	          .userKey('other user key or delivery group key')
+//	          .device('mydev')
+//	          .title('mytitle')
+//	          .URL('myurl')
+//	          .URLTitle('mytitle')
+//
+// # If the userKey() is omitted from above, the default userKey is used from the global pushover configuration
 //
 // Send alerts to Pushover.
 //
@@ -1508,44 +1561,49 @@ type PushoverHandler struct {
 // in the 'slack' configuration section.
 //
 // Example:
-//    [slack]
-//      enabled = true
-//      url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
-//      channel = "#general"
+//
+//	[slack]
+//	  enabled = true
+//	  url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
+//	  channel = "#general"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the channel.
 //
 // Example:
-//    stream
-//         |alert()
-//             .slack()
+//
+//	stream
+//	     |alert()
+//	         .slack()
 //
 // Send alerts to the default worskace Slack channel in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .slack()
-//             .channel('#alerts')
+//
+//	stream
+//	     |alert()
+//	         .slack()
+//	         .channel('#alerts')
 //
 // Send alerts to the default workspace with Slack channel '#alerts'
 //
 // Example:
-//    stream
-//         |alert()
-//             .slack()
-//             .channel('@jsmith')
+//
+//	stream
+//	     |alert()
+//	         .slack()
+//	         .channel('@jsmith')
 //
 // Send alert to user '@jsmith'
 //
 // Example:
 // stream
-//      |alert()
-//          .slack()
-//          .workspace('opencommunity')
-//          .channel('#support')
+//
+//	|alert()
+//	    .slack()
+//	    .workspace('opencommunity')
+//	    .channel('#support')
 //
 // send alerts to the opencommunity workspace on the channel '#support'
 //
@@ -1554,18 +1612,20 @@ type PushoverHandler struct {
 // in the TICKscript.
 //
 // Example:
-//    [[slack]]
-//      enabled = true
-//      default = true
-//      workspace = examplecorp
-//      url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
-//      channel = "#general"
-//      global = true
-//      state-changes-only = true
+//
+//	[[slack]]
+//	  enabled = true
+//	  default = true
+//	  workspace = examplecorp
+//	  url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
+//	  channel = "#general"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to Slack using default channel '#general'.
 // tick:property
@@ -1605,26 +1665,29 @@ type SlackHandler struct {
 // in the 'discord' configuration section.
 //
 // Example:
-//    [[discord]]
-//      enabled = true
-//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//
+//	[[discord]]
+//	  enabled = true
+//	  url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the channel.
 //
 // Example:
-//    stream
-//         |alert()
-//             .discord()
 //
-// Send alerts to the default workspace
+//	stream
+//	     |alert()
+//	         .discord()
+//
+// # Send alerts to the default workspace
 //
 // Example:
 // stream
-//      |alert()
-//          .discord()
-//          .workspace('opencommunity')
+//
+//	|alert()
+//	    .discord()
+//	    .workspace('opencommunity')
 //
 // send alerts to the opencommunity workspace
 //
@@ -1633,17 +1696,19 @@ type SlackHandler struct {
 // in the TICKscript.
 //
 // Example:
-//    [[discord]]
-//      enabled = true
-//      default = true
-//      workspace = examplecorp
-//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-//      global = true
-//      state-changes-only = true
+//
+//	[[discord]]
+//	  enabled = true
+//	  default = true
+//	  workspace = examplecorp
+//	  url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to Discord.
 // tick:property
@@ -1769,30 +1834,33 @@ func (bp *BigPandaHandler) Attribute(key string, value interface{}) *BigPandaHan
 // To allow Kapacitor to post to Telegram,
 //
 // Example:
-//    [telegram]
-//      enabled = true
-//      token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-//      chat-id = "xxxxxxxxx"
-//      parse-mode = "Markdown"
-//	disable-web-page-preview = true
-//	disable-notification = false
+//
+//	   [telegram]
+//	     enabled = true
+//	     token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//	     chat-id = "xxxxxxxxx"
+//	     parse-mode = "Markdown"
+//		disable-web-page-preview = true
+//		disable-notification = false
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the chat-id.
 //
 // Example:
-//    stream
-//         |alert()
-//             .telegram()
+//
+//	stream
+//	     |alert()
+//	         .telegram()
 //
 // Send alerts to Telegram chat-id in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .telegram()
-//             .chatId('xxxxxxx')
+//
+//	stream
+//	     |alert()
+//	         .telegram()
+//	         .chatId('xxxxxxx')
 //
 // Send alerts to Telegram user/group 'xxxxxx'
 //
@@ -1801,16 +1869,18 @@ func (bp *BigPandaHandler) Attribute(key string, value interface{}) *BigPandaHan
 // in the TICKscript.
 //
 // Example:
-//    [telegram]
-//      enabled = true
-//      token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-//      chat-id = "xxxxxxxxx"
-//      global = true
-//      state-changes-only = true
+//
+//	[telegram]
+//	  enabled = true
+//	  token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//	  chat-id = "xxxxxxxxx"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to Telegram using default chat-id 'xxxxxxxx'.
 // tick:property
@@ -1862,26 +1932,29 @@ func (tel *TelegramHandler) DisableWebPagePreview() *TelegramHandler {
 // Then place the API key from the URL into the 'opsgenie' section of the Kapacitor configuration.
 //
 // Example:
-//    [opsgenie]
-//      enabled = true
-//      api-key = "xxxxx"
-//      teams = ["everyone"]
-//      recipients = ["jim", "bob"]
+//
+//	[opsgenie]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  teams = ["everyone"]
+//	  recipients = ["jim", "bob"]
 //
 // With the correct configuration you can now use OpsGenie in TICKscripts.
 //
 // Example:
-//    stream
-//         |alert()
-//             .opsGenie()
+//
+//	stream
+//	     |alert()
+//	         .opsGenie()
 //
 // Send alerts to OpsGenie using the teams and recipients in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .opsGenie()
-//             .teams('team_rocket','team_test')
+//
+//	stream
+//	     |alert()
+//	         .opsGenie()
+//	         .teams('team_rocket','team_test')
 //
 // Send alerts to OpsGenie with team set to 'team_rocket' and 'team_test'
 //
@@ -1890,15 +1963,17 @@ func (tel *TelegramHandler) DisableWebPagePreview() *TelegramHandler {
 // in the TICKscript.
 //
 // Example:
-//    [opsgenie]
-//      enabled = true
-//      api-key = "xxxxx"
-//      recipients = ["johndoe"]
-//      global = true
+//
+//	[opsgenie]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  recipients = ["johndoe"]
+//	  global = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to OpsGenie using the default recipients, found in the configuration.
 // tick:property
@@ -1943,26 +2018,29 @@ func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 // Then place the API key from the URL into the 'opsgenie2' section of the Kapacitor configuration.
 //
 // Example:
-//    [opsgenie2]
-//      enabled = true
-//      api-key = "xxxxx"
-//      teams = ["everyone"]
-//      recipients = ["jim", "bob"]
+//
+//	[opsgenie2]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  teams = ["everyone"]
+//	  recipients = ["jim", "bob"]
 //
 // With the correct configuration you can now use OpsGenie2 in TICKscripts.
 //
 // Example:
-//    stream
-//         |alert()
-//             .opsGenie()
+//
+//	stream
+//	     |alert()
+//	         .opsGenie()
 //
 // Send alerts to OpsGenie2 using the teams and recipients in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .opsGenie()
-//             .teams('team_rocket','team_test')
+//
+//	stream
+//	     |alert()
+//	         .opsGenie()
+//	         .teams('team_rocket','team_test')
 //
 // Send alerts to OpsGenie2 with team set to 'team_rocket' and 'team_test'
 //
@@ -1971,16 +2049,18 @@ func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 // in the TICKscript.
 //
 // Example:
-//    [opsgenie2]
-//      enabled = true
-//      api-key = "xxxxx"
-//      recipients = ["johndoe"]
-//      details = false
-//      global = true
+//
+//	[opsgenie2]
+//	  enabled = true
+//	  api-key = "xxxxx"
+//	  recipients = ["johndoe"]
+//	  details = false
+//	  global = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to OpsGenie2 using the default recipients, found in the configuration.
 // tick:property
@@ -2044,24 +2124,26 @@ func (og *OpsGenie2Handler) Details() *OpsGenie2Handler {
 // Send the alert to Talk.
 // To use Talk alerting you must first follow the steps to create a new incoming webhook.
 //
-//    1. Go to the URL https:/account.jianliao.com/signin.
-//    2. Sign in with you account. under the Team tab, click "Integrations".
-//    3. Select "Customize service", click incoming Webhook "Add" button.
-//    4. After choose the topic to connect with "xxx", click "Confirm Add" button.
-//    5. Once the service is created, you'll see the "Generate Webhook url".
+//  1. Go to the URL https:/account.jianliao.com/signin.
+//  2. Sign in with you account. under the Team tab, click "Integrations".
+//  3. Select "Customize service", click incoming Webhook "Add" button.
+//  4. After choose the topic to connect with "xxx", click "Confirm Add" button.
+//  5. Once the service is created, you'll see the "Generate Webhook url".
 //
 // Place the 'Generate Webhook url' into the 'Talk' section of the Kapacitor configuration as the option 'url'.
 //
 // Example:
-//    [talk]
-//      enabled = true
-//      url = "https://jianliao.com/v2/services/webhook/uuid"
-//      author_name = "Kapacitor"
+//
+//	[talk]
+//	  enabled = true
+//	  url = "https://jianliao.com/v2/services/webhook/uuid"
+//	  author_name = "Kapacitor"
 //
 // Example:
-//    stream
-//         |alert()
-//             .talk()
+//
+//	stream
+//	     |alert()
+//	         .talk()
 //
 // Send alerts to Talk client.
 //
@@ -2083,16 +2165,18 @@ type TalkHandler struct {
 // To allow Kapacitor to post SNMP traps,
 //
 // Example:
-//    [snmptrap]
-//      enabled = true
-//      addr = "127.0.0.1:9162"
-//      community = "public"
+//
+//	[snmptrap]
+//	  enabled = true
+//	  addr = "127.0.0.1:9162"
+//	  community = "public"
 //
 // Example:
-//    stream
-//         |alert()
-//             .snmpTrap('1.1.1.1')
-//                 .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
+//
+//	stream
+//	     |alert()
+//	         .snmpTrap('1.1.1.1')
+//	             .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
 //
 // Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'
 //
@@ -2141,13 +2225,14 @@ type SNMPData struct {
 // | t            | Time ticks |
 //
 // Example:
-//    |alert()
-//       .message('{{ .ID }}:{{ .Level }}')
-//       .snmpTrap('1.3.6.1.4.1.1')
-//          .data('1.3.6.1.4.1.1.5', 's', '{{ .Level }}' )
-//          .data('1.3.6.1.4.1.1.6', 'i', '50' )
-//          .data('1.3.6.1.4.1.1.7', 'c', '{{ index .Fields "num_requests" }}' )
-//          .data('1.3.6.1.4.1.1.8', 's', '{{ .Message }}' )
+//
+//	|alert()
+//	   .message('{{ .ID }}:{{ .Level }}')
+//	   .snmpTrap('1.3.6.1.4.1.1')
+//	      .data('1.3.6.1.4.1.1.5', 's', '{{ .Level }}' )
+//	      .data('1.3.6.1.4.1.1.6', 'i', '50' )
+//	      .data('1.3.6.1.4.1.1.7', 'c', '{{ index .Fields "num_requests" }}' )
+//	      .data('1.3.6.1.4.1.1.8', 's', '{{ .Message }}' )
 //
 // tick:property
 func (h *SNMPTrapHandler) Data(oid, typ, value string) *SNMPTrapHandler {
@@ -2178,17 +2263,19 @@ func (h *SNMPTrapHandler) validate() error {
 // Send the alert to a Kafka topic.
 //
 // Example:
-//    [[kafka]]
-//      enabled = true
-//      id = "default"
-//      brokers = ["localhost:9092"]
+//
+//	[[kafka]]
+//	  enabled = true
+//	  id = "default"
+//	  brokers = ["localhost:9092"]
 //
 // Example:
-//    stream
-//         |alert()
-//             .kafka()
-//                 .cluster('default')
-//                 .kafkaTopic('alerts')
+//
+//	stream
+//	     |alert()
+//	         .kafka()
+//	             .cluster('default')
+//	             .kafkaTopic('alerts')
 //
 // Mesasges are written to Kafka asynchronously.
 // As such, errors are not reported for individual writes to Kafka, rather an error counter is recorded.
@@ -2253,26 +2340,29 @@ func (k *KafkaHandler) DisablePartitionById() *KafkaHandler {
 // and follow instructions to create a webhook for a Teams channel.  Add the webhook URL to the configuration.
 //
 // Example:
-//    [teams]
-//      enabled = true
-//      channel-url = "https://outlook.office.com/webhook/..."
+//
+//	[teams]
+//	  enabled = true
+//	  channel-url = "https://outlook.office.com/webhook/..."
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the room.
 //
 // Example:
-//    stream
-//         |alert()
-//             .teams()
+//
+//	stream
+//	     |alert()
+//	         .teams()
 //
 // Send alerts to Teams channel in the configuration file.
 //
 // Example:
-//    stream
-//         |alert()
-//             .teams()
-//             .channelURL('https://outlook.office.com/webhook/...')
+//
+//	stream
+//	     |alert()
+//	         .teams()
+//	         .channelURL('https://outlook.office.com/webhook/...')
 //
 // Send alerts to Teams channel with webhook (overrides configuration file).
 //
@@ -2281,15 +2371,17 @@ func (k *KafkaHandler) DisablePartitionById() *KafkaHandler {
 // in the TICKscript.
 //
 // Example:
-//    [teams]
-//      enabled = true
-//      channel-url = "https://outlook.office.com/webhook/..."
-//      global = true
-//      state-changes-only = true
+//
+//	[teams]
+//	  enabled = true
+//	  channel-url = "https://outlook.office.com/webhook/..."
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to Teams using default channel.
 // tick:property
@@ -2313,33 +2405,37 @@ type TeamsHandler struct {
 // Send the alert to ServiceNow.
 //
 // Example:
-//    [serviceNow]
-//      enabled = true
-//      url = "https://instance.service-now.com/api/global/em/jsonv2"
+//
+//	[serviceNow]
+//	  enabled = true
+//	  url = "https://instance.service-now.com/api/global/em/jsonv2"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted to the room.
 //
 // Example:
-//    stream
-//         |alert()
-//             .serviceNow()
+//
+//	stream
+//	     |alert()
+//	         .serviceNow()
 //
 // If the 'serviceNow' section in the configuration has the option: global = true
 // then all alerts are sent to ServiceNow without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [serviceNow]
-//      enabled = true
-//      url = "https://instance.service-now.com/api/global/em/jsonv2"
-//      global = true
-//      state-changes-only = true
+//
+//	[serviceNow]
+//	  enabled = true
+//	  url = "https://instance.service-now.com/api/global/em/jsonv2"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
+//
+//	stream
+//	     |alert()
 //
 // Send alert to ServiceNow using default url.
 // tick:property
@@ -2404,40 +2500,44 @@ func (s *ServiceNowHandler) AdditionalInfo(key string, value interface{}) *Servi
 // Send the alert to Zenoss.
 //
 // Example:
-//    [zenoss]
-//      enabled = true
-//      url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+//
+//	[zenoss]
+//	  enabled = true
+//	  url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
 // where the alert changed state are posted.
 //
 // Example:
-//    stream
-//         |alert()
-//             .zenoss()
-//                 .summary('Alert {{ .ID }}')
-//                 .message('{{ .Message }}')
-//                 .eventClass('/App')
+//
+//	stream
+//	     |alert()
+//	         .zenoss()
+//	             .summary('Alert {{ .ID }}')
+//	             .message('{{ .Message }}')
+//	             .eventClass('/App')
 //
 // If the 'zenoss' section in the configuration has the option: global = true
 // then all alerts are sent to Zenoss without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [zenoss]
-//      enabled = true
-//      url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
-//      global = true
-//      state-changes-only = true
+//
+//	[zenoss]
+//	  enabled = true
+//	  url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+//	  global = true
+//	  state-changes-only = true
 //
 // Example:
-//    stream
-//         |alert()
-//             .zenoss()
-//                 .summary('Alert {{ .ID }}')
-//                 .message('{{ .Message }}')
-//                 .eventClass('/App')
+//
+//	stream
+//	     |alert()
+//	         .zenoss()
+//	             .summary('Alert {{ .ID }}')
+//	             .message('{{ .Message }}')
+//	             .eventClass('/App')
 //
 // Send alert to Zenoss using default url.
 // tick:property

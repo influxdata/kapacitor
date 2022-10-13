@@ -23,8 +23,9 @@ const (
 // m,host=A 80.bytes=3512,443.bytes=6723
 //
 // Example:
-//        |flatten()
-//            .on('port')
+//
+//	|flatten()
+//	    .on('port')
 //
 // If flattening on multiple dimensions the order is preserved:
 //
@@ -37,9 +38,9 @@ const (
 // m A.80.bytes=3512,A.443.bytes=6723,B.443.bytes=7243
 //
 // Example:
-//        |flatten()
-//            .on('host', 'port')
 //
+//	|flatten()
+//	    .on('host', 'port')
 //
 // Since flattening points creates dynamically named fields in general it is expected
 // that the resultant data is passed to a UDF or similar for custom processing.
