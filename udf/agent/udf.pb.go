@@ -396,6 +396,7 @@ type OptionValue struct {
 
 	Type ValueType `protobuf:"varint,1,opt,name=type,proto3,enum=agent.ValueType" json:"type,omitempty"`
 	// Types that are assignable to Value:
+	//
 	//	*OptionValue_BoolValue
 	//	*OptionValue_IntValue
 	//	*OptionValue_DoubleValue
@@ -1234,6 +1235,7 @@ type Request struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Message:
+	//
 	//	*Request_Info
 	//	*Request_Init
 	//	*Request_Keepalive
@@ -1401,6 +1403,7 @@ type Response struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Message:
+	//
 	//	*Response_Info
 	//	*Response_Init
 	//	*Response_Keepalive
