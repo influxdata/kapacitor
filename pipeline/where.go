@@ -11,16 +11,18 @@ import (
 //
 // Example:
 // var sums = stream
-//     |from()
-//         .groupBy('service', 'host')
-//     |sum('value')
+//
+//	|from()
+//	    .groupBy('service', 'host')
+//	|sum('value')
+//
 // //Watch particular host for issues.
 // sums
-//    |where(lambda: "host" == 'h001.example.com')
-//    |alert()
-//        .crit(lambda: TRUE)
-//        .email().to('user@example.com')
 //
+//	|where(lambda: "host" == 'h001.example.com')
+//	|alert()
+//	    .crit(lambda: TRUE)
+//	    .email().to('user@example.com')
 type WhereNode struct {
 	chainnode `json:"-"`
 	// The expression predicate.

@@ -21,18 +21,19 @@ import (
 // affect the state duration.
 //
 // Example:
-//     stream
-//         |from()
-//             .measurement('cpu')
-//         |where(lambda: "cpu" == 'cpu-total')
-//         |groupBy('host')
-//         |stateDuration(lambda: "usage_idle" <= 10)
-//             .unit(1m)
-//         |alert()
-//             // Warn after 1 minute
-//             .warn(lambda: "state_duration" >= 1)
-//             // Critical after 5 minutes
-//             .crit(lambda: "state_duration" >= 5)
+//
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	    |where(lambda: "cpu" == 'cpu-total')
+//	    |groupBy('host')
+//	    |stateDuration(lambda: "usage_idle" <= 10)
+//	        .unit(1m)
+//	    |alert()
+//	        // Warn after 1 minute
+//	        .warn(lambda: "state_duration" >= 1)
+//	        // Critical after 5 minutes
+//	        .crit(lambda: "state_duration" >= 5)
 //
 // Note that as the first point in the given state has no previous point, its
 // state duration will be 0.
@@ -117,17 +118,18 @@ func (n *StateDurationNode) UnmarshalJSON(data []byte) error {
 // affect the state count.
 //
 // Example:
-//     stream
-//         |from()
-//             .measurement('cpu')
-//         |where(lambda: "cpu" == 'cpu-total')
-//         |groupBy('host')
-//         |stateCount(lambda: "usage_idle" <= 10)
-//         |alert()
-//             // Warn after 1 point
-//             .warn(lambda: "state_count" >= 1)
-//             // Critical after 5 points
-//             .crit(lambda: "state_count" >= 5)
+//
+//	stream
+//	    |from()
+//	        .measurement('cpu')
+//	    |where(lambda: "cpu" == 'cpu-total')
+//	    |groupBy('host')
+//	    |stateCount(lambda: "usage_idle" <= 10)
+//	    |alert()
+//	        // Warn after 1 point
+//	        .warn(lambda: "state_count" >= 1)
+//	        // Critical after 5 points
+//	        .crit(lambda: "state_count" >= 5)
 type StateCountNode struct {
 	chainnode `json:"-"`
 

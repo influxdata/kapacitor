@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-//Platform dependent constants for non-windows
+// Platform dependent constants for non-windows
 package server_test
 
 const (

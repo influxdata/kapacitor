@@ -15,24 +15,25 @@ import (
 // method on httpPost. Multiple endpoint property methods may be specified.
 //
 // Example:
-//    stream
-//        |window()
-//            .period(10s)
-//            .every(5s)
-//        |top('value', 10)
-//        //Post the top 10 results over the last 10s updated every 5s.
-//        |httpPost('http://example.com/api/top10')
+//
+//	stream
+//	    |window()
+//	        .period(10s)
+//	        .every(5s)
+//	    |top('value', 10)
+//	    //Post the top 10 results over the last 10s updated every 5s.
+//	    |httpPost('http://example.com/api/top10')
 //
 // Example:
-//    stream
-//        |window()
-//            .period(10s)
-//            .every(5s)
-//        |top('value', 10)
-//        //Post the top 10 results over the last 10s updated every 5s.
-//        |httpPost()
-//            .endpoint('example')
 //
+//	stream
+//	    |window()
+//	        .period(10s)
+//	        .every(5s)
+//	    |top('value', 10)
+//	    //Post the top 10 results over the last 10s updated every 5s.
+//	    |httpPost()
+//	        .endpoint('example')
 type HTTPPostNode struct {
 	chainnode
 
@@ -134,9 +135,10 @@ func (p *HTTPPostNode) validate() error {
 // Name of the endpoint to be used, as is defined in the configuration file.
 //
 // Example:
-//    stream
-//         |httpPost()
-//            .endpoint('example')
+//
+//	stream
+//	     |httpPost()
+//	        .endpoint('example')
 //
 // tick:property
 func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostNode {
@@ -147,10 +149,11 @@ func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostNode {
 // Add a header to the POST request
 //
 // Example:
-//    stream
-//         |httpPost()
-//            .endpoint('example')
-//              .header('my', 'header')
+//
+//	stream
+//	     |httpPost()
+//	        .endpoint('example')
+//	          .header('my', 'header')
 //
 // tick:property
 func (p *HTTPPostNode) Header(k, v string) *HTTPPostNode {

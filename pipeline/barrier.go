@@ -18,15 +18,15 @@ import (
 // emitted barrier will be dropped.
 //
 // Example:
-//    stream
-//        |barrier().idle(5s)
-//        |window()
-//            .period(10s)
-//            .every(5s)
-//        |top(10, 'value')
-//        //Post the top 10 results over the last 10s updated every 5s.
-//        |httpPost('http://example.com/api/top10')
 //
+//	stream
+//	    |barrier().idle(5s)
+//	    |window()
+//	        .period(10s)
+//	        .every(5s)
+//	    |top(10, 'value')
+//	    //Post the top 10 results over the last 10s updated every 5s.
+//	    |httpPost('http://example.com/api/top10')
 type BarrierNode struct {
 	chainnode
 

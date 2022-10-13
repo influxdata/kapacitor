@@ -21,34 +21,37 @@ const (
 // Combinations are order independent and will not ever include the same point multiple times.
 //
 // Example:
-//    stream
-//        |from()
-//            .measurement('request_latency')
-//        |combine(lambda: "service" == 'login', lambda: TRUE)
-//            .as('login', 'other')
-//            // points that are within 1 second are considered the same time.
-//            .tolerance(1s)
-//            // delimiter for new field and tag names
-//            .delimiter('.')
-//        // Change group by to be new other.service tag
-//        |groupBy('other.service')
-//        // Both the "value" fields from each data point have been prefixed
-//        // with the respective names 'login' and 'other'.
-//        |eval(lambda: "login.value" / "other.value")
-//           .as('ratio')
-//        ...
+//
+//	stream
+//	    |from()
+//	        .measurement('request_latency')
+//	    |combine(lambda: "service" == 'login', lambda: TRUE)
+//	        .as('login', 'other')
+//	        // points that are within 1 second are considered the same time.
+//	        .tolerance(1s)
+//	        // delimiter for new field and tag names
+//	        .delimiter('.')
+//	    // Change group by to be new other.service tag
+//	    |groupBy('other.service')
+//	    // Both the "value" fields from each data point have been prefixed
+//	    // with the respective names 'login' and 'other'.
+//	    |eval(lambda: "login.value" / "other.value")
+//	       .as('ratio')
+//	    ...
 //
 // In the above example the data points for the `login` service are combined with the data points from all other services.
 //
 // Example:
-//        |combine(lambda: TRUE, lambda: TRUE)
-//            .as('login', 'other')
+//
+//	|combine(lambda: TRUE, lambda: TRUE)
+//	    .as('login', 'other')
 //
 // In the above example all combination pairs are created.
 //
 // Example:
-//        |combine(lambda: TRUE, lambda: TRUE, lambda: TRUE)
-//            .as('login', 'other', 'another')
+//
+//	|combine(lambda: TRUE, lambda: TRUE, lambda: TRUE)
+//	    .as('login', 'other', 'another')
 //
 // In the above example all combinations triples are created.
 type CombineNode struct {

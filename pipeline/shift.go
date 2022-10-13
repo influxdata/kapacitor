@@ -12,14 +12,16 @@ import (
 // batches or points from different times.
 //
 // Example:
-//    stream
-//        |shift(5m)
+//
+//	stream
+//	    |shift(5m)
 //
 // Shift all data points 5m forward in time.
 //
 // Example:
-//    stream
-//        |shift(-10s)
+//
+//	stream
+//	    |shift(-10s)
 //
 // Shift all data points 10s backward in time.
 type ShiftNode struct {

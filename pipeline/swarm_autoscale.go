@@ -14,37 +14,37 @@ import (
 // The node also outputs points for the triggered events.
 //
 // Example:
-//     // Target 80% cpu per container
-//     var target = 80.0
-//     var min = 1
-//     var max = 10
-//     var period = 5m
-//     var every = period
-//     stream
-//         |from()
-//             .measurement('docker_container_cpu')
-//             .groupBy('container_name','com.docker.swarm.service.name')
-//             .where(lambda: "cpu" == 'cpu-total')
-//         |window()
-//             .period(period)
-//             .every(every)
-//         |mean('usage_percent')
-//             .as('mean_cpu')
-//         |groupBy('com.docker.swarm.service.name')
-//         |sum('mean_cpu')
-//             .as('total_cpu')
-//         |swarmAutoscale()
-//             // Get the name of the service from "com.docker.swarm.service.name" tag.
-//             .serviceNameTag('com.docker.swarm.service.name')
-//             .min(min)
-//             .max(max)
-//             // Set the desired number of replicas based on target.
-//             .replicas(lambda: int(ceil("total_cpu" / target)))
-//         |influxDBOut()
-//             .database('deployments')
-//             .measurement('scale_events')
-//             .precision('s')
 //
+//	// Target 80% cpu per container
+//	var target = 80.0
+//	var min = 1
+//	var max = 10
+//	var period = 5m
+//	var every = period
+//	stream
+//	    |from()
+//	        .measurement('docker_container_cpu')
+//	        .groupBy('container_name','com.docker.swarm.service.name')
+//	        .where(lambda: "cpu" == 'cpu-total')
+//	    |window()
+//	        .period(period)
+//	        .every(every)
+//	    |mean('usage_percent')
+//	        .as('mean_cpu')
+//	    |groupBy('com.docker.swarm.service.name')
+//	    |sum('mean_cpu')
+//	        .as('total_cpu')
+//	    |swarmAutoscale()
+//	        // Get the name of the service from "com.docker.swarm.service.name" tag.
+//	        .serviceNameTag('com.docker.swarm.service.name')
+//	        .min(min)
+//	        .max(max)
+//	        // Set the desired number of replicas based on target.
+//	        .replicas(lambda: int(ceil("total_cpu" / target)))
+//	    |influxDBOut()
+//	        .database('deployments')
+//	        .measurement('scale_events')
+//	        .precision('s')
 //
 // The above example computes the mean of cpu usage_percent by container name and service name.
 // Then sum of mean cpu_usage is calculated as total_cpu.
@@ -62,11 +62,10 @@ import (
 //
 // Available Statistics:
 //
-//    * increase_events -- number of times the replica count was increased.
-//    * decrease_events -- number of times the replica count was decreased.
-//    * cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
-//    * errors          -- number of errors encountered, typically related to communicating with the Swarm manager API.
-//
+//   - increase_events -- number of times the replica count was increased.
+//   - decrease_events -- number of times the replica count was decreased.
+//   - cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
+//   - errors          -- number of errors encountered, typically related to communicating with the Swarm manager API.
 type SwarmAutoscaleNode struct {
 	chainnode `json:"-"`
 

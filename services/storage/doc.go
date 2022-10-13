@@ -8,6 +8,5 @@ As a result, updates to a single field of an object can incur the cost to retrie
 In most cases this is acceptable since modifications are rare and object size is small.
 
 A BoltDB backed implementation is also provided.
-
 */
 package storage

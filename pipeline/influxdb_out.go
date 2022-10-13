@@ -14,24 +14,24 @@ const DefaultFlushInterval = time.Second * 10
 // Writes the data to InfluxDB as it is received.
 //
 // Example:
-//    stream
-//        |from()
-//            .measurement('requests')
-//        |eval(lambda: "errors" / "total")
-//            .as('error_percent')
-//        // Write the transformed data to InfluxDB
-//        |influxDBOut()
-//            .database('mydb')
-//            .retentionPolicy('myrp')
-//            .measurement('errors')
-//            .tag('kapacitor', 'true')
-//            .tag('version', '0.2')
+//
+//	stream
+//	    |from()
+//	        .measurement('requests')
+//	    |eval(lambda: "errors" / "total")
+//	        .as('error_percent')
+//	    // Write the transformed data to InfluxDB
+//	    |influxDBOut()
+//	        .database('mydb')
+//	        .retentionPolicy('myrp')
+//	        .measurement('errors')
+//	        .tag('kapacitor', 'true')
+//	        .tag('version', '0.2')
 //
 // Available Statistics:
 //
-//    * points_written -- number of points written to InfluxDB
-//    * write_errors -- number of errors attempting to write to InfluxDB
-//
+//   - points_written -- number of points written to InfluxDB
+//   - write_errors -- number of errors attempting to write to InfluxDB
 type InfluxDBOutNode struct {
 	node `json:"-"`
 

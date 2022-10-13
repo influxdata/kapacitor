@@ -13,9 +13,10 @@ import (
 // See the property EvalNode.As for details on how to reference the results.
 //
 // Example:
-//    stream
-//        |eval(lambda: "error_count" / "total_count")
-//          .as('error_percent')
+//
+//	stream
+//	    |eval(lambda: "error_count" / "total_count")
+//	      .as('error_percent')
 //
 // The above example will add a new field `error_percent` to each
 // data point with the result of `error_count / total_count` where
@@ -23,8 +24,7 @@ import (
 //
 // Available Statistics:
 //
-//    * eval_errors -- number of errors evaluating any expressions.
-//
+//   - eval_errors -- number of errors evaluating any expressions.
 type EvalNode struct {
 	chainnode `json:"-"`
 
@@ -119,9 +119,10 @@ func (e *EvalNode) validate() error {
 // via the name provided.
 //
 // Example:
-//    stream
-//        |eval(lambda: "value" * "value", lambda: 1.0 / "value2")
-//            .as('value2', 'inv_value2')
+//
+//	stream
+//	    |eval(lambda: "value" * "value", lambda: 1.0 / "value2")
+//	        .as('value2', 'inv_value2')
 //
 // The above example calculates two fields from the value and names them
 // `value2` and `inv_value2` respectively.
@@ -136,22 +137,23 @@ func (e *EvalNode) As(names ...string) *EvalNode {
 // The result must be a string.
 // Use the `string()` expression function to convert types.
 //
-//
 // Example:
-//    stream
-//        |eval(lambda: string(floor("value" / 10.0)))
-//            .as('value_bucket')
-//            .tags('value_bucket')
+//
+//	stream
+//	    |eval(lambda: string(floor("value" / 10.0)))
+//	        .as('value_bucket')
+//	        .tags('value_bucket')
 //
 // The above example calculates an expression from the field `value`, casts it as a string, and names it `value_bucket`.
 // The `value_bucket` expression is then converted from a field on the point to a tag `value_bucket` on the point.
 //
 // Example:
-//    stream
-//        |eval(lambda: string(floor("value" / 10.0)))
-//            .as('value_bucket')
-//            .tags('value_bucket')
-//            .keep('value') // keep the original field `value` as well
+//
+//	stream
+//	    |eval(lambda: string(floor("value" / 10.0)))
+//	        .as('value_bucket')
+//	        .tags('value_bucket')
+//	        .keep('value') // keep the original field `value` as well
 //
 // The above example calculates an expression from the field `value`, casts it as a string, and names it `value_bucket`.
 // The `value_bucket` expression is then converted from a field on the point to a tag `value_bucket` on the point.
@@ -175,10 +177,11 @@ func (e *EvalNode) Tags(names ...string) *EvalNode {
 // If no list is given then all fields are retained.
 //
 // Example:
-//    stream
-//        |eval(lambda: "value" * "value", lambda: 1.0 / "value2")
-//            .as('value2', 'inv_value2')
-//            .keep('value', 'inv_value2')
+//
+//	stream
+//	    |eval(lambda: "value" * "value", lambda: 1.0 / "value2")
+//	        .as('value2', 'inv_value2')
+//	        .keep('value', 'inv_value2')
 //
 // In the above example the original field `value` is preserved.
 // The new field `value2` is calculated and used in evaluating

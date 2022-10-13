@@ -16,16 +16,18 @@ import (
 // not part of the normal InfluxQL functions.
 //
 // Example:
-//     stream
-//         |from()
-//             .measurement('net_rx_packets')
-//         |derivative('value')
-//            .unit(1s) // default
-//            .nonNegative()
-//         ...
+//
+//	stream
+//	    |from()
+//	        .measurement('net_rx_packets')
+//	    |derivative('value')
+//	       .unit(1s) // default
+//	       .nonNegative()
+//	    ...
 //
 // Computes the derivative via:
-//    (current - previous ) / ( time_difference / unit)
+//
+//	(current - previous ) / ( time_difference / unit)
 //
 // The derivative is computed for each point, and
 // because of boundary conditions the first point is

@@ -28,30 +28,31 @@ const (
 // The join can be an inner or outer join, see the JoinNode.Fill property.
 //
 // Example:
-//    var errors = stream
-//        |from()
-//            .measurement('errors')
-//    var requests = stream
-//        |from()
-//            .measurement('requests')
-//    // Join the errors and requests streams
-//    errors
-//        |join(requests)
-//            // Provide prefix names for the fields of the data points.
-//            .as('errors', 'requests')
-//            // points that are within 1 second are considered the same time.
-//            .tolerance(1s)
-//            // fill missing values with 0, implies outer join.
-//            .fill(0.0)
-//            // name the resulting stream
-//            .streamName('error_rate')
-//            // treat a delete from one side of the join as a delete to all sides
-//            .deleteAll(TRUE)
-//        // Both the "value" fields from each parent have been prefixed
-//        // with the respective names 'errors' and 'requests'.
-//        |eval(lambda: "errors.value" / "requests.value")
-//           .as('rate')
-//        ...
+//
+//	var errors = stream
+//	    |from()
+//	        .measurement('errors')
+//	var requests = stream
+//	    |from()
+//	        .measurement('requests')
+//	// Join the errors and requests streams
+//	errors
+//	    |join(requests)
+//	        // Provide prefix names for the fields of the data points.
+//	        .as('errors', 'requests')
+//	        // points that are within 1 second are considered the same time.
+//	        .tolerance(1s)
+//	        // fill missing values with 0, implies outer join.
+//	        .fill(0.0)
+//	        // name the resulting stream
+//	        .streamName('error_rate')
+//	        // treat a delete from one side of the join as a delete to all sides
+//	        .deleteAll(TRUE)
+//	    // Both the "value" fields from each parent have been prefixed
+//	    // with the respective names 'errors' and 'requests'.
+//	    |eval(lambda: "errors.value" / "requests.value")
+//	       .as('rate')
+//	    ...
 //
 // In the above example the `errors` and `requests` streams are joined
 // and then transformed to calculate a combined field.
@@ -217,20 +218,21 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 // we only want to join on the building tag.
 //
 // Example:
-//    var building = stream
-//        |from()
-//            .measurement('building_power')
-//            .groupBy('building')
-//    var floor = stream
-//        |from()
-//            .measurement('floor_power')
-//            .groupBy('building', 'floor')
-//    building
-//        |join(floor)
-//            .as('building', 'floor')
-//            .on('building')
-//        |eval(lambda: "floor.value" / "building.value")
-//            ... // Values here are grouped by 'building' and 'floor'
+//
+//	var building = stream
+//	    |from()
+//	        .measurement('building_power')
+//	        .groupBy('building')
+//	var floor = stream
+//	    |from()
+//	        .measurement('floor_power')
+//	        .groupBy('building', 'floor')
+//	building
+//	    |join(floor)
+//	        .as('building', 'floor')
+//	        .on('building')
+//	    |eval(lambda: "floor.value" / "building.value")
+//	        ... // Values here are grouped by 'building' and 'floor'
 //
 // tick:property
 func (j *JoinNode) On(dims ...string) *JoinNode {

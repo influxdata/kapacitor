@@ -7,9 +7,11 @@ import (
 
 // A node that converts from batchedges to streamedges.
 // Example:
-//     var errors = stream
-//                      |from()
-//                      |trickle()
+//
+//	var errors = stream
+//	                 |from()
+//	                 |trickle()
+//
 // Children of trickle will be treated as if they are in a stream.
 type TrickleNode struct {
 	chainnode `json:"-"`

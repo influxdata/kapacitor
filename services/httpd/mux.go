@@ -7,7 +7,6 @@ import (
 	"sync"
 )
 
-//
 // What follows is an copy of golang's built in ServeMux with a few modifications:
 //  1. An error is returned instead of a panics on registering handlers.
 //  2. A delete method has been added to remove handlers.
@@ -116,7 +115,7 @@ func (mux *ServeMux) match(path string) (h http.Handler, pattern string) {
 // the pattern that will match after following the redirect.
 //
 // If there is no registered handler that applies to the request,
-// Handler returns a ``page not found'' handler and an empty pattern.
+// Handler returns a “page not found” handler and an empty pattern.
 func (mux *ServeMux) Handler(r *http.Request) (h http.Handler, pattern string) {
 	if r.Method != "CONNECT" {
 		if p := cleanPath(r.URL.Path); p != r.URL.Path {

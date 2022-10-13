@@ -19,15 +19,14 @@ import (
 // For a stream edge, all points with the same time are accumulated into the function.
 // For a batch edge, all points in the batch are accumulated into the function.
 //
-//
 // Example:
-//    stream
-//        |window()
-//            .period(10s)
-//            .every(10s)
-//        // Sum the values for each 10s window of data.
-//        |sum('value')
 //
+//	stream
+//	    |window()
+//	        .period(10s)
+//	        .every(10s)
+//	    // Sum the values for each 10s window of data.
+//	    |sum('value')
 //
 // Note: Derivative has its own implementation as a DerivativeNode instead of as part of the
 // InfluxQL functions.

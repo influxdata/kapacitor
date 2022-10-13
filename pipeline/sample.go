@@ -12,14 +12,16 @@ import (
 // One point will be emitted every count or duration specified.
 //
 // Example:
-//    stream
-//        |sample(3)
+//
+//	stream
+//	    |sample(3)
 //
 // Keep every third data point or batch.
 //
 // Example:
-//    stream
-//        |sample(10s)
+//
+//	stream
+//	    |sample(10s)
 //
 // Keep only samples that land on the 10s boundary.
 // See FromNode.Truncate, QueryNode.GroupBy time or WindowNode.Align

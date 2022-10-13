@@ -14,10 +14,9 @@ import (
 // This means the interval time is independent of the times of the data points the other node is receiving.
 // As a result the StatsNode is a root node in the task pipeline.
 //
-//
 // The currently available internal statistics:
 //
-//    * emitted -- the number of points or batches this node has sent to its children.
+//   - emitted -- the number of points or batches this node has sent to its children.
 //
 // Each stat is available as a field in the data stream.
 //
@@ -28,14 +27,15 @@ import (
 // are considered.
 //
 // Example:
-//     var data = stream
-//         |from()...
-//     // Emit statistics every 1 minute and cache them via the HTTP API.
-//     data
-//         |stats(1m)
-//         |httpOut('stats')
-//     // Continue normal processing of the data stream
-//     data...
+//
+//	var data = stream
+//	    |from()...
+//	// Emit statistics every 1 minute and cache them via the HTTP API.
+//	data
+//	    |stats(1m)
+//	    |httpOut('stats')
+//	// Continue normal processing of the data stream
+//	data...
 //
 // WARNING: It is not recommended to join the stats stream with the original data stream.
 // Since they operate on different clocks you could potentially create a deadlock.

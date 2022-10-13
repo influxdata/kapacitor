@@ -36,7 +36,7 @@ func (e EdgeType) String() string {
 	}
 }
 
-//Generic node in a pipeline
+// Generic node in a pipeline
 type Node interface {
 	// List of parents of this node.
 	Parents() []Node
@@ -225,57 +225,60 @@ const intervalMarker = "INTERVAL"
 // - Expressions -- optional list of expressions to also evaluate. Useful for time of day alerting.
 //
 // Example:
-//    var data = stream
-//        |from()...
-//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    data
-//        |deadman(100.0, 10s)
-//    //Do normal processing of data
-//    data...
+//
+//	var data = stream
+//	    |from()...
+//	// Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//	data
+//	    |deadman(100.0, 10s)
+//	//Do normal processing of data
+//	data...
 //
 // The above is equivalent to this
 // Example:
-//    var data = stream
-//        |from()...
-//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    data
-//        |stats(10s)
-//            .align()
-//        |derivative('emitted')
-//            .unit(10s)
-//            .nonNegative()
-//        |alert()
-//            .id('node \'stream0\' in task \'{{ .TaskName }}\'')
-//            .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "emitted" | printf "%0.3f" }} points/10s.')
-//            .crit(lambda: "emitted" <= 100.0)
-//    //Do normal processing of data
-//    data...
+//
+//	var data = stream
+//	    |from()...
+//	// Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//	data
+//	    |stats(10s)
+//	        .align()
+//	    |derivative('emitted')
+//	        .unit(10s)
+//	        .nonNegative()
+//	    |alert()
+//	        .id('node \'stream0\' in task \'{{ .TaskName }}\'')
+//	        .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "emitted" | printf "%0.3f" }} points/10s.')
+//	        .crit(lambda: "emitted" <= 100.0)
+//	//Do normal processing of data
+//	data...
 //
 // The `id` and `message` alert properties can be configured globally via the 'deadman' configuration section.
 //
 // Since the AlertNode is the last piece it can be further modified as usual.
 // Example:
-//    var data = stream
-//        |from()...
-//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    data
-//        |deadman(100.0, 10s)
-//            .slack()
-//            .channel('#dead_tasks')
-//    //Do normal processing of data
-//    data...
+//
+//	var data = stream
+//	    |from()...
+//	// Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//	data
+//	    |deadman(100.0, 10s)
+//	        .slack()
+//	        .channel('#dead_tasks')
+//	//Do normal processing of data
+//	data...
 //
 // You can specify additional lambda expressions to further constrain when the deadman's switch is triggered.
 // Example:
-//    var data = stream
-//        |from()...
-//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    // Only trigger the alert if the time of day is between 8am-5pm.
-//    data
-//        |deadman(100.0, 10s, lambda: hour("time") >= 8 AND hour("time") <= 17)
-//    //Do normal processing of data
-//    data...
 //
+//	var data = stream
+//	    |from()...
+//	// Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//	// Only trigger the alert if the time of day is between 8am-5pm.
+//	data
+//	    |deadman(100.0, 10s, lambda: hour("time") >= 8 AND hour("time") <= 17)
+//	//Do normal processing of data
+//	data...
 func (n *node) Deadman(threshold float64, interval time.Duration, expr ...*ast.LambdaNode) *AlertNode {
 	dn := n.Stats(interval).Align().
 		Derivative("emitted").NonNegative()
@@ -414,8 +417,8 @@ func (n *chainnode) Eval(expressions ...*ast.LambdaNode) *EvalNode {
 //
 // Can pass literal * to group by all dimensions.
 // Example:
-//    |groupBy(*)
 //
+//	|groupBy(*)
 func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	g := newGroupByNode(n.provides, tag)
 	n.linkChild(g)

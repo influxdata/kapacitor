@@ -1666,7 +1666,7 @@ func parseDataSourceURL(rawurl string) (DataSource, error) {
 	}
 }
 
-//getFilePathFromUrl restores filesystem path from file URL
+// getFilePathFromUrl restores filesystem path from file URL
 func getFilePathFromUrl(url *url.URL) string {
 	//Host part on windows contains drive, on non windows it is empty
 	return url.Host + filepath.FromSlash(url.Path)

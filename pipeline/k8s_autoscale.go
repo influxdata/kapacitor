@@ -21,41 +21,41 @@ const (
 // The node also outputs points for the triggered events.
 //
 // Example:
-//     // Target 100 requests per second per host
-//     var target = 100.0
-//     var min = 1
-//     var max = 100
-//     var period = 5m
-//     var every = period
-//     stream
-//         |from()
-//             .measurement('requests')
-//             .groupBy('host', 'deployment')
-//             .truncate(1s)
-//         |derivative('value')
-//             .as('requests_per_second')
-//             .unit(1s)
-//             .nonNegative()
-//         |groupBy('deployment')
-//         |sum('requests_per_second')
-//             .as('total_requests')
-//         |window()
-//             .period(period)
-//             .every(every)
-//         |mean('total_requests')
-//             .as('total_requests')
-//         |k8sAutoscale()
-//             // Get the name of the deployment from the 'deployment' tag.
-//             .resourceNameTag('deployment')
-//             .min(min)
-//             .max(max)
-//             // Set the desired number of replicas based on target.
-//             .replicas(lambda: int(ceil("total_requests" / target)))
-//         |influxDBOut()
-//             .database('deployments')
-//             .measurement('scale_events')
-//             .precision('s')
 //
+//	// Target 100 requests per second per host
+//	var target = 100.0
+//	var min = 1
+//	var max = 100
+//	var period = 5m
+//	var every = period
+//	stream
+//	    |from()
+//	        .measurement('requests')
+//	        .groupBy('host', 'deployment')
+//	        .truncate(1s)
+//	    |derivative('value')
+//	        .as('requests_per_second')
+//	        .unit(1s)
+//	        .nonNegative()
+//	    |groupBy('deployment')
+//	    |sum('requests_per_second')
+//	        .as('total_requests')
+//	    |window()
+//	        .period(period)
+//	        .every(every)
+//	    |mean('total_requests')
+//	        .as('total_requests')
+//	    |k8sAutoscale()
+//	        // Get the name of the deployment from the 'deployment' tag.
+//	        .resourceNameTag('deployment')
+//	        .min(min)
+//	        .max(max)
+//	        // Set the desired number of replicas based on target.
+//	        .replicas(lambda: int(ceil("total_requests" / target)))
+//	    |influxDBOut()
+//	        .database('deployments')
+//	        .measurement('scale_events')
+//	        .precision('s')
 //
 // The above example computes the requests per second by deployment and host.
 // Then the total_requests per second across all hosts is computed per deployment.
@@ -73,11 +73,10 @@ const (
 //
 // Available Statistics:
 //
-//    * increase_events -- number of times the replica count was increased.
-//    * decrease_events -- number of times the replica count was decreased.
-//    * cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
-//    * errors          -- number of errors encountered, typically related to communicating with the Kubernetes API.
-//
+//   - increase_events -- number of times the replica count was increased.
+//   - decrease_events -- number of times the replica count was decreased.
+//   - cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
+//   - errors          -- number of errors encountered, typically related to communicating with the Kubernetes API.
 type K8sAutoscaleNode struct {
 	chainnode `json:"-"`
 

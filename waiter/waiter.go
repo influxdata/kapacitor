@@ -13,18 +13,18 @@ const waiterBufferSize = 100
 // of goroutines to finish, WaiterGroup unblocks a group of waiting goroutines.
 //
 // Example:
-//    g := NewGroup()
-//    // Always call stop when it is no longer needed.
-//    defer g.Stop()
-//    w := g.NewWaiter()
-//    go func() {
-//        // Block until the broadcast.
-//        for w.Wait() {
-//            // ... do something now that event has occurred ...
-//        }
-//    }()
-//    g.Broadcast()
 //
+//	g := NewGroup()
+//	// Always call stop when it is no longer needed.
+//	defer g.Stop()
+//	w := g.NewWaiter()
+//	go func() {
+//	    // Block until the broadcast.
+//	    for w.Wait() {
+//	        // ... do something now that event has occurred ...
+//	    }
+//	}()
+//	g.Broadcast()
 type WaiterGroup struct {
 	mu            sync.Mutex
 	stopped       bool

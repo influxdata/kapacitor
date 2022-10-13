@@ -14,11 +14,12 @@
 // Just place one of these comments on a line all by itself and tickdoc will find it and behave accordingly.
 //
 // Example:
-//    // Normal comments
-//    //
-//    // Other comments
-//    // tick:ignore
-//    type A struct{}
+//
+//	// Normal comments
+//	//
+//	// Other comments
+//	// tick:ignore
+//	type A struct{}
 //
 // Tickdoc will format examples like godoc but assumes the examples are TICKscript instead of
 // golang code and styles them accordingly.
