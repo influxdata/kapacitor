@@ -2,7 +2,7 @@ package influxdb
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -18,7 +18,7 @@ func mustParseTime(s string) time.Time {
 	return ts
 }
 func Test_FluxCSV(t *testing.T) {
-	x := ioutil.NopCloser(bytes.NewBufferString(`
+	x := io.NopCloser(bytes.NewBufferString(`
 #datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,double,string,string
 #group,false,false,true,true,false,false,true,true
 ,result,table,_start,_stop,_time,_value,_field,_measurement
@@ -119,7 +119,7 @@ func Test_FluxCSV(t *testing.T) {
 	}
 }
 func Test_FluxCSV_Empty(t *testing.T) {
-	data := ioutil.NopCloser(bytes.NewBufferString(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+	data := io.NopCloser(bytes.NewBufferString(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
 #group,false,false,true,true,false,true,true,false
 #default,_result,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,,cpu,A,
 ,result,table,_start,_stop,_time,_measurement,host,_value`))
@@ -136,7 +136,7 @@ func Test_FluxCSV_Empty(t *testing.T) {
 }
 
 func Test_FluxCSV_Error(t *testing.T) {
-	data := ioutil.NopCloser(bytes.NewBufferString(`#datatype,string,string
+	data := io.NopCloser(bytes.NewBufferString(`#datatype,string,string
 #group,true,true
 #default,,
 ,error,reference

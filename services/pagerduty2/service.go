@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync/atomic"
 	text "text/template"
@@ -234,7 +233,7 @@ func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc s
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			fmt.Printf("error parsing error body\n")
 			return err

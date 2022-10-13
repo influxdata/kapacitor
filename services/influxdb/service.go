@@ -9,10 +9,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -1296,7 +1296,7 @@ func getTLSConfig(
 	}
 
 	if SSLCA != "" {
-		caCert, err := ioutil.ReadFile(SSLCA)
+		caCert, err := os.ReadFile(SSLCA)
 		if err != nil {
 			return nil, fmt.Errorf("Could not load TLS CA: %s",
 				err)

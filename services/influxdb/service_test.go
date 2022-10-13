@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/url"
 	"strings"
@@ -41,7 +41,7 @@ var (
 var diagService *diagnostic.Service
 
 func init() {
-	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
 	diagService.Open()
 }
 

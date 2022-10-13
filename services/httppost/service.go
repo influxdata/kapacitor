@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -380,7 +379,7 @@ func (h *handler) Handle(event alert.Event) {
 		var err error
 		if h.captureResponse {
 			var body []byte
-			body, err = ioutil.ReadAll(resp.Body)
+			body, err = io.ReadAll(resp.Body)
 			if err == nil {
 				// Use the body content as the error
 				err = errors.New(string(body))

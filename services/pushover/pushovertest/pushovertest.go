@@ -1,7 +1,7 @@
 package pushovertest
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,7 +21,7 @@ func NewServer() *Server {
 	s := new(Server)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fr := Request{}
-		data, _ := ioutil.ReadAll(r.Body)
+		data, _ := io.ReadAll(r.Body)
 		v, _ := url.ParseQuery(string(data))
 		fr.PostData, _ = NewPostData(v)
 		s.mu.Lock()

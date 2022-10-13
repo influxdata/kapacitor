@@ -2,7 +2,7 @@ package httpposttest
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -27,7 +27,7 @@ func NewAlertServer(headers map[string]string, raw bool) *AlertServer {
 			}
 		}
 		if raw {
-			req.Raw, _ = ioutil.ReadAll(r.Body)
+			req.Raw, _ = io.ReadAll(r.Body)
 			json.Unmarshal(req.Raw, &req.Data)
 		} else {
 			json.NewDecoder(r.Body).Decode(&req.Data)

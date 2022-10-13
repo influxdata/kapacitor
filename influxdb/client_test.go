@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -208,7 +208,7 @@ func TestClient_Write(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		bod, err := ioutil.ReadAll(uncompressedBody)
+		bod, err := io.ReadAll(uncompressedBody)
 		if err != nil {
 			t.Error(err)
 		}
@@ -255,7 +255,7 @@ func TestClient_WriteLarge(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		bod, err := ioutil.ReadAll(uncompressedBody)
+		bod, err := io.ReadAll(uncompressedBody)
 		if err != nil {
 			t.Error(err)
 		}
@@ -308,7 +308,7 @@ func TestClient_WriteLarge(t *testing.T) {
 func TestClient_Write_noCompression(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data Response
-		bod, err := ioutil.ReadAll(r.Body)
+		bod, err := io.ReadAll(r.Body)
 		expected := "testpt,tag1=tag1 value=1i 942105600000000003\n"
 		if string(bod) != expected {
 			t.Errorf("unexpected send, expected '%s', got '%s'", expected, string(bod))
@@ -537,7 +537,7 @@ func TestHTTPClient_CreateBucketV2(t *testing.T) {
 			gotBucketBody := false
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "Token mytoken", r.Header.Get("Authorization"))
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
 				switch r.URL.Path {
 				case "/api/v2/buckets":

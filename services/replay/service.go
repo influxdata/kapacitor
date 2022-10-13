@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -224,7 +223,7 @@ func (s *Service) syncRecordingMetadata() error {
 	// recording file in the replays dir and for it to be auto discovered on restart.
 
 	// Find all recordings and store their metadata into the new storage service.
-	files, err := ioutil.ReadDir(s.saveDir)
+	files, err := os.ReadDir(s.saveDir)
 	if err != nil {
 		return errors.Wrap(err, "syncing recording metadata")
 	}
@@ -255,12 +254,18 @@ func (s *Service) syncRecordingMetadata() error {
 			Scheme: "file",
 			Path:   filepath.ToSlash(filepath.Join(s.saveDir, info.Name())),
 		}
+		finfo, err := info.Info()
+		if err != nil {
+			s.diag.Error("file info error", fmt.Errorf("%s has unknown file info", name))
+			continue
+
+		}
 		recording := Recording{
 			ID:       id,
 			DataURL:  dataUrl.String(),
 			Type:     typ,
-			Size:     info.Size(),
-			Date:     info.ModTime().UTC(),
+			Size:     finfo.Size(),
+			Date:     finfo.ModTime().UTC(),
 			Status:   Finished,
 			Progress: 1.0,
 		}

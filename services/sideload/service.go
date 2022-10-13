@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -297,7 +296,7 @@ func readValues(p string) (map[string]interface{}, error) {
 		return nil, errors.Wrapf(err, "failed to open values file %q", p)
 	}
 	defer f.Close()
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read values file %q", p)
 	}
@@ -319,7 +318,7 @@ func readValues(p string) (map[string]interface{}, error) {
 }
 
 func loadValues(resp io.ReadCloser) (map[string]map[string]interface{}, error) {
-	data, err := ioutil.ReadAll(resp)
+	data, err := io.ReadAll(resp)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to read response body")
 	}

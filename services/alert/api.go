@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path"
 	"sort"
@@ -409,7 +408,7 @@ func (s *apiServer) handlePatchHandler(topic, handler string, w http.ResponseWri
 		return
 	}
 
-	patchBytes, err := ioutil.ReadAll(r.Body)
+	patchBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to read request body: ", err.Error()), true, http.StatusInternalServerError)
 		return

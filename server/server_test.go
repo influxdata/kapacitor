@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -13386,7 +13385,7 @@ func TestStorage_Backup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	backup, err := ioutil.ReadAll(r)
+	backup, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13398,7 +13397,7 @@ func TestStorage_Backup(t *testing.T) {
 	s.Stop()
 
 	// Restore from backup
-	if err := ioutil.WriteFile(s.Config.Storage.BoltDBPath, backup, 0644); err != nil {
+	if err := os.WriteFile(s.Config.Storage.BoltDBPath, backup, 0644); err != nil {
 		t.Fatal(err)
 	}
 

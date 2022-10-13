@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -22,7 +22,7 @@ import (
 var diagService *diagnostic.Service
 
 func init() {
-	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
 	diagService.Open()
 }
 
@@ -212,7 +212,7 @@ func TestService_UpdateSection(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1065,7 +1065,7 @@ func TestService_GetConfig(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer resp.Body.Close()
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				if err != nil {
 					t.Fatal(err)
 				}

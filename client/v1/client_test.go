@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -580,7 +580,7 @@ func Test_CreateTask(t *testing.T) {
 	tickScript := "stream|from().measurement('cpu')"
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var task client.CreateTaskOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		err := json.Unmarshal(body, &task)
 		if err != nil {
 			t.Fatal(err)
@@ -645,7 +645,7 @@ func Test_UpdateTask(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var task client.UpdateTaskOptions
 		task.Status = client.Enabled
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		err := json.Unmarshal(body, &task)
 		if err != nil {
 			t.Fatal(err)
@@ -710,7 +710,7 @@ func Test_UpdateTask(t *testing.T) {
 func Test_UpdateTask_Enable(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var task client.UpdateTaskOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &task)
 
 		if r.URL.Path == "/kapacitor/v1/tasks/taskname" && r.Method == "PATCH" {
@@ -755,7 +755,7 @@ func Test_UpdateTask_Disable(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var task client.UpdateTaskOptions
 		task.Status = client.Enabled
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &task)
 
 		if r.URL.Path == "/kapacitor/v1/tasks/taskname" && r.Method == "PATCH" {
@@ -1129,7 +1129,7 @@ func Test_CreateTemplate(t *testing.T) {
 	tickScript := "stream|from().measurement('cpu')"
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var template client.CreateTemplateOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &template)
 
 		if r.URL.Path == "/kapacitor/v1/templates" && r.Method == "POST" {
@@ -1174,7 +1174,7 @@ func Test_CreateTemplate(t *testing.T) {
 func Test_UpdateTemplate(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var template client.UpdateTemplateOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &template)
 
 		if r.URL.Path == "/kapacitor/v1/templates/templatename" && r.Method == "PATCH" {
@@ -1354,7 +1354,7 @@ func Test_RecordStream(t *testing.T) {
 	stop := time.Now().Add(time.Minute).UTC()
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.RecordStreamOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/recordings/stream" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
@@ -1387,7 +1387,7 @@ func Test_RecordBatch(t *testing.T) {
 	start := stop.Add(-24 * time.Hour)
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.RecordBatchOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/recordings/batch" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
@@ -1424,7 +1424,7 @@ func Test_RecordBatch(t *testing.T) {
 func Test_RecordQuery(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.RecordQueryOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/recordings/query" && r.Method == "POST" &&
 			opts.Query == "SELECT * FROM allthethings" &&
@@ -1799,7 +1799,7 @@ func Test_ReplayRunning(t *testing.T) {
 func Test_CreateReplay(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.CreateReplayOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/replays" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
@@ -1839,7 +1839,7 @@ func Test_ReplayBatch(t *testing.T) {
 	start := stop.Add(-24 * time.Hour)
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.ReplayBatchOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/replays/batch" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
@@ -1880,7 +1880,7 @@ func Test_ReplayBatch(t *testing.T) {
 func Test_ReplayQuery(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.ReplayQueryOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/replays/query" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
@@ -2097,7 +2097,7 @@ func Test_ConfigUpdate(t *testing.T) {
 	}
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var update client.ConfigUpdateAction
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &update)
 		if r.URL.Path == "/kapacitor/v1/config/section" && r.Method == "POST" &&
 			cmp.Equal(update, expUpdate) {
@@ -2125,7 +2125,7 @@ func Test_ConfigUpdate_Element(t *testing.T) {
 	}
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var update client.ConfigUpdateAction
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &update)
 		if r.URL.Path == "/kapacitor/v1/config/section/element" && r.Method == "POST" &&
 			cmp.Equal(update, expUpdate) {
@@ -3090,7 +3090,7 @@ func Test_DeleteTopicHandler(t *testing.T) {
 func Test_LogLevel(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var opts client.LogLevelOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 
 		if r.URL.Path == "/kapacitor/v1/loglevel" && r.Method == "POST" &&
@@ -3115,7 +3115,7 @@ func Test_LogLevel(t *testing.T) {
 func Test_CreateUser(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var user client.CreateUserOptions
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 		err := json.Unmarshal(body, &user)
 		if err != nil {
 			t.Fatal(err)

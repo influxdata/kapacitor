@@ -7,7 +7,6 @@ import (
 	"expvar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/pprof"
 	"strings"
@@ -444,7 +443,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 	}
 	defer body.Close()
 
-	b, err := ioutil.ReadAll(body)
+	b, err := io.ReadAll(body)
 	if err != nil {
 		if h.writeTrace {
 			h.diag.Error("write handler unabled to read bytes from request body", err)

@@ -3,7 +3,6 @@ package kapacitor_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"testing"
 	"time"
@@ -23,7 +22,7 @@ var diagService *diagnostic.Service
 var kapacitorDiag kapacitor.Diagnostic
 
 func init() {
-	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
 	diagService.Open()
 	kapacitorDiag = diagService.NewKapacitorHandler()
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -95,7 +95,7 @@ func readFile(filename string) (string, error) {
 		}
 	}
 	defer f.Close()
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return "", nil
 	}
@@ -103,7 +103,7 @@ func readFile(filename string) (string, error) {
 }
 
 func writeTmpFile(dir, contents string) (string, error) {
-	f, err := ioutil.TempFile(dir, "tickfmt")
+	f, err := os.CreateTemp(dir, "tickfmt")
 	if err != nil {
 		return "", err
 	}

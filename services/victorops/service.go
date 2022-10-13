@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -113,7 +112,7 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 		if resp.StatusCode == http.StatusNotFound {
 			return errors.New("URL or API key not found: 404")
 		}
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}

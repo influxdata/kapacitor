@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 )
@@ -33,7 +33,7 @@ func Create(
 	}
 
 	if SSLCA != "" {
-		caCert, err := ioutil.ReadFile(SSLCA)
+		caCert, err := os.ReadFile(SSLCA)
 		if err != nil {
 			return nil, fmt.Errorf("Could not load TLS CA: %s",
 				err)

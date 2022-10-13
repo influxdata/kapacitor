@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -151,7 +151,7 @@ func (n *HTTPPostNode) doPost(row *models.Row) int {
 		var err error
 		if n.c.CaptureResponseFlag {
 			var body []byte
-			body, err = ioutil.ReadAll(resp.Body)
+			body, err = io.ReadAll(resp.Body)
 			if err == nil {
 				// Use the body content as the error
 				err = errors.New(string(body))

@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/influxdata/influxdb/query"
@@ -14,7 +13,7 @@ type Result query.Result
 
 // Unmarshal a Result object from JSON.
 func ResultFromJSON(in io.Reader) (r Result) {
-	b, err := ioutil.ReadAll(in)
+	b, err := io.ReadAll(in)
 	if err != nil {
 		r.Err = err
 		return

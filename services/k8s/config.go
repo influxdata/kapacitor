@@ -3,8 +3,8 @@ package k8s
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"net/url"
+	"os"
 
 	"github.com/influxdata/kapacitor/listmap"
 	"github.com/influxdata/kapacitor/services/k8s/client"
@@ -74,7 +74,7 @@ func (c Config) ClientConfig() (client.Config, error) {
 	var t *tls.Config
 	if c.CAPath != "" {
 		t = &tls.Config{}
-		caCert, err := ioutil.ReadFile(c.CAPath)
+		caCert, err := os.ReadFile(c.CAPath)
 		if err != nil {
 			return client.Config{}, errors.Wrapf(err, "failed to read ca-path %q", c.CAPath)
 		}

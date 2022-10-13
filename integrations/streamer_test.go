@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -99,7 +99,7 @@ var diagService *diagnostic.Service
 func init() {
 	testing.Init()
 	flag.Parse()
-	out := ioutil.Discard
+	out := io.Discard
 	if testing.Verbose() {
 		out = os.Stderr
 	}
@@ -3690,7 +3690,7 @@ func TestStream_HttpPostEndpoint_CustomBody(t *testing.T) {
 				t.Fatalf("got '%s:%s', exp '%s:%s'", k, nv, k, v)
 			}
 		}
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -12516,7 +12516,7 @@ stream
 		rp = r.URL.Query().Get("rp")
 		precision = r.URL.Query().Get("precision")
 
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			done <- err
 			return

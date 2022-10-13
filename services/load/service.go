@@ -3,7 +3,7 @@ package load
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -118,7 +118,7 @@ func (s *Service) taskFiles() (tickscripts []string, taskFiles []string, err err
 
 	tasksDir := s.config.tasksDir()
 
-	files, err := ioutil.ReadDir(tasksDir)
+	files, err := os.ReadDir(tasksDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -150,7 +150,7 @@ func (s *Service) templateFiles() (tickscripts []string, err error) {
 
 	templatesDir := s.config.templatesDir()
 
-	files, err := ioutil.ReadDir(templatesDir)
+	files, err := os.ReadDir(templatesDir)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (s *Service) handlerFiles() ([]string, error) {
 
 	handlersDir := s.config.handlersDir()
 
-	files, err := ioutil.ReadDir(handlersDir)
+	files, err := os.ReadDir(handlersDir)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (s *Service) Load() error {
 
 func (s *Service) load() error {
 
-	if _, err := ioutil.ReadDir(s.config.Dir); os.IsNotExist(err) {
+	if _, err := os.ReadDir(s.config.Dir); os.IsNotExist(err) {
 		s.diag.Debug("skipping load... load directory does not exists")
 		return nil
 	}
@@ -286,7 +286,7 @@ func (s *Service) loadTask(f string) error {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}
@@ -361,7 +361,7 @@ func (s *Service) loadTemplate(f string) error {
 
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}
@@ -409,7 +409,7 @@ func (s *Service) loadVars(f string) error {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}
@@ -499,7 +499,7 @@ func (s *Service) loadHandler(f string) error {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("failed to read file %v: %v", f, err)
 	}

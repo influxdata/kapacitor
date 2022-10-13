@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -375,7 +374,7 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 	}
 	body := resp.Body
 	defer func() {
-		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}()
 
@@ -395,7 +394,7 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 	}
 
 	if !valid {
-		body, err := ioutil.ReadAll(body)
+		body, err := io.ReadAll(body)
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +460,7 @@ func (c *HTTPClient) doHttpV2(req *http.Request, codes ...int) (io.ReadCloser, e
 		return nil, err
 	}
 	closer := func() error {
-		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return resp.Body.Close()
 	}
 	defer func() {
@@ -478,7 +477,7 @@ func (c *HTTPClient) doHttpV2(req *http.Request, codes ...int) (io.ReadCloser, e
 		}
 	}
 	if !valid {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
