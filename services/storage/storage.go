@@ -72,6 +72,7 @@ type TxOperator interface {
 }
 
 // Common interface for interacting with a simple Key/Value storage
+// Yes, I realize this is a bad name.
 type Interface interface {
 
 	// View creates a new read only transaction and always rolls it back.
@@ -80,6 +81,8 @@ type Interface interface {
 	// Update creates a new read-write transaction and always rolls it back.
 	// If the function returns a nil error the transaction is committed, otherwise the error is returned.
 	Update(func(Tx) error) error
+
+	Store(Buckets ...[]byte) Interface
 }
 
 // View manages a read only transaction.

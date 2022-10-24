@@ -57,7 +57,7 @@ func TestTaskService(t *testing.T, fn BackendComponentFactory, testCategory ...s
 					testTaskCRUD(t, sys)
 				})
 
-				t.Run("FindTasks paging", func(t *testing.T) {
+				t.Run("FindTasks_paging", func(t *testing.T) {
 					testTaskFindTasksPaging(t, sys)
 				})
 

@@ -211,13 +211,8 @@ def run_tests(race, parallel, timeout, verbose):
         test_command += " -timeout {}".format(timeout)
     test_command += " ./..."
     logging.info("Running tests...")
-
-    packages = run("go list ./...").split("\n")
-    print(packages)
     logging.info("Test command: " + test_command)
-    for package in packages:
-        run(test_command + " " + package, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
-
+    output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
 
 def package_udfs(version, dist_dir):

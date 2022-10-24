@@ -2857,7 +2857,6 @@ test value=1 0000000011
 func TestServer_UpdateTaskID(t *testing.T) {
 	s, cli := OpenDefaultServer(t)
 	defer s.Close()
-	println("here")
 	id := "testTaskID"
 	ttype := client.StreamTask
 	dbrps := []client.DBRP{
@@ -9990,70 +9989,70 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		// Create default config
-		c := NewConfig(t)
-		s := OpenServer(c)
-		cli := Client(s)
-		defer s.Close()
-
-		h, err := cli.CreateTopicHandler(cli.TopicHandlersLink(tc.topic), tc.create)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(h, tc.expCreate) {
-			t.Errorf("unexpected handler created:\ngot\n%#v\nexp\n%#v\n", h, tc.expCreate)
-		}
-
-		h, err = cli.PatchTopicHandler(h.Link, tc.patch)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(h, tc.expPatch) {
-			t.Errorf("unexpected handler patched:\ngot\n%#v\nexp\n%#v\n", h, tc.expPatch)
-		}
-
-		h, err = cli.ReplaceTopicHandler(h.Link, tc.put)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(h, tc.expPut) {
-			t.Errorf("unexpected handler put:\ngot\n%#v\nexp\n%#v\n", h, tc.expPut)
-		}
-
-		// Restart server
-		s.Restart()
-
-		rh, err := cli.TopicHandler(h.Link)
-		if err != nil {
-			t.Fatalf("could not find handler after restart: %v", err)
-		}
-		if got, exp := rh, h; !reflect.DeepEqual(got, exp) {
-			t.Errorf("unexpected handler after restart:\ngot\n%#v\nexp\n%#v\n", got, exp)
-		}
-
-		err = cli.DeleteTopicHandler(h.Link)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		_, err = cli.TopicHandler(h.Link)
-		if err == nil {
-			t.Errorf("expected handler to be deleted")
-		}
-
-		handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(tc.topic), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, h := range handlers.Handlers {
-			if h.ID == tc.expPut.ID {
-				t.Errorf("expected handler to be deleted")
-				break
+		t.Run(tc.topic, func(t *testing.T) {
+			// Create default config
+			c := NewConfig(t)
+			s := OpenServer(c)
+			cli := Client(s)
+			defer s.Close()
+			h, err := cli.CreateTopicHandler(cli.TopicHandlersLink(tc.topic), tc.create)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
+
+			if !reflect.DeepEqual(h, tc.expCreate) {
+				t.Errorf("unexpected handler created:\ngot\n%#v\nexp\n%#v\n", h, tc.expCreate)
+			}
+
+			h, err = cli.PatchTopicHandler(h.Link, tc.patch)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !reflect.DeepEqual(h, tc.expPatch) {
+				t.Errorf("unexpected handler patched:\ngot\n%#v\nexp\n%#v\n", h, tc.expPatch)
+			}
+
+			h, err = cli.ReplaceTopicHandler(h.Link, tc.put)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(h, tc.expPut) {
+				t.Errorf("unexpected handler put:\ngot\n%#v\nexp\n%#v\n", h, tc.expPut)
+			}
+
+			// Restart server
+			s.Restart()
+
+			rh, err := cli.TopicHandler(h.Link)
+			if err != nil {
+				t.Fatalf("could not find handler after restart: %v", err)
+			}
+			if got, exp := rh, h; !reflect.DeepEqual(got, exp) {
+				t.Errorf("unexpected handler after restart:\ngot\n%#v\nexp\n%#v\n", got, exp)
+			}
+
+			err = cli.DeleteTopicHandler(h.Link)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = cli.TopicHandler(h.Link)
+			if err == nil {
+				t.Errorf("expected handler to be deleted")
+			}
+
+			handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(tc.topic), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, h := range handlers.Handlers {
+				if h.ID == tc.expPut.ID {
+					t.Errorf("expected handler to be deleted")
+					break
+				}
+			}
+		})
 	}
 }
 
@@ -12001,7 +12000,10 @@ stream
 	v := url.Values{}
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", point, v)
+	time.Sleep(15 * time.Second)
 
+	q, _ := s.AlertService.EventStates("tcp", -1)
+	_ = q
 	s.Restart()
 
 	// Check TCP handler got event
@@ -12029,9 +12031,8 @@ stream
 	exp := []alert.Data{alertData}
 	got := ts.Data()
 	if !reflect.DeepEqual(exp, got) {
-		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+		t.Fatalf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 	}
-
 	// Check event on topic
 	l := cli.TopicEventsLink(tcpTopic)
 	expTopicEvents := client.TopicEvents{
@@ -12055,7 +12056,7 @@ stream
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(te, expTopicEvents) {
-		t.Errorf("unexpected topic events for publish topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+		t.Fatalf("unexpected topic events for publish topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
 	}
 }
 

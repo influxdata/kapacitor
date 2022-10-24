@@ -19,28 +19,25 @@ func NewBolt(db *bolt.DB, bucket ...[]byte) *Bolt {
 	}
 }
 
-func (b *Bolt) deleteBucket() error {
-	if len(b.bucket) == 0 {
-		return nil
-	}
-	return b.db.Update(func(tx *bolt.Tx) error {
-		var bucket *bolt.Bucket
-		i := 0
-		for i = range b.bucket {
-			bucket = tx.Bucket(b.bucket[i])
-			if bucket == nil {
-				return nil
-			}
-		}
-		return tx.DeleteBucket(b.bucket[i])
-	})
-
-}
-
+// Bucket tells the Bolt to do following actions in a bucket.  A nil bucket will return a *Bolt that is targeted to the root bucket.
 func (b *Bolt) Bucket(bucket []byte) *Bolt {
+	if bucket == nil {
+		return &Bolt{
+			db:     b.db,
+			bucket: nil,
+		}
+	}
 	return &Bolt{
 		db:     b.db,
 		bucket: append(b.bucket, bucket),
+	}
+}
+
+// Bucket tells the Bolt to do following actions in a bucket.  A nil bucket will return a *Bolt that is targeted to the root bucket.
+func (b *Bolt) Store(buckets ...[]byte) Interface {
+	return &Bolt{
+		db:     b.db,
+		bucket: buckets,
 	}
 }
 
@@ -53,10 +50,12 @@ func (b *Bolt) Update(f func(tx Tx) error) error {
 }
 
 func (b *Bolt) put(tx *bolt.Tx, key string, value []byte) error {
-	var bucket *bolt.Bucket
-	var err error
-	for i := range b.bucket {
-		bucket, err = tx.CreateBucketIfNotExists(b.bucket[i])
+	bucket, err := tx.CreateBucketIfNotExists(b.bucket[0])
+	if err != nil {
+		return err
+	}
+	for _, buckName := range b.bucket[1:] {
+		bucket, err = bucket.CreateBucketIfNotExists(buckName)
 		if err != nil {
 			return err
 		}
@@ -71,12 +70,9 @@ func (b *Bolt) Put(key string, value []byte) error {
 }
 
 func (b *Bolt) get(tx *bolt.Tx, key string) (*KeyValue, error) {
-	var bucket *bolt.Bucket
-	for i := range b.bucket {
-		bucket = tx.Bucket(b.bucket[i])
-		if bucket == nil {
-			return nil, ErrNoKeyExists
-		}
+	bucket := b.bucketHelper(tx)
+	if bucket == nil {
+		return nil, ErrNoKeyExists
 	}
 	val := bucket.Get([]byte(key))
 	if val == nil {
@@ -98,15 +94,28 @@ func (b *Bolt) Get(key string) (kv *KeyValue, err error) {
 	return
 }
 
+// Delete removes a key from a bolt.  If the key is a bucket, it removes that.
 func (b *Bolt) delete(tx *bolt.Tx, key string) error {
-	var bucket *bolt.Bucket
-	for i := range b.bucket {
-		bucket = tx.Bucket(b.bucket[i])
-		if bucket == nil {
-			return nil
-		}
+	bucket := b.bucketHelper(tx)
+	if bucket == nil {
+		return nil
 	}
-	return bucket.Delete([]byte(key))
+	cursor := bucket.Cursor()
+	if cursor == nil {
+		return nil
+	}
+	// handling for buckets
+	bkey := []byte(key)
+	k, v := cursor.Seek(bkey)
+	if key != string(k) {
+		return nil
+	}
+	if v == nil {
+		return bucket.DeleteBucket(bkey)
+	}
+	// handling for regular keys
+	return bucket.Delete(bkey)
+
 }
 
 func (b *Bolt) Delete(key string) error {
@@ -116,14 +125,7 @@ func (b *Bolt) Delete(key string) error {
 }
 
 func (b *Bolt) exists(tx *bolt.Tx, key string) (bool, error) {
-	var bucket *bolt.Bucket
-	for i := range b.bucket {
-		bucket = tx.Bucket(b.bucket[i])
-		if bucket == nil {
-			return false, nil
-		}
-	}
-
+	bucket := b.bucketHelper(tx)
 	if bucket == nil {
 		return false, nil
 	}
@@ -140,25 +142,53 @@ func (b *Bolt) Exists(key string) (exists bool, err error) {
 	return
 }
 
-func (b *Bolt) list(tx *bolt.Tx, prefixStr string) (kvs []*KeyValue, err error) {
-	var bucket *bolt.Bucket
-	for i := range b.bucket {
-		bucket = tx.Bucket(b.bucket[i])
+func (b *Bolt) bucketHelper(tx *bolt.Tx) *bolt.Bucket {
+	if len(b.bucket) == 0 {
+		return tx.Cursor().Bucket() //grab root bucket
+	} // get the right bucket
+	bucket := tx.Bucket(b.bucket[0])
+	if bucket == nil {
+		return nil
+	}
+	for _, buckName := range b.bucket[1:] {
+		bucket = bucket.Bucket(buckName)
 		if bucket == nil {
-			return
+			return nil
 		}
 	}
+	return bucket
+}
 
-	cursor := bucket.Cursor()
+// cursor returns a cursor at the appropriate bucket or nil if that bucket doesn't exist
+func (b *Bolt) cursor(tx *bolt.Tx) *bolt.Cursor {
+	if len(b.bucket) == 0 {
+		return tx.Cursor() //grab root bucket
+	} // get the right bucket
+	bucket := tx.Bucket(b.bucket[0])
+	if bucket == nil {
+		return nil
+	}
+	for _, buckName := range b.bucket[1:] {
+		bucket = bucket.Bucket(buckName)
+		if bucket == nil {
+			return nil
+		}
+	}
+	return bucket.Cursor()
+}
+
+func (b *Bolt) list(tx *bolt.Tx, prefixStr string) (kvs []*KeyValue, err error) {
+	cursor := b.cursor(tx)
+	if cursor == nil {
+		return nil, nil // no objects returned
+	}
+
 	prefix := []byte(prefixStr)
-
-	for key, v := cursor.Seek(prefix); bytes.HasPrefix(key, prefix); key, v = cursor.Next() {
-		value := make([]byte, len(v))
-		copy(value, v)
-
+	for key, v := cursor.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, v = cursor.Next() {
+		// we want to be able to grab buckets AND keys here
 		kvs = append(kvs, &KeyValue{
 			Key:   string(key),
-			Value: value,
+			Value: append([]byte(nil), v...),
 		})
 	}
 	return

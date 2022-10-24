@@ -298,6 +298,7 @@ func (s *apiServer) handleListEvents(topic string, w http.ResponseWriter, r *htt
 		httpd.HttpError(w, fmt.Sprintf("failed to get topic events: %s", err.Error()), true, http.StatusInternalServerError)
 		return
 	}
+
 	res := client.TopicEvents{
 		Link:   s.topicEventsLink(topic, client.Self),
 		Topic:  topic,

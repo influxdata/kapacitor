@@ -3,87 +3,50 @@ package storage_test
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/pkg/errors"
-	bolt "go.etcd.io/bbolt"
 )
 
 // Error used to specifically trigger a rollback for tests.
 var rollbackErr = errors.New("rollback")
 
-type createStoreCloser func() (storeCloser, error)
+//type storeCloser interface {
+//	Store(namespace string) storage.Interface
+//	Close() error
+//}
 
-// stores is a map of all storage implementations,
-// each test will be run against the stores found in this map.
-var stores = map[string]createStoreCloser{
-	"bolt": newBolt,
-	"mem":  newMemStore,
-}
+//type boltDB struct {
+//	db  *bolt.DB
+//	dir string
+//}
+//
+//func (b boltDB) Close() error {
+//	_ = b.db.Close() // we don't need to worry about this error
+//	return os.RemoveAll(b.dir)
+//}
+//
+//func newBolt() (storeCloser, error) {
+//	tmpDir, err := os.MkdirTemp("", "storage-bolt")
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to create temp directory: %v", err)
+//	}
+//	db, err := bolt.Open(filepath.Join(tmpDir, "bolt.db"), 0600, nil)
+//	if err != nil {
+//		return boltDB{}, err
+//	}
+//	return boltDB{
+//		db:  db,
+//		dir: tmpDir,
+//	}, nil
+//}
+//
+//func (b boltDB) Store(bucket string) storage.Interface {
+//	return storage.NewBolt(b.db, []byte(bucket))
+//}
 
-type storeCloser interface {
-	Store(namespace string) storage.Interface
-	Close()
-}
-
-type boltDB struct {
-	db  *bolt.DB
-	dir string
-}
-
-func (b boltDB) Close() {
-	_ = b.db.Close()
-	os.RemoveAll(b.dir)
-}
-
-func newBolt() (storeCloser, error) {
-	tmpDir, err := os.MkdirTemp("", "storage-bolt")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %v", err)
-	}
-	db, err := bolt.Open(filepath.Join(tmpDir, "bolt.db"), 0600, nil)
-	if err != nil {
-		return boltDB{}, err
-	}
-	return boltDB{
-		db:  db,
-		dir: tmpDir,
-	}, nil
-}
-
-func (b boltDB) Store(bucket string) storage.Interface {
-	return storage.NewBolt(b.db, bucket)
-}
-
-type memStore struct {
-	stores map[string]storage.Interface
-}
-
-func newMemStore() (storeCloser, error) {
-	return memStore{
-		stores: make(map[string]storage.Interface),
-	}, nil
-}
-
-func (s memStore) Store(name string) storage.Interface {
-	m, ok := s.stores[name]
-	if ok {
-		return m
-	}
-	m = storage.NewMemStore(name)
-	s.stores[name] = m
-	return m
-}
-
-func (s memStore) Close() {
-}
-
-=======
->>>>>>> c705d4c2 (WIP)
 func TestStorage_CRUD(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
 		db, err := storagetest.NewBolt()
