@@ -268,6 +268,7 @@ func TestServer_Pprof_Index(t *testing.T) {
 		})
 	}
 }
+
 func TestServer_Authenticate_Fail(t *testing.T) {
 	conf := NewConfig(t)
 	conf.HTTP.AuthEnabled = true
@@ -480,6 +481,7 @@ func TestServer_CreateUser(t *testing.T) {
 		t.Fatalf("unexpected permissions got %s exp %s", user.Permissions, permissions)
 	}
 }
+
 func TestServer_CreateTask(t *testing.T) {
 	s, cli := OpenDefaultServer(t)
 	defer s.Close()
