@@ -9,18 +9,18 @@ import (
 )
 
 type TestStore struct {
-	db        *boltDB
+	db        *BoltDB
 	versions  storage.Versions
 	registrar *storage.StoreActionerRegistrar
 }
 
-// boltDB is a database that deletes itself when closed
-type boltDB struct {
+// BoltDB is a database that deletes itself when closed
+type BoltDB struct {
 	*bolt.DB
 }
 
 // NewBolt is an in-memory db that deletes itself when closed, do not use except for testing.
-func NewBolt() (*boltDB, error) {
+func NewBolt() (*BoltDB, error) {
 	db, err := bolt.Open(":memory:", 0600, &bolt.Options{
 		Timeout:    0,
 		NoGrowSync: false,
@@ -29,14 +29,14 @@ func NewBolt() (*boltDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &boltDB{db}, nil
+	return &BoltDB{db}, nil
 }
 
-func (b boltDB) Store(bucket string) storage.Interface {
+func (b BoltDB) Store(bucket string) storage.Interface {
 	return storage.NewBolt(b.DB, []byte(bucket))
 }
 
-func (b boltDB) Close() error {
+func (b BoltDB) Close() error {
 	err := b.DB.Close()
 	if err != nil {
 		return err

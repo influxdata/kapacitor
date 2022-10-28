@@ -1,6 +1,10 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+
+	"go.etcd.io/bbolt"
+)
 
 // Common errors that can be returned
 var (
@@ -44,6 +48,9 @@ type ReadOnlyTx interface {
 type Tx interface {
 	ReadOperator
 	WriteOperator
+
+	// returns a cursor for that bucket
+	Cursor() *bbolt.Cursor
 
 	// Bucket returns a Tx for that bucket.  If the bucket doesn't exist Tx should be nil.
 	Bucket(name []byte) Tx

@@ -19,7 +19,7 @@ var rollbackErr = errors.New("rollback")
 //}
 
 //type boltDB struct {
-//	db  *bolt.DB
+//	db  *bolt.db
 //	dir string
 //}
 //

@@ -353,6 +353,13 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 	return s.StorageService.Versions().Set(handlerSpecsStoreVersion, handlerSpecsStoreVersion1)
 }
 
+func (s *Service) MigrateTopicStoreState() error {
+	s.mu.Lock()
+
+	defer s.mu.Unlock()
+	return nil
+}
+
 func (s *Service) loadSavedHandlerSpecs() error {
 	offset := 0
 	limit := 100
