@@ -31,22 +31,37 @@ func NewPrintConfigCommand() *PrintConfigCommand {
 func (cmd *PrintConfigCommand) Run(args ...string) error {
 	// Parse command flags.
 	fs := flag.NewFlagSet("", flag.ContinueOnError)
+	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, printConfigUsage) }
+
+	config, err := cmd.PrepareConfig(args, fs)
+	if err != nil {
+		return err
+	}
+
+	if err = toml.NewEncoder(cmd.Stdout).Encode(config); err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(cmd.Stdout, "\n")
+
+	return err
+}
+
+func (cmd *PrintConfigCommand) PrepareConfig(args []string, fs *flag.FlagSet) (*server.Config, error) {
 	configPath := fs.String("config", "", "")
 	hostname := fs.String("hostname", "", "")
-	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, printConfigUsage) }
 	if err := fs.Parse(args); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Parse config from path.
 	config, err := cmd.parseConfig(FindConfigPath(*configPath))
 	if err != nil {
-		return fmt.Errorf("parse config: %s", err)
+		return nil, fmt.Errorf("parse config: %s", err)
 	}
 
 	// Apply any environment variables on top of the parsed config
 	if err := config.ApplyEnvOverrides(); err != nil {
-		return fmt.Errorf("apply env config: %v", err)
+		return nil, fmt.Errorf("apply env config: %v", err)
 	}
 
 	// Override config properties.
@@ -56,13 +71,9 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 
 	// Validate the configuration.
 	if err := config.Validate(); err != nil {
-		return fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
+		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
-
-	toml.NewEncoder(cmd.Stdout).Encode(config)
-	fmt.Fprint(cmd.Stdout, "\n")
-
-	return nil
+	return config, nil
 }
 
 // FindConfigPath returns the config path specified or searches for a valid config path.

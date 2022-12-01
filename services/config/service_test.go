@@ -53,10 +53,10 @@ type TestConfig struct {
 	SectionCs []SectionC `override:"section-c,element-key=name"`
 }
 
-func OpenNewSerivce(testConfig interface{}, updates chan<- config.ConfigUpdate) (*config.Service, *httpdtest.Server) {
+func OpenNewService(testConfig interface{}, updates chan<- config.ConfigUpdate) (*config.Service, *httpdtest.Server) {
 	c := config.NewConfig()
 	service := config.NewService(c, testConfig, diagService.NewConfigOverrideHandler(), updates)
-	service.StorageService = storagetest.New()
+	service.StorageService = storagetest.New(diagService.NewStorageHandler())
 	server := httpdtest.NewServer(testing.Verbose())
 	service.HTTPDService = server
 	if err := service.Open(); err != nil {
@@ -187,7 +187,7 @@ func TestService_UpdateSection(t *testing.T) {
 		},
 	}
 	updates := make(chan config.ConfigUpdate, len(testCases))
-	service, server := OpenNewSerivce(testConfig, updates)
+	service, server := OpenNewService(testConfig, updates)
 	defer server.Close()
 	defer service.Close()
 	basePath := server.Server.URL + httpd.BasePath + "/config"
@@ -1035,7 +1035,7 @@ func TestService_GetConfig(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		updates := make(chan config.ConfigUpdate, len(testCases))
-		service, server := OpenNewSerivce(testConfig, updates)
+		service, server := OpenNewService(testConfig, updates)
 		defer server.Close()
 		defer service.Close()
 		basePath := server.Server.URL + httpd.BasePath + "/config"

@@ -13,9 +13,9 @@ var (
 
 // ReadOperator provides an interface for performing read operations.
 type ReadOperator interface {
-	// Retrieve a value.
+	// Get - Retrieve a value.
 	Get(key string) (*KeyValue, error)
-	// Check if a key exists>
+	// Exists - Check if a key exists>
 	Exists(key string) (bool, error)
 	// List all values with given prefix.
 	List(prefix string) ([]*KeyValue, error)
@@ -24,7 +24,7 @@ type ReadOperator interface {
 // WriteOperator provides an interface for performing write operations.
 type WriteOperator interface {
 
-	// Store a value.
+	// Put - Store a value.
 	Put(key string, value []byte) error
 	// Delete a key.
 	// Deleting a non-existent key is not an error.
@@ -49,7 +49,7 @@ type Tx interface {
 	ReadOperator
 	WriteOperator
 
-	// returns a cursor for that bucket
+	// Cursor - returns a cursor for that bucket
 	Cursor() *bbolt.Cursor
 
 	// Bucket returns a Tx for that bucket.  If the bucket doesn't exist Tx should be nil.

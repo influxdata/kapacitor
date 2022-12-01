@@ -225,27 +225,6 @@ var (
 	ErrNoTopicStateExists = errors.New("no topic state exists")
 )
 
-//// Data access object for TopicState data.
-//type TopicStateDAO interface {
-//	// Retrieve a handler
-//	Get(id string) (TopicState, error)
-//
-//	// Put an alert.Event, replaces any existing alert.Event.
-//	Put(h alert.Event) error
-//
-//	// Delete a handler.
-//	// It is not an error to delete an non-existent handler.
-//	Delete(id string) error
-//
-//	// List handlers matching a pattern.
-//	// The pattern is shell/glob matching see https://golang.org/pkg/path/#Match
-//	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
-//	// More results may exist while the number of returned items is equal to limit.
-//	List(pattern string, offset, limit int) ([]TopicState, error)
-//
-//	Rebuild() error
-//}
-
 const topicStateVersion = 1
 
 //easyjson:json
@@ -282,16 +261,6 @@ func (e *EventState) AlertEventState(id string) *alert.EventState {
 	}
 }
 
-//type DurableEventState struct {
-//	*EventState
-//	Topic string
-//	ID    string
-//}
-//
-//func (t DurableEventState) ObjectID() string {
-//	return t.Topic
-//}
-
 func (t TopicState) ObjectID() string {
 	return t.Topic
 }
@@ -307,75 +276,101 @@ func (t *TopicState) UnmarshalBinary(data []byte) error {
 	})
 }
 
-//
-// // Key/Value store based implementation of the TopicStateDAO
-//
-//	type topicStateKV struct {
-//		store *storage.IndexedStore
-//	}
-//func newTopicStateKV(store storage.Interface) (storage.Interface, error) {
-//	//c := storage.DefaultIndexedStoreConfig("topics", func() storage.BinaryObject {
-//	//	return new(TopicState)
-//	//})
-//	//istore, err := storage.NewIndexedStore(store, c)
-//	//if err != nil {
-//	//	return nil, err
-//	//}
-//	return store, nil
-//}
+type TopicStateDAO interface {
+	Get(id string) (TopicState error)
+	Put(t TopicState) error
+	Replace(t TopicState) error
+	Delete(id string) error
+	List(pattern string, offset, limit int) ([]TopicState, error)
+	Rebuild() error
+	DeleteMultiple(keys []string) error
+}
 
-//	return &topicStateKV{
-//		store: istore,
-//	}, nil
-//}
-//
-//func (kv *topicStateKV) error(err error) error {
-//	if err == storage.ErrNoObjectExists {
-//		return ErrNoTopicStateExists
-//	}
-//	return err
-//}
-//
-//func (kv *topicStateKV) Get(id string) (TopicState, error) {
-//	o, err := kv.store.Get(id)
-//	if err != nil {
-//		return TopicState{}, kv.error(err)
-//	}
-//	t, ok := o.(*TopicState)
-//	if !ok {
-//		return TopicState{}, storage.ImpossibleTypeErr(t, o)
-//	}
-//	return *t, nil
-//}
-//
-//func (kv *topicStateKV) Put(event alert.Event) error {
-//	return kv.store.Put(&event)
-//}
-//
-//func (kv *topicStateKV) Replace(topic, id string, state EventState) error {
-//	return kv.store.Replace(&t)
-//}
-//
-//func (kv *topicStateKV) Delete(id string) error {
-//	return kv.store.Delete(id)
-//}
-//
-//func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, error) {
-//	objects, err := kv.store.List(storage.DefaultIDIndex, pattern, offset, limit)
-//	if err != nil {
-//		return nil, err
-//	}
-//	specs := make([]TopicState, len(objects))
-//	for i, o := range objects {
-//		t, ok := o.(*TopicState)
-//		if !ok {
-//			return nil, storage.ImpossibleTypeErr(t, o)
-//		}
-//		specs[i] = *t
-//	}
-//	return specs, nil
-//}
-//
-//func (kv *topicStateKV) Rebuild() error {
-//	return kv.store.Rebuild()
-//}
+// Key/Value store based implementation of the TopicStateDAO
+type topicStateKV struct {
+	store *storage.IndexedStore
+}
+
+const topicStateKVPrefix = "topics"
+
+func NewTopicStateKV(store storage.Interface) (*topicStateKV, error) {
+	c := storage.DefaultIndexedStoreConfig(topicStateKVPrefix, func() storage.BinaryObject {
+		return new(TopicState)
+	})
+	istore, err := storage.NewIndexedStore(store, c)
+	if err != nil {
+		return nil, err
+	}
+	return &topicStateKV{
+		store: istore,
+	}, nil
+}
+
+func (kv *topicStateKV) error(err error) error {
+	if err == storage.ErrNoObjectExists {
+		return ErrNoTopicStateExists
+	}
+	return err
+}
+
+func (kv *topicStateKV) Get(id string) (TopicState, error) {
+	o, err := kv.store.Get(id)
+	if err != nil {
+		return TopicState{}, kv.error(err)
+	}
+	t, ok := o.(*TopicState)
+	if !ok {
+		return TopicState{}, storage.ImpossibleTypeErr(t, o)
+	}
+	return *t, nil
+}
+
+func (kv *topicStateKV) Put(t TopicState) error {
+	return kv.store.Put(&t)
+}
+
+func (kv *topicStateKV) Replace(t TopicState) error {
+	return kv.store.Replace(&t)
+}
+
+func (kv *topicStateKV) Delete(id string) error {
+	return kv.store.Delete(id)
+}
+
+func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, error) {
+	objects, err := kv.store.List(storage.DefaultIDIndex, pattern, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	specs := make([]TopicState, len(objects))
+	for i, o := range objects {
+		t, ok := o.(*TopicState)
+		if !ok {
+			return nil, storage.ImpossibleTypeErr(t, o)
+		}
+		specs[i] = *t
+	}
+	return specs, nil
+}
+
+func (kv *topicStateKV) Rebuild() error {
+	return kv.store.Rebuild()
+}
+
+func (kv *topicStateKV) DeleteMultiple(keys []string) error {
+	err := kv.store.Store().Update(func(tx storage.Tx) error {
+		for _, tk := range keys {
+			if err := kv.store.DeleteTx(tx, tk); err != nil {
+				return fmt.Errorf("cannot delete topic %q: %w", tk, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if err = kv.Rebuild(); err != nil {
+		return fmt.Errorf("cannot rebuild topic store index: %w", err)
+	}
+	return nil
+}

@@ -59,31 +59,17 @@ func (s *Topics) Topic(id string) (*Topic, bool) {
 func (s *Topics) RestoreTopicNoCopy(topic string, eventStates map[string]*EventState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	t := s.EnsureTopic(topic)
+	t.restoreEventStatesNoCopy(eventStates)
+}
+
+func (s *Topics) EnsureTopic(topic string) *Topic {
 	t, ok := s.topics[topic]
 	if !ok {
 		t = s.newTopic(topic)
 		s.topics[topic] = t
 	}
-	t.restoreEventStatesNoCopy(eventStates)
-}
-
-func (s *Topics) RestoreTopic(id string, eventStates map[string]*EventState) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	t, ok := s.topics[id]
-	if !ok {
-		t = s.newTopic(id)
-		s.topics[id] = t
-	}
-	t.restoreEventStates(eventStates)
-}
-
-func (s *Topics) RestoreTopics() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, t := range s.topics {
-		t.restoreEventStates(t.events)
-	}
+	return t
 }
 
 func (s *Topics) UpdateEvent(topicID string, event EventState) {
@@ -293,20 +279,6 @@ func (t *Topic) restoreEventStatesNoCopy(eventStates map[string]*EventState) {
 	for id, state := range eventStates {
 		t.events[id] = state
 		t.sorted = append(t.sorted, state)
-	}
-	sort.Sort(sortedStates(t.sorted))
-}
-
-func (t *Topic) restoreEventStates(eventStates map[string]*EventState) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.events = make(map[string]*EventState, len(eventStates))
-	t.sorted = make([]*EventState, 0, len(eventStates))
-	for id, state := range eventStates {
-		e := new(EventState)
-		*e = *state
-		t.events[id] = e
-		t.sorted = append(t.sorted, e)
 	}
 	sort.Sort(sortedStates(t.sorted))
 }

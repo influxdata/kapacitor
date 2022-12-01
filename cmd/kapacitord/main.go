@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/influxdata/kapacitor/cmd/kapacitord/downgrade"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/help"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 	"github.com/influxdata/kapacitor/services/diagnostic"
@@ -141,6 +142,10 @@ func (m *Main) Run(args ...string) error {
 	case "help":
 		if err := help.NewCommand().Run(args...); err != nil {
 			return fmt.Errorf("help: %s", err)
+		}
+	case "downgrade":
+		if err := downgrade.NewCommand().Run(args...); err != nil {
+			return fmt.Errorf("downgrade: %w", err)
 		}
 	default:
 		return fmt.Errorf(`unknown command "%s"`+"\n"+`Run 'kapacitord help' for usage`+"\n\n", name)
