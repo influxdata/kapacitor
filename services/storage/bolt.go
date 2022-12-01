@@ -33,7 +33,7 @@ func (b *Bolt) Bucket(bucket []byte) *Bolt {
 	}
 }
 
-// Bucket tells the Bolt to do following actions in a bucket.  A nil bucket will return a *Bolt that is targeted to the root bucket.
+// Store tells the Bolt to do following actions in a bucket.  A nil bucket will return a *Bolt that is targeted to the root bucket.
 func (b *Bolt) Store(buckets ...[]byte) Interface {
 	return &Bolt{
 		db:     b.db,
@@ -241,6 +241,11 @@ func (t *boltTXReadOnly) Bucket(name []byte) ReadOnlyTx {
 type boltTx struct {
 	b  *Bolt
 	tx *bolt.Tx
+}
+
+// Cursor TODO (DSB):  Is this even remotely correct?
+func (t *boltTx) Cursor() *bolt.Cursor {
+	return t.b.cursor(t.tx)
 }
 
 func (t *boltTx) Bucket(name []byte) Tx {
