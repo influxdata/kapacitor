@@ -513,7 +513,7 @@ def build(version=None,
             if arch == "amd64":
                 tags += ["netgo", "osusergo", "static_build"]
             if arch == "arm64":
-                cc = "aarch64-unknown-linux-musl-cc"
+                cc = "/musl/aarch64/bin/musl-gcc"
                 tags += ["netgo", "osusergo", "static_build", "noasm"]
         elif platform == "darwin" and arch == "amd64":
             cc = "x86_64-apple-darwin18-clang"
