@@ -25,8 +25,8 @@ type fakeQueryService struct {
 	mostRecentCtx context.Context
 }
 
-func makeAST(q string) lang.ASTCompiler {
-	pkg, err := runtime.ParseToJSON(q)
+func makeAST(ctx context.Context, q string) lang.ASTCompiler {
+	pkg, err := runtime.ParseToJSON(ctx, q)
 	if err != nil {
 		panic(err)
 	}
@@ -75,12 +75,12 @@ func (s *fakeQueryService) Query(ctx context.Context, compiler flux.Compiler) (f
 }
 
 // SucceedQuery allows the running query matching the given script to return on its Ready channel.
-func (s *fakeQueryService) SucceedQuery(script string) {
+func (s *fakeQueryService) SucceedQuery(ctx context.Context, script string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Unblock the flux.
-	ast := makeAST(script)
+	ast := makeAST(ctx, script)
 	spec := makeASTString(ast)
 	fq, ok := s.queries[spec]
 	if !ok {
@@ -93,12 +93,12 @@ func (s *fakeQueryService) SucceedQuery(script string) {
 }
 
 // FailQuery closes the running query's Ready channel and sets its error to the given value.
-func (s *fakeQueryService) FailQuery(script string, forced error) {
+func (s *fakeQueryService) FailQuery(ctx context.Context, script string, forced error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	// Unblock the flux.
-	ast := makeAST(script)
+	ast := makeAST(ctx, script)
 	spec := makeASTString(ast)
 	fq, ok := s.queries[spec]
 	if !ok {
@@ -119,12 +119,12 @@ func (s *fakeQueryService) FailNextQuery(forced error) {
 // WaitForQueryLive ensures that the query has made it into the service.
 // This is particularly useful for the synchronous executor,
 // because the execution starts on a separate goroutine.
-func (s *fakeQueryService) WaitForQueryLive(t *testing.T, script string) {
+func (s *fakeQueryService) WaitForQueryLive(ctx context.Context, t *testing.T, script string) {
 	t.Helper()
 
 	const attempts = 100
-	ast := makeAST(script)
-	astUTC := makeAST(script)
+	ast := makeAST(ctx, script)
+	astUTC := makeAST(ctx, script)
 	astUTC.Now = ast.Now.UTC()
 	spec := makeASTString(ast)
 	specUTC := makeASTString(astUTC)

@@ -118,8 +118,8 @@ func testQuerySuccess(t *testing.T) {
 		t.Fatalf("did not correctly set RunAt value, got: %v", run.RunAt)
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.SucceedQuery(script)
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.SucceedQuery(ctx, script)
 
 	<-promise.Done()
 
@@ -177,8 +177,8 @@ func testQueryFailure(t *testing.T) {
 		t.Fatal("promise and run dont match")
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.FailQuery(script, errors.New("blargyblargblarg"))
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.FailQuery(ctx, script, errors.New("blargyblargblarg"))
 
 	<-promise.Done()
 
@@ -226,8 +226,8 @@ func testManualRun(t *testing.T) {
 		t.Fatal("promise and run and manual run dont match")
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.SucceedQuery(script)
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.SucceedQuery(ctx, script)
 
 	if got := promise.Error(); got != nil {
 		t.Fatal(got)
@@ -269,8 +269,8 @@ func testResumingRun(t *testing.T) {
 		t.Fatal("promise and run and manual run dont match")
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.SucceedQuery(script)
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.SucceedQuery(ctx, script)
 
 	if got := promise.Error(); got != nil {
 		t.Fatal(got)
@@ -297,8 +297,8 @@ func testWorkerLimit(t *testing.T) {
 		t.Fatal("expected a worker to be started")
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.FailQuery(script, errors.New("blargyblargblarg"))
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.FailQuery(ctx, script, errors.New("blargyblargblarg"))
 
 	<-promise.Done()
 
@@ -370,13 +370,13 @@ func testMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, promiseID, run.ID, "promise and run dont match")
 
-	tes.svc.WaitForQueryLive(t, script)
+	tes.svc.WaitForQueryLive(ctx, t, script)
 
 	mg = promtest.MustGather(t, reg)
 	m = promtest.MustFindMetric(t, mg, "task_executor_total_runs_active", nil)
 	assert.EqualValues(t, 1, *m.Gauge.Value, "unexpected number of active runs")
 
-	tes.svc.SucceedQuery(script)
+	tes.svc.SucceedQuery(ctx, script)
 	<-promise.Done()
 
 	// N.B. You might think the _runs_complete and _runs_active metrics are updated atomically,
@@ -455,8 +455,8 @@ func testIteratorFailure(t *testing.T) {
 		t.Fatal("promise and run dont match")
 	}
 
-	tes.svc.WaitForQueryLive(t, script)
-	tes.svc.SucceedQuery(script)
+	tes.svc.WaitForQueryLive(ctx, t, script)
+	tes.svc.SucceedQuery(ctx, script)
 
 	<-promise.Done()
 
