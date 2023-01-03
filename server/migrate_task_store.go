@@ -15,8 +15,8 @@ import (
 const (
 	topicStatesNameSpaceV2 = "topic_states_store"
 	alertNameSpace         = "alert_store"
-	versionStoreNameSpace  = "version"
 	topicStoreVersionKey   = "topic_store_version"
+	topicStoreVersion2     = "2"
 )
 
 func (s *Server) MigrateTopicStore() error {
@@ -24,14 +24,14 @@ func (s *Server) MigrateTopicStore() error {
 	if err != nil {
 		return err
 	}
-	if version == "2" {
+	if version == topicStoreVersion2 {
 		return nil
 	}
-	return s.AlertService.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
+	err = s.AlertService.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
 		v1Bucket := []byte(alertNameSpace)
 		b := tx.Bucket(nil).Bucket(v1Bucket) // the read bucket
 		if b == nil {
-			return errors.New("come up with error")
+			return errors.New("Alerts not found")
 		}
 
 		// read the data from the v1 bucket and write the data to the v2 bucket
@@ -49,6 +49,11 @@ func (s *Server) MigrateTopicStore() error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	// TODO(DSB): delete V1 alerts: tx.DeleteBucket(alertNameSpace)
+	return s.StorageService.Versions().Set(topicStoreVersionKey, topicStoreVersion2)
 }
 
 func MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
@@ -118,6 +123,8 @@ func MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
 
 		return nil
 	})
+
+	// TODO(DSB): change version, delete V2 bucket.
 }
 
 //easyjson:json
