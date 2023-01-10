@@ -270,7 +270,7 @@ type TaskMaster struct {
 }
 
 func (tm *TaskMaster) WritePointsPrivileged(ctx tsdb.WriteContext, database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
-	panic("not implemented") // we shouldn't need this.
+	return tm.WritePoints(database, retentionPolicy, consistencyLevel, points)
 }
 
 type forkKey struct {
