@@ -1,7 +1,8 @@
-package server
+package alert
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/mailru/easyjson/jwriter"
@@ -19,15 +20,15 @@ const (
 	topicStoreVersion2     = "2"
 )
 
-func (s *Server) MigrateTopicStore() error {
-	version, err := s.AlertService.StorageService.Versions().Get(topicStoreVersionKey)
-	if err != nil {
+func (s *Service) MigrateTopicStore() error {
+	version, err := s.StorageService.Versions().Get(topicStoreVersionKey)
+	if err != nil && !errors.Is(err, storage.ErrNoKeyExists) {
 		return err
 	}
 	if version == topicStoreVersion2 {
 		return nil
 	}
-	err = s.AlertService.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
+	err = s.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
 		v1Bucket := []byte(alertNameSpace)
 		b := tx.Bucket(nil).Bucket(v1Bucket) // the read bucket
 		if b == nil {
@@ -52,18 +53,24 @@ func (s *Server) MigrateTopicStore() error {
 	if err != nil {
 		return err
 	}
-	// TODO(DSB): delete V1 alerts: tx.DeleteBucket(alertNameSpace)
+	// TODO(DSB): Test!  Test! Test!
+	err = s.StorageService.Store(alertNameSpace).Update(func(tx storage.Tx) error {
+		return tx.Delete(alertNameSpace)
+	})
+	if err != nil {
+		return err
+	}
 	return s.StorageService.Versions().Set(topicStoreVersionKey, topicStoreVersion2)
 }
 
-func MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
+func (s *Service) MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
 	v2Bucket := []byte(topicStatesNameSpaceV2)
 	v1Bucket := []byte(alertNameSpace)
 
 	return db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(v2Bucket)
 		if b == nil {
-			return errors.New("come up with error")
+			return fmt.Errorf("version 2 topic store not found: %q", topicStatesNameSpaceV2)
 		}
 
 		bOut, err := tx.CreateBucketIfNotExists(v1Bucket)

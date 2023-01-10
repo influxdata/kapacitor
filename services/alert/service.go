@@ -210,6 +210,10 @@ func (s *Service) Open() error {
 		return err
 	}
 
+	if err := s.MigrateTopicStore(); err != nil {
+		return err
+	}
+
 	// Load saved topic state
 	if err := s.loadSavedTopicStates(); err != nil {
 		return err
@@ -351,13 +355,6 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 	}
 	// Save version
 	return s.StorageService.Versions().Set(handlerSpecsStoreVersion, handlerSpecsStoreVersion1)
-}
-
-func (s *Service) MigrateTopicStoreState() error {
-	s.mu.Lock()
-
-	defer s.mu.Unlock()
-	return nil
 }
 
 func (s *Service) loadSavedHandlerSpecs() error {

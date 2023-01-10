@@ -1,12 +1,12 @@
-package server_test
+package alert_test
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/influxdata/kapacitor/server"
+	_ "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
-
-	"go.etcd.io/bbolt"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -16,14 +16,23 @@ func mustDB(db *storagetest.BoltDB, err error) *bolt.DB {
 	}
 	return db.DB
 }
+
+// TODO(DSB): What's the right format for test cases here?  We don't
+// really want to keep V1 definitions for DAO just to generate test cases, do we?
 func Test_migrate_topicstore_v1_v2(t *testing.T) {
 	tests := []struct {
-		name    string
-		db      *bbolt.DB
-		wantErr bool
+		name string
+		alerttest.EventStateSpec
+		wantErr error
 	}{
-		// TODO: Add test cases.
+		{
+			"basic",
+			alerttest.EventStateSpec{N: 25, Mwc: 5, Dwc: 15},
+			nil,
+		},
+		// TODO(DSB): Add test cases.
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create default config
@@ -31,8 +40,10 @@ func Test_migrate_topicstore_v1_v2(t *testing.T) {
 			s := OpenServer(c)
 			cli := Client(s)
 			_ = cli
+			// TODO(DSB) - load test cases into V2 database
+			// convert them into V1 format, convert them back into V2 format, check against original examples.
 			defer s.Close()
-			if err := server.MigrateTopicStoreV1V2(tt.db); (err != nil) != tt.wantErr {
+			if err := s.MigrateTopicStore(); (tt.wantErr == err) || errors.Is(err, tt.wantErr) {
 				t.Errorf("migrate_topicstore_v1_v2() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -58,7 +69,7 @@ func Test_migrate_topicstore_v2_v1(t *testing.T) {
 			_ = cli
 			defer s.Close()
 
-			if err := server.MigrateTopicStoreV2V1(tt.db); (err != nil) != tt.wantErr {
+			if err := s.MigrateTopicStoreV2V1(tt.db); (err != nil) != tt.wantErr {
 				t.Errorf("migrate_topicstore_v2_v1() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

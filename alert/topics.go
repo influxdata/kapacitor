@@ -59,12 +59,17 @@ func (s *Topics) Topic(id string) (*Topic, bool) {
 func (s *Topics) RestoreTopicNoCopy(topic string, eventStates map[string]*EventState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	t := s.EnsureTopic(topic)
+	t.restoreEventStatesNoCopy(eventStates)
+}
+
+func (s *Topics) EnsureTopic(topic string) *Topic {
 	t, ok := s.topics[topic]
 	if !ok {
 		t = s.newTopic(topic)
 		s.topics[topic] = t
 	}
-	t.restoreEventStatesNoCopy(eventStates)
+	return t
 }
 
 func (s *Topics) RestoreTopic(id string, eventStates map[string]*EventState) {
