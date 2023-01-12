@@ -1,6 +1,7 @@
 package alert
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/zenoss"
+	"github.com/mailru/easyjson/jlexer"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
@@ -56,7 +58,7 @@ type Service struct {
 	mu            sync.RWMutex
 	disabled      map[string]struct{}
 	specsDAO      HandlerSpecDAO
-	topicsDAO     TopicStateDAO
+	topicsStore   storage.Interface
 	PersistTopics bool
 
 	APIServer *apiServer
@@ -180,12 +182,13 @@ const (
 	topicStatesAPIName = "topic-states"
 	// The storage namespace for all task data.
 	alertNamespace = "alert_store"
+	// The storage namespace for topic states
+	topicStatesNameSpace = "topic_states_store"
 )
 
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	// Create DAO
 	store := s.StorageService.Store(alertNamespace)
 	specsDAO, err := newHandlerSpecKV(store)
@@ -194,12 +197,8 @@ func (s *Service) Open() error {
 	}
 	s.specsDAO = specsDAO
 	s.StorageService.Register(handlerSpecsAPIName, s.specsDAO)
-	topicsDAO, err := newTopicStateKV(store)
-	if err != nil {
-		return err
-	}
-	s.topicsDAO = topicsDAO
-	s.StorageService.Register(topicStatesAPIName, s.topicsDAO)
+	s.topicsStore = s.StorageService.Store(topicStatesNameSpace)
+	// NOTE: since the topics store doesn't use the indexing store, we don't need to register the api
 
 	// Migrate v1.2 handlers
 	if err := s.migrateHandlerSpecs(store); err != nil {
@@ -354,6 +353,13 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 	return s.StorageService.Versions().Set(handlerSpecsStoreVersion, handlerSpecsStoreVersion1)
 }
 
+func (s *Service) MigrateTopicStoreState() error {
+	s.mu.Lock()
+
+	defer s.mu.Unlock()
+	return nil
+}
+
 func (s *Service) loadSavedHandlerSpecs() error {
 	offset := 0
 	limit := 100
@@ -377,15 +383,16 @@ func (s *Service) loadSavedHandlerSpecs() error {
 	return nil
 }
 
-func (s *Service) convertEventStatesToAlert(states map[string]EventState) map[string]alert.EventState {
-	newStates := make(map[string]alert.EventState, len(states))
-	for id, state := range states {
-		newStates[id] = s.convertEventStateToAlert(id, state)
-	}
-	return newStates
-}
-func (s *Service) convertEventStateToAlert(id string, state EventState) alert.EventState {
-	return alert.EventState{
+//func (s *Service) convertEventStatesToAlert(states map[string]EventState) map[string]alert.EventState {
+//	newStates := make(map[string]alert.EventState, len(states))
+//	for id, state := range states {
+//		newStates[id] = s.convertEventStateToAlert(id, state)
+//	}
+//	return newStates
+//}
+
+func convertEventStateToAlert(id string, state *EventState) *alert.EventState {
+	return &alert.EventState{
 		ID:       id,
 		Message:  state.Message,
 		Details:  state.Details,
@@ -395,16 +402,8 @@ func (s *Service) convertEventStateToAlert(id string, state EventState) alert.Ev
 	}
 }
 
-func (s *Service) convertEventStatesFromAlert(states map[string]alert.EventState) map[string]EventState {
-	newStates := make(map[string]EventState, len(states))
-	for id, state := range states {
-		newStates[id] = s.convertEventStateFromAlert(state)
-	}
-	return newStates
-}
-
-func (s *Service) convertEventStateFromAlert(state alert.EventState) EventState {
-	return EventState{
+func convertEventStateFromAlert(state alert.EventState) *EventState {
+	return &EventState{
 		Message:  state.Message,
 		Details:  state.Details,
 		Time:     state.Time,
@@ -414,24 +413,40 @@ func (s *Service) convertEventStateFromAlert(state alert.EventState) EventState 
 }
 
 func (s *Service) loadSavedTopicStates() error {
-	offset := 0
-	limit := 100
-	for {
-		topicStates, err := s.topicsDAO.List("", offset, limit)
+	return s.topicsStore.View(func(tx storage.ReadOnlyTx) error {
+		kv, err := tx.List("")
 		if err != nil {
 			return err
 		}
 
-		for _, ts := range topicStates {
-			s.topics.RestoreTopic(ts.Topic, s.convertEventStatesToAlert(ts.EventStates))
-		}
+		buf := bytes.Buffer{}
+		for _, b := range kv {
 
-		offset += limit
-		if len(topicStates) != limit {
-			break
+			if b == nil {
+				continue
+			}
+			_, _ = buf.WriteString(b.Key) // writestring error is always nil
+			q, err := tx.Bucket(buf.Bytes()).List("")
+			buf.Reset()
+			if err != nil {
+				return err
+			}
+			eventstates := make(map[string]*alert.EventState, len(q))
+			lex := jlexer.Lexer{}
+			es := &EventState{} //create a buffer to hold the unmarshalled eventstate
+			for _, b := range q {
+				lex.Data = b.Value
+				es.UnmarshalEasyJSON(&lex)
+				if err := lex.Error(); err != nil {
+					return err
+				}
+				eventstates[b.Key] = convertEventStateToAlert(b.Key, es)
+				es.Reset()
+			}
+			s.topics.RestoreTopicNoCopy(b.Key, eventstates)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func validatePattern(pattern string) error {
@@ -462,25 +477,29 @@ func (s *Service) Collect(event alert.Event) error {
 	if err != nil {
 		return err
 	}
-	return s.persistTopicState(event.Topic)
+	return s.persistEventState(event)
 }
 
-func (s *Service) persistTopicState(topic string) error {
+func (s *Service) persistEventState(event alert.Event) error {
 	if !s.PersistTopics {
 		return nil
 	}
 
-	t, ok := s.topics.Topic(topic)
-	if !ok {
+	if _, ok := s.topics.Topic(event.Topic); !ok {
 		// Topic was deleted since event was collected, nothing to do.
 		return nil
 	}
 
-	ts := TopicState{
-		Topic:       topic,
-		EventStates: s.convertEventStatesFromAlert(t.EventStates(alert.OK)),
-	}
-	return s.topicsDAO.Put(ts)
+	return s.topicsStore.Update(func(tx storage.Tx) error {
+
+		//panic("unfinished")
+		tx = tx.Bucket([]byte(event.Topic))
+		data, err := convertEventStateFromAlert(event.State).MarshalJSON()
+		if err != nil {
+			return err
+		}
+		return tx.Put(event.State.ID, data)
+	})
 }
 
 func (s *Service) restoreClosedTopic(topic string) error {
@@ -501,13 +520,29 @@ func (s *Service) restoreClosedTopic(topic string) error {
 // restoreTopic restores a topic's state from the storage and registers any handlers.
 // Caller must have lock to call.
 func (s *Service) restoreTopic(topic string) error {
-	// Restore events state from storage
-	ts, err := s.topicsDAO.Get(topic)
-	if err != nil && err != ErrNoTopicStateExists {
+	err := s.topicsStore.View(func(tx storage.ReadOnlyTx) error {
+		q, err := tx.Bucket([]byte(topic)).List("")
+		if err != nil {
+			return err
+		}
+		eventStates := make(map[string]*alert.EventState, len(q))
+		lex := jlexer.Lexer{}
+		es := &EventState{} //create a buffer to hold the unmarshalled eventstate
+		for _, b := range q {
+			lex.Data = b.Value
+			es.UnmarshalEasyJSON(&lex)
+			if err := lex.Error(); err != nil {
+				return err
+			}
+			eventStates[b.Key] = es.AlertEventState(b.Key)
+			es.Reset()
+		}
+		s.topics.RestoreTopicNoCopy(topic, eventStates)
+		return nil
+	})
+	if err != nil {
 		return err
-	} else if err != ErrNoTopicStateExists {
-		s.topics.RestoreTopic(topic, s.convertEventStatesToAlert(ts.EventStates))
-	} // else nothing to restore
+	}
 
 	// Re-Register all handlers
 	for _, h := range s.handlers[topic] {
@@ -531,7 +566,7 @@ func (s *Service) CloseTopic(topic string) error {
 	s.closedTopics[topic] = true
 
 	// Save the final topic state
-	return s.persistTopicState(topic)
+	return nil
 }
 
 func (s *Service) DeleteTopic(topic string) error {
@@ -539,12 +574,17 @@ func (s *Service) DeleteTopic(topic string) error {
 	defer s.mu.Unlock()
 	delete(s.closedTopics, topic)
 	s.topics.DeleteTopic(topic)
-	return s.topicsDAO.Delete(topic)
+	return s.topicsStore.Update(func(tx storage.Tx) error {
+		return tx.Delete(topic)
+	})
 }
 
 func (s *Service) UpdateEvent(topic string, event alert.EventState) error {
 	s.topics.UpdateEvent(topic, event)
-	return s.persistTopicState(topic)
+	return s.persistEventState(alert.Event{
+		Topic: topic,
+		State: event,
+	})
 }
 
 func (s *Service) RegisterAnonHandler(topic string, h alert.Handler) {
@@ -680,6 +720,7 @@ func (s *Service) TopicStates(pattern string, minLevel alert.Level) (map[string]
 // EventState returns the current state of the event.
 func (s *Service) EventState(topic, event string) (alert.EventState, bool, error) {
 	t, ok := s.topics.Topic(topic)
+
 	if !ok {
 		return alert.EventState{}, false, nil
 	}

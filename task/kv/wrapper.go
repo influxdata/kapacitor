@@ -30,7 +30,7 @@ func (t *wrappedTx) Delete(key string) error {
 
 // BoltTx wraps an underlying bolt.Tx type to implement the Tx interface.
 type wrappedReadTx struct {
-	tx     storage.ReadOnlyTx
+	tx     storage.ReadOperator
 	prefix string
 }
 

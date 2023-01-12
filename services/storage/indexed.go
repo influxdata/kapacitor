@@ -130,6 +130,10 @@ func NewIndexedStore(store Interface, c IndexedStoreConfig) (*IndexedStore, erro
 	}, nil
 }
 
+func (s *IndexedStore) Store() Interface {
+	return s.store
+}
+
 // Create a key for the object data
 func (s *IndexedStore) dataKey(id string) string {
 	return s.dataPrefix + id
@@ -155,7 +159,7 @@ func (s *IndexedStore) Get(id string) (o BinaryObject, err error) {
 	return
 }
 
-func (s *IndexedStore) GetTx(tx ReadOnlyTx, id string) (BinaryObject, error) {
+func (s *IndexedStore) GetTx(tx ReadOperator, id string) (BinaryObject, error) {
 	key := s.dataKey(id)
 	if exists, err := tx.Exists(key); err != nil {
 		return nil, err
@@ -306,7 +310,7 @@ func (s *IndexedStore) List(index, pattern string, offset, limit int) (objects [
 	})
 	return
 }
-func (s *IndexedStore) ListTx(tx ReadOnlyTx, index, pattern string, offset, limit int) ([]BinaryObject, error) {
+func (s *IndexedStore) ListTx(tx ReadOperator, index, pattern string, offset, limit int) ([]BinaryObject, error) {
 	return s.list(tx, index, pattern, offset, limit, false)
 }
 
@@ -323,7 +327,7 @@ func (s *IndexedStore) ReverseListTx(tx ReadOnlyTx, index, pattern string, offse
 	return s.list(tx, index, pattern, offset, limit, true)
 }
 
-func (s *IndexedStore) list(tx ReadOnlyTx, index, pattern string, offset, limit int, reverse bool) ([]BinaryObject, error) {
+func (s *IndexedStore) list(tx ReadOperator, index, pattern string, offset, limit int, reverse bool) ([]BinaryObject, error) {
 	// List all object ids sorted by index
 	ids, err := tx.List(s.indexKey(index, "") + "/")
 	if err != nil {

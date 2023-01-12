@@ -122,7 +122,7 @@ func kvToInfluxTask(k *kvTask) *taskmodel.Task {
 // FindTaskByID returns a single task
 func (s *Service) FindTaskByID(ctx context.Context, id platform.ID) (*taskmodel.Task, error) {
 	var t *taskmodel.Task
-	err := s.kv.View(func(tx storage.ReadOnlyTx) error {
+	return t, s.kv.View(func(tx storage.ReadOnlyTx) error {
 		task, err := s.findTaskByID(ctx, tx, id)
 		if err != nil {
 			return err
@@ -130,11 +130,6 @@ func (s *Service) FindTaskByID(ctx context.Context, id platform.ID) (*taskmodel.
 		t = task
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	return t, nil
 }
 
 func IsNotFound(err error) bool {
@@ -143,7 +138,7 @@ func IsNotFound(err error) bool {
 
 // findTaskByID is an internal method used to do any action with tasks internally
 // that do not require authorization.
-func (s *Service) findTaskByID(ctx context.Context, tx storage.ReadOnlyTx, id platform.ID) (*taskmodel.Task, error) {
+func (s *Service) findTaskByID(_ context.Context, tx storage.ReadOperator, id platform.ID) (*taskmodel.Task, error) {
 	b := &wrappedReadTx{
 		tx:     tx,
 		prefix: taskPrefix,
@@ -636,7 +631,7 @@ func (s *Service) FindRuns(ctx context.Context, filter taskmodel.RunFilter) ([]*
 	return runs, len(runs), nil
 }
 
-func (s *Service) findRuns(ctx context.Context, tx storage.ReadOnlyTx, filter taskmodel.RunFilter) ([]*taskmodel.Run, int, error) {
+func (s *Service) findRuns(ctx context.Context, tx storage.ReadOperator, filter taskmodel.RunFilter) ([]*taskmodel.Run, int, error) {
 	if filter.Limit == 0 {
 		filter.Limit = taskmodel.TaskDefaultPageSize
 	}
@@ -710,7 +705,7 @@ func (s *Service) FindRunByID(ctx context.Context, taskID, runID platform.ID) (*
 	return run, nil
 }
 
-func (s *Service) findRunByID(ctx context.Context, tx storage.ReadOnlyTx, taskID, runID platform.ID) (*taskmodel.Run, error) {
+func (s *Service) findRunByID(ctx context.Context, tx storage.ReadOperator, taskID, runID platform.ID) (*taskmodel.Run, error) {
 	bucket := wrappedReadTx{
 		tx:     tx,
 		prefix: taskRunPrefix,
@@ -963,7 +958,7 @@ func (s *Service) CurrentlyRunning(ctx context.Context, taskID platform.ID) ([]*
 	return runs, nil
 }
 
-func (s *Service) currentlyRunning(ctx context.Context, tx storage.ReadOnlyTx, taskID platform.ID) ([]*taskmodel.Run, error) {
+func (s *Service) currentlyRunning(ctx context.Context, tx storage.ReadOperator, taskID platform.ID) ([]*taskmodel.Run, error) {
 	bucket := wrappedReadTx{
 		tx:     tx,
 		prefix: taskRunPrefix,
@@ -1006,7 +1001,7 @@ func (s *Service) ManualRuns(ctx context.Context, taskID platform.ID) ([]*taskmo
 	return runs, nil
 }
 
-func (s *Service) manualRuns(ctx context.Context, tx storage.ReadOnlyTx, taskID platform.ID) ([]*taskmodel.Run, error) {
+func (s *Service) manualRuns(ctx context.Context, tx storage.ReadOperator, taskID platform.ID) ([]*taskmodel.Run, error) {
 	b := wrappedReadTx{
 		tx:     tx,
 		prefix: taskRunPrefix,

@@ -9,9 +9,10 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/mailru/easyjson/jlexer"
+
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/services/storage"
-	"github.com/mailru/easyjson/jlexer"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +25,7 @@ var (
 type HandlerSpecDAO interface {
 	// Retrieve a handler
 	Get(topic, id string) (HandlerSpec, error)
-	GetTx(tx storage.ReadOnlyTx, topic, id string) (HandlerSpec, error)
+	GetTx(tx storage.ReadOperator, topic, id string) (HandlerSpec, error)
 
 	// Create a handler.
 	// ErrHandlerSpecExists is returned if a handler already exists with the same ID.
@@ -46,7 +47,7 @@ type HandlerSpecDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(topic, pattern string, offset, limit int) ([]HandlerSpec, error)
-	ListTx(tx storage.ReadOnlyTx, topic, pattern string, offset, limit int) ([]HandlerSpec, error)
+	ListTx(tx storage.ReadOperator, topic, pattern string, offset, limit int) ([]HandlerSpec, error)
 
 	Rebuild() error
 }
@@ -152,7 +153,8 @@ func (kv *handlerSpecKV) error(err error) error {
 func (kv *handlerSpecKV) Get(topic, id string) (HandlerSpec, error) {
 	return kv.getHelper(kv.store.Get(fullID(topic, id)))
 }
-func (kv *handlerSpecKV) GetTx(tx storage.ReadOnlyTx, topic, id string) (HandlerSpec, error) {
+
+func (kv *handlerSpecKV) GetTx(tx storage.ReadOperator, topic, id string) (HandlerSpec, error) {
 	return kv.getHelper(kv.store.GetTx(tx, fullID(topic, id)))
 }
 
@@ -194,7 +196,7 @@ func (kv *handlerSpecKV) List(topic, pattern string, offset, limit int) ([]Handl
 	}
 	return kv.listHelper(kv.store.List(storage.DefaultIDIndex, fullID(topic, pattern), offset, limit))
 }
-func (kv *handlerSpecKV) ListTx(tx storage.ReadOnlyTx, topic, pattern string, offset, limit int) ([]HandlerSpec, error) {
+func (kv *handlerSpecKV) ListTx(tx storage.ReadOperator, topic, pattern string, offset, limit int) ([]HandlerSpec, error) {
 	if pattern == "" {
 		pattern = "*"
 	}
@@ -223,26 +225,26 @@ var (
 	ErrNoTopicStateExists = errors.New("no topic state exists")
 )
 
-// Data access object for TopicState data.
-type TopicStateDAO interface {
-	// Retrieve a handler
-	Get(id string) (TopicState, error)
-
-	// Put a topic state, replaces any existing state.
-	Put(h TopicState) error
-
-	// Delete a handler.
-	// It is not an error to delete an non-existent handler.
-	Delete(id string) error
-
-	// List handlers matching a pattern.
-	// The pattern is shell/glob matching see https://golang.org/pkg/path/#Match
-	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
-	// More results may exist while the number of returned items is equal to limit.
-	List(pattern string, offset, limit int) ([]TopicState, error)
-
-	Rebuild() error
-}
+//// Data access object for TopicState data.
+//type TopicStateDAO interface {
+//	// Retrieve a handler
+//	Get(id string) (TopicState, error)
+//
+//	// Put an alert.Event, replaces any existing alert.Event.
+//	Put(h alert.Event) error
+//
+//	// Delete a handler.
+//	// It is not an error to delete an non-existent handler.
+//	Delete(id string) error
+//
+//	// List handlers matching a pattern.
+//	// The pattern is shell/glob matching see https://golang.org/pkg/path/#Match
+//	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
+//	// More results may exist while the number of returned items is equal to limit.
+//	List(pattern string, offset, limit int) ([]TopicState, error)
+//
+//	Rebuild() error
+//}
 
 const topicStateVersion = 1
 
@@ -254,12 +256,41 @@ type TopicState struct {
 
 //easyjson:json
 type EventState struct {
-	Message  string        `json:"message"`
-	Details  string        `json:"details"`
-	Time     time.Time     `json:"time"`
-	Duration time.Duration `json:"duration"`
+	Message  string        `json:"message,omitempty"`
+	Details  string        `json:"details,omitempty"`
+	Time     time.Time     `json:"time,omitempty"`
+	Duration time.Duration `json:"duration,omitempty"`
 	Level    alert.Level   `json:"level"`
 }
+
+func (e *EventState) Reset() {
+	e.Message = ""
+	e.Details = ""
+	e.Time = time.Time{}
+	e.Duration = 0
+	e.Level = 0
+}
+
+func (e *EventState) AlertEventState(id string) *alert.EventState {
+	return &alert.EventState{
+		ID:       id,
+		Message:  e.Message,
+		Details:  e.Details,
+		Time:     e.Time,
+		Duration: e.Duration,
+		Level:    e.Level,
+	}
+}
+
+//type DurableEventState struct {
+//	*EventState
+//	Topic string
+//	ID    string
+//}
+//
+//func (t DurableEventState) ObjectID() string {
+//	return t.Topic
+//}
 
 func (t TopicState) ObjectID() string {
 	return t.Topic
@@ -276,71 +307,75 @@ func (t *TopicState) UnmarshalBinary(data []byte) error {
 	})
 }
 
-// Key/Value store based implementation of the TopicStateDAO
-type topicStateKV struct {
-	store *storage.IndexedStore
-}
+//
+// // Key/Value store based implementation of the TopicStateDAO
+//
+//	type topicStateKV struct {
+//		store *storage.IndexedStore
+//	}
+//func newTopicStateKV(store storage.Interface) (storage.Interface, error) {
+//	//c := storage.DefaultIndexedStoreConfig("topics", func() storage.BinaryObject {
+//	//	return new(TopicState)
+//	//})
+//	//istore, err := storage.NewIndexedStore(store, c)
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//	return store, nil
+//}
 
-func newTopicStateKV(store storage.Interface) (*topicStateKV, error) {
-	c := storage.DefaultIndexedStoreConfig("topics", func() storage.BinaryObject {
-		return new(TopicState)
-	})
-	istore, err := storage.NewIndexedStore(store, c)
-	if err != nil {
-		return nil, err
-	}
-	return &topicStateKV{
-		store: istore,
-	}, nil
-}
-
-func (kv *topicStateKV) error(err error) error {
-	if err == storage.ErrNoObjectExists {
-		return ErrNoTopicStateExists
-	}
-	return err
-}
-
-func (kv *topicStateKV) Get(id string) (TopicState, error) {
-	o, err := kv.store.Get(id)
-	if err != nil {
-		return TopicState{}, kv.error(err)
-	}
-	t, ok := o.(*TopicState)
-	if !ok {
-		return TopicState{}, storage.ImpossibleTypeErr(t, o)
-	}
-	return *t, nil
-}
-
-func (kv *topicStateKV) Put(t TopicState) error {
-	return kv.store.Put(&t)
-}
-
-func (kv *topicStateKV) Replace(t TopicState) error {
-	return kv.store.Replace(&t)
-}
-
-func (kv *topicStateKV) Delete(id string) error {
-	return kv.store.Delete(id)
-}
-
-func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, error) {
-	objects, err := kv.store.List(storage.DefaultIDIndex, pattern, offset, limit)
-	if err != nil {
-		return nil, err
-	}
-	specs := make([]TopicState, len(objects))
-	for i, o := range objects {
-		t, ok := o.(*TopicState)
-		if !ok {
-			return nil, storage.ImpossibleTypeErr(t, o)
-		}
-		specs[i] = *t
-	}
-	return specs, nil
-}
-
-func (kv *topicStateKV) Rebuild() error {
-	return kv.store.Rebuild()
-}
+//	return &topicStateKV{
+//		store: istore,
+//	}, nil
+//}
+//
+//func (kv *topicStateKV) error(err error) error {
+//	if err == storage.ErrNoObjectExists {
+//		return ErrNoTopicStateExists
+//	}
+//	return err
+//}
+//
+//func (kv *topicStateKV) Get(id string) (TopicState, error) {
+//	o, err := kv.store.Get(id)
+//	if err != nil {
+//		return TopicState{}, kv.error(err)
+//	}
+//	t, ok := o.(*TopicState)
+//	if !ok {
+//		return TopicState{}, storage.ImpossibleTypeErr(t, o)
+//	}
+//	return *t, nil
+//}
+//
+//func (kv *topicStateKV) Put(event alert.Event) error {
+//	return kv.store.Put(&event)
+//}
+//
+//func (kv *topicStateKV) Replace(topic, id string, state EventState) error {
+//	return kv.store.Replace(&t)
+//}
+//
+//func (kv *topicStateKV) Delete(id string) error {
+//	return kv.store.Delete(id)
+//}
+//
+//func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, error) {
+//	objects, err := kv.store.List(storage.DefaultIDIndex, pattern, offset, limit)
+//	if err != nil {
+//		return nil, err
+//	}
+//	specs := make([]TopicState, len(objects))
+//	for i, o := range objects {
+//		t, ok := o.(*TopicState)
+//		if !ok {
+//			return nil, storage.ImpossibleTypeErr(t, o)
+//		}
+//		specs[i] = *t
+//	}
+//	return specs, nil
+//}
+//
+//func (kv *topicStateKV) Rebuild() error {
+//	return kv.store.Rebuild()
+//}
