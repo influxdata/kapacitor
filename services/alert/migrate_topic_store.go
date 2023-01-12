@@ -3,7 +3,6 @@ package alert
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/mailru/easyjson/jwriter"
 
@@ -28,24 +27,31 @@ func (s *Service) MigrateTopicStore() error {
 	if version == topicStoreVersion2 {
 		return nil
 	}
-	err = s.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
-		v1Bucket := []byte(alertNameSpace)
-		b := tx.Bucket(nil).Bucket(v1Bucket) // the read bucket
-		if b == nil {
-			return errors.New("Alerts not found")
-		}
+	rootStore := s.StorageService.Store(alertNamespace)
+	topicsDAO, err := newTopicStateKV(rootStore)
 
-		// read the data from the v1 bucket and write the data to the v2 bucket
-		lex := &jlexer.Lexer{}
-		cursor := b.Cursor()
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			topicOutBucket := tx.Bucket(k)
-			lex.Data = v
-			processJSON(lex, func(eventID, eventVal []byte) error {
-				return topicOutBucket.Put(string(eventID), eventVal)
-			})
-			if err := lex.Error(); err != nil {
+	offset := 0
+	const limit = 100
+
+	topicKeys := make([]string, 0, limit)
+	err = s.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
+		for {
+			topicStates, err := topicsDAO.List("", offset, limit)
+			if err != nil {
 				return err
+			}
+			for _, ts := range topicStates {
+				topicKeys = append(topicKeys, ts.Topic)
+				for _, es := range ts.EventStates {
+					if len(es.Message) <= 0 {
+						fmt.Printf("Empty Message")
+					}
+					// TODO(DSB): read the data from the v1 bucket and write the data to the v2 bucket
+				}
+			}
+			offset += limit
+			if len(topicStates) != limit {
+				break
 			}
 		}
 		return nil
@@ -53,13 +59,19 @@ func (s *Service) MigrateTopicStore() error {
 	if err != nil {
 		return err
 	}
-	// TODO(DSB): Test!  Test! Test!
-	err = s.StorageService.Store(alertNameSpace).Update(func(tx storage.Tx) error {
-		return tx.Delete(alertNameSpace)
+	// TODO(DSB): not working like kv.Delete()
+	err = topicsDAO.store.Store().Update(func(tx storage.Tx) error {
+		for _, tk := range topicKeys {
+			if err = topicsDAO.store.DeleteTx(tx, tk); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
-	if err != nil {
+	if err = topicsDAO.Rebuild(); err != nil {
 		return err
 	}
+	topicsDAO.store = nil
 	return s.StorageService.Versions().Set(topicStoreVersionKey, topicStoreVersion2)
 }
 
