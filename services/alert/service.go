@@ -181,8 +181,8 @@ const (
 	// Public name of the handler specs store.
 	topicStatesAPIName = "topic-states"
 	// The storage namespace for all task data.
-	alertNamespace = "alert_store"
-	// The storage namespace for topic states
+	alertNameSpace = "alert_store"
+	// topicStatesNameSpace - The storage namespace for topic states
 	topicStatesNameSpace = "topic_states_store"
 )
 
@@ -190,7 +190,7 @@ func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Create DAO
-	store := s.StorageService.Store(alertNamespace)
+	store := s.StorageService.Store(alertNameSpace)
 	specsDAO, err := newHandlerSpecKV(store)
 	if err != nil {
 		return err
@@ -429,12 +429,10 @@ func (s *Service) loadSavedTopicStates() error {
 				return err
 			}
 			eventstates := make(map[string]*alert.EventState, len(q))
-			lex := jlexer.Lexer{}
 			es := &EventState{} //create a buffer to hold the unmarshalled eventstate
 			for _, b := range q {
-				lex.Data = b.Value
-				es.UnmarshalEasyJSON(&lex)
-				if err := lex.Error(); err != nil {
+				err = es.UnmarshalJSON(b.Value)
+				if err != nil {
 					return err
 				}
 				eventstates[b.Key] = convertEventStateToAlert(b.Key, es)
@@ -495,6 +493,7 @@ func (s *Service) persistEventState(event alert.Event) error {
 		if err != nil {
 			return err
 		}
+
 		return tx.Put(event.State.ID, data)
 	})
 }

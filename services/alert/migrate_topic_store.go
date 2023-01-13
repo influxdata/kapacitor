@@ -1,22 +1,18 @@
 package alert
 
 import (
-	"encoding/json"
 	"fmt"
+
 	"github.com/influxdata/kapacitor/services/storage"
-	"github.com/mailru/easyjson/jwriter"
-
 	"github.com/mailru/easyjson/jlexer"
+	"github.com/mailru/easyjson/jwriter"
 	"github.com/pkg/errors"
-
 	"go.etcd.io/bbolt"
 )
 
 const (
-	topicStatesNameSpaceV2 = "topic_states_store"
-	alertNameSpace         = "alert_store"
-	topicStoreVersionKey   = "topic_store_version"
-	topicStoreVersion2     = "2"
+	topicStoreVersionKey = "topic_store_version"
+	topicStoreVersion2   = "2"
 )
 
 func (s *Service) MigrateTopicStore() error {
@@ -27,29 +23,36 @@ func (s *Service) MigrateTopicStore() error {
 	if version == topicStoreVersion2 {
 		return nil
 	}
-	rootStore := s.StorageService.Store(alertNamespace)
-	topicsDAO, err := newTopicStateKV(rootStore)
+	topicsDAO, err := newTopicStateKV(s.StorageService.Store(alertNameSpace))
+	if err != nil {
+		return fmt.Errorf("cannot create version 1 topic store: %w", err)
+	}
 
 	offset := 0
 	const limit = 100
 
 	topicKeys := make([]string, 0, limit)
-	err = s.StorageService.Store(topicStatesNameSpaceV2).Update(func(tx storage.Tx) error {
+	err = s.StorageService.Store(topicStatesNameSpace).Update(func(txV2 storage.Tx) error {
 		for {
 			topicStates, err := topicsDAO.List("", offset, limit)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot read version 1 topic store: %w", err)
 			}
 			for _, ts := range topicStates {
 				topicKeys = append(topicKeys, ts.Topic)
-				for _, es := range ts.EventStates {
-					if len(es.Message) <= 0 {
-						fmt.Printf("Empty Message")
+				txBucket := txV2.Bucket([]byte(ts.Topic))
+				for id, es := range ts.EventStates {
+					data, err := es.MarshalJSON()
+					if err != nil {
+						return fmt.Errorf("error converting event %q in topic %q to JSON: %w", id, ts.Topic, err)
 					}
-					// TODO(DSB): read the data from the v1 bucket and write the data to the v2 bucket
+					if err = txBucket.Put(id, data); err != nil {
+						return fmt.Errorf("cannot store event %q in topic %q: %w", id, ts.Topic, err)
+					}
 				}
 			}
 			offset += limit
+			// TODO(DSB): check what happens if exactly limit are present....  Does List() EOF or return empty?
 			if len(topicStates) != limit {
 				break
 			}
@@ -59,30 +62,23 @@ func (s *Service) MigrateTopicStore() error {
 	if err != nil {
 		return err
 	}
-	// TODO(DSB): not working like kv.Delete()
-	err = topicsDAO.store.Store().Update(func(tx storage.Tx) error {
-		for _, tk := range topicKeys {
-			if err = topicsDAO.store.DeleteTx(tx, tk); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err = topicsDAO.Rebuild(); err != nil {
+	if err = topicsDAO.DeleteMultiple(topicKeys); err != nil {
 		return err
 	}
-	topicsDAO.store = nil
-	return s.StorageService.Versions().Set(topicStoreVersionKey, topicStoreVersion2)
+	if err = s.StorageService.Versions().Set(topicStoreVersionKey, topicStoreVersion2); err != nil {
+		return fmt.Errorf("cannot set topic store version to %s: %w", topicStoreVersion2, err)
+	}
+	return nil
 }
 
 func (s *Service) MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
-	v2Bucket := []byte(topicStatesNameSpaceV2)
+	v2Bucket := []byte(topicStatesNameSpace)
 	v1Bucket := []byte(alertNameSpace)
 
 	return db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(v2Bucket)
 		if b == nil {
-			return fmt.Errorf("version 2 topic store not found: %q", topicStatesNameSpaceV2)
+			return fmt.Errorf("version 2 topic store not found: %q", topicStatesNameSpace)
 		}
 
 		bOut, err := tx.CreateBucketIfNotExists(v1Bucket)
@@ -143,20 +139,7 @@ func (s *Service) MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
 		return nil
 	})
 
-	// TODO(DSB): change version, delete V2 bucket.
-}
-
-//easyjson:json
-type TopicStateV1 struct {
-	Version string `json:"version"`
-	Value   struct {
-		Topic       string                     `json:"topic"`
-		EventStates map[string]json.RawMessage `json:"event-states"`
-	} `json:"value"`
-}
-
-func (t *TopicStateV1) ObjectID() string {
-	return t.Value.Topic
+	// TODO(DSB): change version, delete V2 buckets.
 }
 
 func processJSON(in *jlexer.Lexer, out func(k []byte, v []byte) error) {

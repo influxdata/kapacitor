@@ -261,16 +261,6 @@ func (e *EventState) AlertEventState(id string) *alert.EventState {
 	}
 }
 
-//type DurableEventState struct {
-//	*EventState
-//	Topic string
-//	ID    string
-//}
-//
-//func (t DurableEventState) ObjectID() string {
-//	return t.Topic
-//}
-
 func (t TopicState) ObjectID() string {
 	return t.Topic
 }
@@ -355,4 +345,22 @@ func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, e
 
 func (kv *topicStateKV) Rebuild() error {
 	return kv.store.Rebuild()
+}
+
+func (kv *topicStateKV) DeleteMultiple(keys []string) error {
+	err := kv.store.Store().Update(func(tx storage.Tx) error {
+		for _, tk := range keys {
+			if err := kv.store.DeleteTx(tx, tk); err != nil {
+				return fmt.Errorf("cannot delete key %q: %w", tk, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if err = kv.Rebuild(); err != nil {
+		return fmt.Errorf("cannot rebuild topic store index: %w", err)
+	}
+	return nil
 }
