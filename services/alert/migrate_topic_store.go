@@ -4,10 +4,7 @@ import (
 	"fmt"
 
 	"github.com/influxdata/kapacitor/services/storage"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
 	"github.com/pkg/errors"
-	"go.etcd.io/bbolt"
 )
 
 const (
@@ -71,134 +68,72 @@ func (s *Service) MigrateTopicStore() error {
 	return nil
 }
 
-func (s *Service) MigrateTopicStoreV2V1(db *bbolt.DB) (err error) {
-	v2Bucket := []byte(topicStatesNameSpace)
-	v1Bucket := []byte(alertNameSpace)
+func MigrateTopicStoreV2V1(storageService StorageService) (err error) {
 
-	return db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(v2Bucket)
-		if b == nil {
-			return fmt.Errorf("version 2 topic store not found: %q", topicStatesNameSpace)
-		}
+	version, err := storageService.Versions().Get(topicStoreVersionKey)
+	if err != nil && !errors.Is(err, storage.ErrNoKeyExists) {
+		return err
+	}
+	if errors.Is(err, storage.ErrNoKeyExists) || (version == "") {
+		// V1 has no version number
+		return nil
+	}
 
-		bOut, err := tx.CreateBucketIfNotExists(v1Bucket)
-		if bOut != nil {
+	topicsDAO, err := newTopicStateKV(storageService.Store(alertNameSpace))
+	if err != nil {
+		return fmt.Errorf("cannot create version 1 topic store: %w", err)
+	}
+
+	topicsStore := storageService.Store(topicStatesNameSpace)
+	err = walkTopicBuckets(topicsStore, func(tx storage.ReadOnlyTx, topic string) error {
+		eventStates, err := loadTopicBucket(tx, []byte(topic))
+		if err != nil {
 			return err
 		}
-		inCursor := b.Cursor()
-		for topic, v := inCursor.First(); topic != nil; topic, v = inCursor.Next() {
-			if v != nil {
-				return errors.New("not a bucket")
-			}
-			w := &jwriter.Writer{}
-			w.RawByte('{')
-			w.String("version")
-			w.RawByte(':')
-			w.Int64Str(1)
-			w.RawByte(',')
-			w.String("value")
-			w.RawByte(':')
-			w.RawByte('{')
-			w.String("topic")
-			w.RawByte(':')
-			w.String(string(topic))
-			w.RawByte(',')
-			w.String("event-states")
-			w.RawByte(':')
-			w.RawByte('{')
-
-			eventBucket := b.Bucket(topic)
-			if eventBucket == nil {
-				w.RawByte('}')
-				continue
-			}
-			eventCursor := eventBucket.Cursor()
-			if eventCursor == nil {
-				w.RawByte('}')
-				continue
-			}
-			i := 0
-			for eventK, v := eventCursor.First(); eventK != nil; eventK, v = eventCursor.Next() {
-				if v == nil {
-					continue
-				}
-				if i != 0 {
-					w.RawByte(',')
-				}
-				w.String(string(eventK))
-				w.RawByte(':')
-				w.Raw(v, nil)
-				i++
-			}
-			w.RawByte('}')
-			w.RawByte('}')
-			w.RawByte('}')
-
-		}
-
-		return nil
+		return topicsDAO.Put(TopicState{Topic: topic, EventStates: eventStates})
 	})
-
-	// TODO(DSB): change version, delete V2 buckets.
+	if err != nil {
+		return err
+	}
+	if err = deleteV2TopicStore(topicsStore); err != nil {
+		return err
+	}
+	return storageService.Versions().Set(topicStoreVersionKey, "")
 }
 
-func processJSON(in *jlexer.Lexer, out func(k []byte, v []byte) error) {
-	isTopLevel := in.IsStart()
-	if in.IsNull() {
-		if isTopLevel {
-			in.Consumed()
+func deleteV2TopicStore(topicsStore storage.Interface) error {
+	return topicsStore.Update(func(txV2 storage.Tx) error {
+		kv, err := txV2.List("")
+		if err != nil {
+			return fmt.Errorf("cannot retrieve version 2 topic list: %w", err)
 		}
-		in.Skip()
-		return
-	}
-	in.Delim('{')
-	for !in.IsDelim('}') {
-		key := in.UnsafeFieldName(false)
-		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
-		switch key {
-		case "value":
-			in.Delim('{')
-			for !in.IsDelim('}') {
-				key := in.UnsafeFieldName(false)
-				in.WantColon()
-				if in.IsNull() {
-					in.Skip()
-					in.WantComma()
-					continue
-				}
-				switch key {
-				case "event-states":
-					if in.IsNull() {
-						in.Skip()
-					} else {
-						in.Delim('{')
-						for !in.IsDelim('}') {
-							key := in.UnsafeFieldName(false)
-							in.WantColon()
-							if err := out([]byte(key), in.Raw()); err != nil {
-								in.AddError(err)
-							}
-						}
-						in.WantComma()
-					}
-					in.Delim('}')
 
-				default:
-					in.SkipRecursive()
-				}
+		for _, b := range kv {
+			if b == nil {
+				continue
 			}
-		default:
-			in.SkipRecursive()
+			if err = txV2.Delete(b.Key); err != nil {
+				return err
+			}
 		}
-		in.WantComma()
+		return nil
+	})
+}
+
+func loadTopicBucket(tx storage.ReadOnlyTx, topic []byte) (map[string]EventState, error) {
+	q, err := tx.Bucket(topic).List("")
+	if err != nil {
+		return nil, err
 	}
-	in.Delim('}')
-	if isTopLevel {
-		in.Consumed()
+	EventStates := make(map[string]EventState, len(q))
+	es := &EventState{} //create a buffer to hold the unmarshalled EventState
+	for _, b := range q {
+		err = es.UnmarshalJSON(b.Value)
+		if err != nil {
+			return nil, err
+		}
+		EventStates[b.Key] = *es
+		es.Reset()
 	}
+	return EventStates, nil
 }

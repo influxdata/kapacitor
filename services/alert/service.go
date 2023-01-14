@@ -54,6 +54,12 @@ type Diagnostic interface {
 	Error(msg string, err error, ctx ...keyvalue.T)
 }
 
+type StorageService interface {
+	Store(namespace string) storage.Interface
+	Register(name string, store storage.StoreActioner)
+	Versions() storage.Versions
+}
+
 type Service struct {
 	mu            sync.RWMutex
 	disabled      map[string]struct{}
@@ -77,11 +83,7 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 
-	StorageService interface {
-		Store(namespace string) storage.Interface
-		Register(name string, store storage.StoreActioner)
-		Versions() storage.Versions
-	}
+	StorageService StorageService
 
 	Commander command.Commander
 
@@ -410,38 +412,54 @@ func convertEventStateFromAlert(state alert.EventState) *EventState {
 }
 
 func (s *Service) loadSavedTopicStates() error {
-	return s.topicsStore.View(func(tx storage.ReadOnlyTx) error {
-		kv, err := tx.List("")
+	buf := bytes.Buffer{}
+	return walkTopicBuckets(s.topicsStore, func(tx storage.ReadOnlyTx, topic string) error {
+		_, _ = buf.WriteString(topic) // WriteString error is always nil
+		eventStates, err := s.loadConvertTopicBucket(tx, buf.Bytes())
 		if err != nil {
 			return err
 		}
+		s.topics.RestoreTopicNoCopy(topic, eventStates)
+		buf.Reset()
+		return nil
+	})
+}
 
-		buf := bytes.Buffer{}
+func walkTopicBuckets(topicsStore storage.Interface, fn func(tx storage.ReadOnlyTx, topic string) error) error {
+	return topicsStore.View(func(tx storage.ReadOnlyTx) error {
+		kv, err := tx.List("")
+		if err != nil {
+			return fmt.Errorf("cannot retrieve topic list: %w", err)
+		}
+
 		for _, b := range kv {
-
 			if b == nil {
 				continue
 			}
-			_, _ = buf.WriteString(b.Key) // writestring error is always nil
-			q, err := tx.Bucket(buf.Bytes()).List("")
-			buf.Reset()
-			if err != nil {
+			if err = fn(tx, b.Key); err != nil {
 				return err
 			}
-			eventstates := make(map[string]*alert.EventState, len(q))
-			es := &EventState{} //create a buffer to hold the unmarshalled eventstate
-			for _, b := range q {
-				err = es.UnmarshalJSON(b.Value)
-				if err != nil {
-					return err
-				}
-				eventstates[b.Key] = convertEventStateToAlert(b.Key, es)
-				es.Reset()
-			}
-			s.topics.RestoreTopicNoCopy(b.Key, eventstates)
 		}
 		return nil
 	})
+}
+
+func (s *Service) loadConvertTopicBucket(tx storage.ReadOnlyTx, topic []byte) (map[string]*alert.EventState, error) {
+	q, err := tx.Bucket(topic).List("")
+	if err != nil {
+		return nil, err
+	}
+	eventstates := make(map[string]*alert.EventState, len(q))
+	es := &EventState{} //create a buffer to hold the unmarshalled EventState
+	for _, b := range q {
+		err = es.UnmarshalJSON(b.Value)
+		if err != nil {
+			return nil, err
+		}
+		eventstates[b.Key] = convertEventStateToAlert(b.Key, es)
+		es.Reset()
+	}
+	return eventstates, nil
 }
 
 func validatePattern(pattern string) error {
