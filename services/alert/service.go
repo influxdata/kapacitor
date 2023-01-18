@@ -183,7 +183,7 @@ const (
 	// Public name of the handler specs store.
 	topicStatesAPIName = "topic-states"
 	// The storage namespace for all task data.
-	alertNameSpace = "alert_store"
+	AlertNameSpace = "alert_store"
 	// topicStatesNameSpace - The storage namespace for topic states
 	topicStatesNameSpace = "topic_states_store"
 )
@@ -192,7 +192,7 @@ func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// Create DAO
-	store := s.StorageService.Store(alertNameSpace)
+	store := s.StorageService.Store(AlertNameSpace)
 	specsDAO, err := newHandlerSpecKV(store)
 	if err != nil {
 		return err

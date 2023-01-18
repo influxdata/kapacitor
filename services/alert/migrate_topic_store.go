@@ -20,7 +20,7 @@ func (s *Service) MigrateTopicStore() error {
 	if version == topicStoreVersion2 {
 		return nil
 	}
-	topicsDAO, err := newTopicStateKV(s.StorageService.Store(alertNameSpace))
+	topicsDAO, err := NewTopicStateKV(s.StorageService.Store(AlertNameSpace))
 	if err != nil {
 		return fmt.Errorf("cannot create version 1 topic store: %w", err)
 	}
@@ -79,7 +79,7 @@ func MigrateTopicStoreV2V1(storageService StorageService) (err error) {
 		return nil
 	}
 
-	topicsDAO, err := newTopicStateKV(storageService.Store(alertNameSpace))
+	topicsDAO, err := NewTopicStateKV(storageService.Store(AlertNameSpace))
 	if err != nil {
 		return fmt.Errorf("cannot create version 1 topic store: %w", err)
 	}

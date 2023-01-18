@@ -276,6 +276,16 @@ func (t *TopicState) UnmarshalBinary(data []byte) error {
 	})
 }
 
+type TopicStateDAO interface {
+	Get(id string) (TopicState error)
+	Put(t TopicState) error
+	Replace(t TopicState) error
+	Delete(id string) error
+	List(pattern string, offset, limit int) ([]TopicState, error)
+	Rebuild() error
+	DeleteMultiple(keys []string) error
+}
+
 // Key/Value store based implementation of the TopicStateDAO
 type topicStateKV struct {
 	store *storage.IndexedStore
@@ -283,7 +293,7 @@ type topicStateKV struct {
 
 const topicStateKVPrefix = "topics"
 
-func newTopicStateKV(store storage.Interface) (*topicStateKV, error) {
+func NewTopicStateKV(store storage.Interface) (*topicStateKV, error) {
 	c := storage.DefaultIndexedStoreConfig(topicStateKVPrefix, func() storage.BinaryObject {
 		return new(TopicState)
 	})
