@@ -184,8 +184,8 @@ const (
 	topicStatesAPIName = "topic-states"
 	// The storage namespace for all task data.
 	AlertNameSpace = "alert_store"
-	// topicStatesNameSpace - The storage namespace for topic states
-	topicStatesNameSpace = "topic_states_store"
+	// TopicStatesNameSpace - The storage namespace for topic states
+	TopicStatesNameSpace = "topic_states_store"
 )
 
 func (s *Service) Open() error {
@@ -199,7 +199,7 @@ func (s *Service) Open() error {
 	}
 	s.specsDAO = specsDAO
 	s.StorageService.Register(handlerSpecsAPIName, s.specsDAO)
-	s.topicsStore = s.StorageService.Store(topicStatesNameSpace)
+	s.topicsStore = s.StorageService.Store(TopicStatesNameSpace)
 	// NOTE: since the topics store doesn't use the indexing store, we don't need to register the api
 
 	// Migrate v1.2 handlers
@@ -382,14 +382,6 @@ func (s *Service) loadSavedHandlerSpecs() error {
 	return nil
 }
 
-//func (s *Service) convertEventStatesToAlert(states map[string]EventState) map[string]alert.EventState {
-//	newStates := make(map[string]alert.EventState, len(states))
-//	for id, state := range states {
-//		newStates[id] = s.convertEventStateToAlert(id, state)
-//	}
-//	return newStates
-//}
-
 func convertEventStateToAlert(id string, state *EventState) *alert.EventState {
 	return &alert.EventState{
 		ID:       id,
@@ -413,7 +405,7 @@ func convertEventStateFromAlert(state alert.EventState) *EventState {
 
 func (s *Service) loadSavedTopicStates() error {
 	buf := bytes.Buffer{}
-	return walkTopicBuckets(s.topicsStore, func(tx storage.ReadOnlyTx, topic string) error {
+	return WalkTopicBuckets(s.topicsStore, func(tx storage.ReadOnlyTx, topic string) error {
 		_, _ = buf.WriteString(topic) // WriteString error is always nil
 		eventStates, err := s.loadConvertTopicBucket(tx, buf.Bytes())
 		if err != nil {
@@ -425,7 +417,7 @@ func (s *Service) loadSavedTopicStates() error {
 	})
 }
 
-func walkTopicBuckets(topicsStore storage.Interface, fn func(tx storage.ReadOnlyTx, topic string) error) error {
+func WalkTopicBuckets(topicsStore storage.Interface, fn func(tx storage.ReadOnlyTx, topic string) error) error {
 	return topicsStore.View(func(tx storage.ReadOnlyTx) error {
 		kv, err := tx.List("")
 		if err != nil {
@@ -504,8 +496,6 @@ func (s *Service) persistEventState(event alert.Event) error {
 	}
 
 	return s.topicsStore.Update(func(tx storage.Tx) error {
-
-		//panic("unfinished")
 		tx = tx.Bucket([]byte(event.Topic))
 		data, err := convertEventStateFromAlert(event.State).MarshalJSON()
 		if err != nil {
