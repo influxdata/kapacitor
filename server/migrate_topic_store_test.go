@@ -9,16 +9,7 @@ import (
 
 	_ "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
-	"github.com/influxdata/kapacitor/services/storage/storagetest"
-	bolt "go.etcd.io/bbolt"
 )
-
-func mustDB(db *storagetest.BoltDB, err error) *bolt.DB {
-	if err != nil {
-		panic(err)
-	}
-	return db.DB
-}
 
 type testData struct {
 	name                string
@@ -26,6 +17,12 @@ type testData struct {
 }
 
 var tests []testData = []testData{
+	{
+		name: "one topic",
+		topicEventStatesMap: map[string]map[string]alert.EventState{
+			"t1": alerttest.MakeEventStates(alerttest.EventStateSpec{N: 300, Mwc: 6, Dwc: 20}),
+		},
+	},
 	{
 		name: "three topics",
 		topicEventStatesMap: map[string]map[string]alert.EventState{
