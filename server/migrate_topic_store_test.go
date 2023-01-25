@@ -69,7 +69,7 @@ func Test_migrate_topicstore(t *testing.T) {
 				t.Errorf("cannot reset version in topic store: %v", err)
 			}
 			// Convert the V1 topic Store to a V2 topic store
-			err = s.AlertService.MigrateTopicStore()
+			err = s.AlertService.MigrateTopicStoreV1V2()
 			if err != nil {
 				t.Errorf("failure migrating topic store from version one to version two: %v", err)
 			}

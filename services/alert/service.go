@@ -52,12 +52,14 @@ type Diagnostic interface {
 	MigratingOldHandlerSpec(id string)
 
 	Error(msg string, err error, ctx ...keyvalue.T)
+	Info(msg string, ctx ...keyvalue.T)
 }
 
 type StorageService interface {
 	Store(namespace string) storage.Interface
 	Register(name string, store storage.StoreActioner)
 	Versions() storage.Versions
+	Diagnostic() storage.Diagnostic
 }
 
 type Service struct {
@@ -212,7 +214,7 @@ func (s *Service) Open() error {
 		return err
 	}
 
-	if err := s.MigrateTopicStore(); err != nil {
+	if err := s.MigrateTopicStoreV1V2(); err != nil {
 		return err
 	}
 

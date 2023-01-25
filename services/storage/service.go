@@ -5,6 +5,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
@@ -12,6 +13,7 @@ import (
 
 type Diagnostic interface {
 	Error(msg string, err error)
+	Info(msg string, ctx ...keyvalue.T)
 }
 
 type Service struct {
@@ -114,4 +116,8 @@ func (s *Service) Versions() Versions {
 
 func (s *Service) Register(name string, store StoreActioner) {
 	s.registrar.Register(name, store)
+}
+
+func (s *Service) Diagnostic() Diagnostic {
+	return s.diag
 }

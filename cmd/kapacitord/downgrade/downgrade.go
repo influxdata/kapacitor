@@ -3,14 +3,16 @@ package downgrade
 import (
 	"flag"
 	"fmt"
+	"io"
+	"os"
+
 	"github.com/influxdata/influxdb/pkg/errors"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
-	"io"
-	"os"
 )
 
 const downgradeUsage = `usage: downgrade
@@ -21,7 +23,7 @@ type Diagnostic interface {
 	Error(msg string, err error)
 	KapacitorStarting(version, branch, commit string)
 	GoVersion()
-	Info(msg string)
+	Info(msg string, ctx ...keyvalue.T)
 }
 
 type HTTPDService interface {

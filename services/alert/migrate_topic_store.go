@@ -2,7 +2,7 @@ package alert
 
 import (
 	"fmt"
-
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/pkg/errors"
 )
@@ -12,14 +12,16 @@ const (
 	TopicStoreVersion2   = "2"
 )
 
-func (s *Service) MigrateTopicStore() error {
+func (s *Service) MigrateTopicStoreV1V2() error {
 	version, err := s.StorageService.Versions().Get(TopicStoreVersionKey)
 	if err != nil && !errors.Is(err, storage.ErrNoKeyExists) {
-		return err
+		return fmt.Errorf("cannot determine topic store version: %w", err)
 	}
 	if version == TopicStoreVersion2 {
+		s.diag.Info(fmt.Sprintf("Topic Store is already version %s. Cannot upgrade.", TopicStoreVersion2))
 		return nil
 	}
+
 	topicsDAO, err := NewTopicStateKV(s.StorageService.Store(AlertNameSpace))
 	if err != nil {
 		return fmt.Errorf("cannot create version 1 topic store: %w", err)
@@ -49,7 +51,6 @@ func (s *Service) MigrateTopicStore() error {
 				}
 			}
 			offset += limit
-			// TODO(DSB): check what happens if exactly limit are present....  Does List() EOF or return empty?
 			if len(topicStates) != limit {
 				break
 			}
@@ -65,17 +66,19 @@ func (s *Service) MigrateTopicStore() error {
 	if err = s.StorageService.Versions().Set(TopicStoreVersionKey, TopicStoreVersion2); err != nil {
 		return fmt.Errorf("cannot set topic store version to %s: %w", TopicStoreVersion2, err)
 	}
+	s.diag.Info("Topic Store updated", keyvalue.T{Key: "version", Value: TopicStoreVersion2})
 	return nil
 }
 
-func MigrateTopicStoreV2V1(storageService StorageService) (err error) {
+func MigrateTopicStoreV2V1(storageService StorageService) error {
 
 	version, err := storageService.Versions().Get(TopicStoreVersionKey)
 	if err != nil && !errors.Is(err, storage.ErrNoKeyExists) {
-		return err
+		return fmt.Errorf("cannot determine topic store version: %w", err)
 	}
 	if errors.Is(err, storage.ErrNoKeyExists) || (version != TopicStoreVersion2) {
 		// V1 has no version number
+		storageService.Diagnostic().Info(fmt.Sprintf("Topic Store is not version %s. Cannot downgrade.", TopicStoreVersion2))
 		return nil
 	}
 
@@ -90,7 +93,7 @@ func MigrateTopicStoreV2V1(storageService StorageService) (err error) {
 	err = WalkTopicBuckets(topicsStore, func(tx storage.ReadOnlyTx, topic string) error {
 		eventStates, err := LoadTopicBucket(tx, []byte(topic))
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot load topic %q: %w", topic, err)
 		}
 		topics = append(topics, TopicState{Topic: topic, EventStates: eventStates})
 		return nil
@@ -108,7 +111,11 @@ func MigrateTopicStoreV2V1(storageService StorageService) (err error) {
 	if err = DeleteV2TopicStore(topicsStore); err != nil {
 		return err
 	}
-	return storageService.Versions().Set(TopicStoreVersionKey, "")
+	if err = storageService.Versions().Set(TopicStoreVersionKey, ""); err != nil {
+		return fmt.Errorf("cannot set topic store version to %s after upgrade: %w", TopicStoreVersion2, err)
+	}
+	storageService.Diagnostic().Info("Topic Store upgraded", keyvalue.T{Key: "version", Value: TopicStoreVersion2})
+	return nil
 }
 
 func DeleteV2TopicStore(topicsStore storage.Interface) error {
@@ -123,7 +130,8 @@ func DeleteV2TopicStore(topicsStore storage.Interface) error {
 				continue
 			}
 			if err = txV2.Delete(b.Key); err != nil {
-				return err
+				return fmt.Errorf("cannot delete topic %q: %w", b.Key, err)
+
 			}
 		}
 		return nil
@@ -133,14 +141,14 @@ func DeleteV2TopicStore(topicsStore storage.Interface) error {
 func LoadTopicBucket(tx storage.ReadOnlyTx, topic []byte) (map[string]EventState, error) {
 	q, err := tx.Bucket(topic).List("")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot load topic %q: %w", topic, err)
 	}
 	EventStates := make(map[string]EventState, len(q))
 	es := &EventState{} //create a buffer to hold the unmarshalled EventState
 	for _, b := range q {
 		err = es.UnmarshalJSON(b.Value)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot unmarshal an event in topic %q: %w", topic, err)
 		}
 		EventStates[b.Key] = *es
 		es.Reset()
