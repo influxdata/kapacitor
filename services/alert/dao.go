@@ -361,7 +361,7 @@ func (kv *topicStateKV) DeleteMultiple(keys []string) error {
 	err := kv.store.Store().Update(func(tx storage.Tx) error {
 		for _, tk := range keys {
 			if err := kv.store.DeleteTx(tx, tk); err != nil {
-				return fmt.Errorf("cannot delete key %q: %w", tk, err)
+				return fmt.Errorf("cannot delete topic %q: %w", tk, err)
 			}
 		}
 		return nil
