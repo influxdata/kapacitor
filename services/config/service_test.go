@@ -56,7 +56,7 @@ type TestConfig struct {
 func OpenNewSerivce(testConfig interface{}, updates chan<- config.ConfigUpdate) (*config.Service, *httpdtest.Server) {
 	c := config.NewConfig()
 	service := config.NewService(c, testConfig, diagService.NewConfigOverrideHandler(), updates)
-	service.StorageService = storagetest.New()
+	service.StorageService = storagetest.New(diagService.NewStorageHandler())
 	server := httpdtest.NewServer(testing.Verbose())
 	service.HTTPDService = server
 	if err := service.Open(); err != nil {

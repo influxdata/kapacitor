@@ -9,9 +9,10 @@ import (
 )
 
 type TestStore struct {
-	db        *BoltDB
-	versions  storage.Versions
-	registrar *storage.StoreActionerRegistrar
+	db         *BoltDB
+	versions   storage.Versions
+	registrar  *storage.StoreActionerRegistrar
+	diagnostic storage.Diagnostic
 }
 
 // BoltDB is a database that deletes itself when closed
@@ -44,30 +45,36 @@ func (b BoltDB) Close() error {
 	return os.RemoveAll(path.Dir(b.Path()))
 }
 
-func New() TestStore {
+func New(diagnostic storage.Diagnostic) *TestStore {
 	db, err := NewBolt()
 	if err != nil {
 		panic(err)
 	}
-	return TestStore{
-		db:        db,
-		versions:  storage.NewVersions(db.Store("versions")),
-		registrar: storage.NewStorageResitrar(),
+	return &TestStore{
+		db:         db,
+		versions:   storage.NewVersions(db.Store("versions")),
+		registrar:  storage.NewStorageResitrar(),
+		diagnostic: diagnostic,
 	}
 }
 
-func (s TestStore) Store(name string) storage.Interface {
+func (s *TestStore) Store(name string) storage.Interface {
 	return s.db.Store(name)
 }
 
-func (s TestStore) Versions() storage.Versions {
+func (s *TestStore) Versions() storage.Versions {
 	return s.versions
 }
 
-func (s TestStore) Register(name string, store storage.StoreActioner) {
+func (s *TestStore) Register(name string, store storage.StoreActioner) {
 	s.registrar.Register(name, store)
 }
 
-func (s TestStore) Close() {
-	//s.db.Close()
+// TODO(DSB): put this in all tests that use this TestStore
+func (s *TestStore) Close() error {
+	return s.db.Close()
+}
+
+func (s *TestStore) Diagnostic() storage.Diagnostic {
+	return s.diagnostic
 }

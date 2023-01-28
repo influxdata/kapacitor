@@ -14027,7 +14027,7 @@ func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
 	tm.DeadmanService = deadman{}
 	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler(), nil, 0)
-	as.StorageService = storagetest.New()
+	as.StorageService = storagetest.New(diagService.NewStorageHandler())
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {
 		return nil, err

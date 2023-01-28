@@ -72,25 +72,6 @@ func (s *Topics) EnsureTopic(topic string) *Topic {
 	return t
 }
 
-func (s *Topics) RestoreTopic(id string, eventStates map[string]*EventState) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	t, ok := s.topics[id]
-	if !ok {
-		t = s.newTopic(id)
-		s.topics[id] = t
-	}
-	t.restoreEventStates(eventStates)
-}
-
-func (s *Topics) RestoreTopics() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, t := range s.topics {
-		t.restoreEventStates(t.events)
-	}
-}
-
 func (s *Topics) UpdateEvent(topicID string, event EventState) {
 
 	s.mu.Lock()
@@ -409,6 +390,13 @@ func (t *Topic) updateEvent(state EventState) (EventState, bool) {
 		sort.Sort(sortedStates(t.sorted))
 	}
 	return prev, hasPrev
+}
+
+func (t *Topic) ClearHistory() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.events = make(map[string]*EventState)
+	t.sorted = t.sorted[:0]
 }
 
 type sortedStates []*EventState

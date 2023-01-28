@@ -480,6 +480,11 @@ func (s *Service) Collect(event alert.Event) error {
 		}
 	}
 
+	if (event.State.Level == alert.OK) && (event.PreviousState().Level != alert.OK) {
+		if err := s.clearHistory(&event); err != nil {
+			s.diag.Error("failed to clear event history", err, keyvalue.T{Key: "topic", Value: event.Topic})
+		}
+	}
 	err := s.topics.Collect(event)
 	if err != nil {
 		return err
@@ -499,13 +504,48 @@ func (s *Service) persistEventState(event alert.Event) error {
 
 	return s.topicsStore.Update(func(tx storage.Tx) error {
 		tx = tx.Bucket([]byte(event.Topic))
+		if tx == nil {
+			return nil
+		}
 		data, err := convertEventStateFromAlert(event.State).MarshalJSON()
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot marshal event %q in topic %q: %w", event.State.ID, event.Topic, err)
 		}
-
 		return tx.Put(event.State.ID, data)
 	})
+}
+
+func (s *Service) clearHistory(event *alert.Event) error {
+	// Clear in-memory EventStates
+	t, ok := s.topics.Topic(event.Topic)
+	if ok {
+		t.ClearHistory()
+	}
+	// clear on-disk EventStates
+	return s.topicsStore.Update(func(tx storage.Tx) error {
+		tx = tx.Bucket([]byte(event.Topic))
+		if tx == nil {
+			return nil
+		}
+		// Clear previous topic state on recovery from an alert.
+		kvs, err := tx.List("")
+		if err != nil {
+			// Log inability to clear history, but do not return an error.
+			s.diag.Error("cannot access prior topic state on reset to OK level", err, keyvalue.T{Key: "topic", Value: event.Topic})
+			return err
+		} else {
+			for _, kv := range kvs {
+				if err = tx.Delete(kv.Key); err != nil {
+					// Log inability to clear history, but do not return an error.
+					s.diag.Error("cannot delete topic state on reset to OK level", err, keyvalue.T{Key: "topic", Value: event.Topic}, keyvalue.T{Key: "event", Value: kv.Key})
+					// Give up on deletions
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return nil
 }
 
 func (s *Service) restoreClosedTopic(topic string) error {
@@ -533,7 +573,7 @@ func (s *Service) restoreTopic(topic string) error {
 		}
 		eventStates := make(map[string]*alert.EventState, len(q))
 		lex := jlexer.Lexer{}
-		es := &EventState{} //create a buffer to hold the unmarshalled eventstate
+		es := &EventState{} //create a buffer to hold the unmarshalled EventState
 		for _, b := range q {
 			lex.Data = b.Value
 			es.UnmarshalEasyJSON(&lex)
