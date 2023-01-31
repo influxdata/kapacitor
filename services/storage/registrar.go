@@ -8,7 +8,7 @@ type StoreActioner interface {
 	Rebuild() error
 }
 
-func NewStorageResitrar() *StoreActionerRegistrar {
+func NewStorageRegistrar() *StoreActionerRegistrar {
 	return &StoreActionerRegistrar{
 		stores: make(map[string]StoreActioner),
 	}

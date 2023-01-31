@@ -61,7 +61,7 @@ func (s *Service) Open() error {
 	}
 	s.boltdb = db
 
-	s.registrar = NewStorageResitrar()
+	s.registrar = NewStorageRegistrar()
 	s.apiServer = &APIServer{
 		DB:           s.boltdb,
 		Registrar:    s.registrar,

@@ -70,7 +70,7 @@ func TestBatch_InvalidQuery(t *testing.T) {
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
 	tm.Open()
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	testCases := []struct {
 		script string
@@ -1630,7 +1630,7 @@ batch
 		.post('` + ts.URL + `')
 `
 	clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertStateChangesOnly", script)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
 	if err != nil {
@@ -1710,7 +1710,7 @@ batch
 		.post('` + ts.URL + `')
 `
 	clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertStateChangesOnly", script)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
 	if err != nil {
@@ -3740,8 +3740,7 @@ batch
 	c := make(chan bool, 1)
 	go func() {
 		clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertPostTimeout", script)
-		defer tm.Close()
-
+		defer checkDeferredErrors(t, tm.Close)()
 		err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
 		if err != nil {
 			t.Error(err)
@@ -3817,7 +3816,7 @@ func testBatcherWithOutput(
 	ignoreOrder bool,
 ) {
 	clock, et, replayErr, tm := testBatcher(t, name, script)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
@@ -3847,6 +3846,14 @@ func testBatcherWithOutput(
 	} else {
 		if eq, msg := compareResults(er, result); !eq {
 			t.Error(msg)
+		}
+	}
+}
+
+func checkDeferredErrors(t *testing.T, cleanup func() error) func() {
+	return func() {
+		if err := cleanup(); err != nil {
+			t.Fatal(err)
 		}
 	}
 }

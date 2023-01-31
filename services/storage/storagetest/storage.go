@@ -15,6 +15,8 @@ type TestStore struct {
 	diagnostic storage.Diagnostic
 }
 
+const memoryPath = ":memory:"
+
 // BoltDB is a database that deletes itself when closed
 type BoltDB struct {
 	*bolt.DB
@@ -22,7 +24,7 @@ type BoltDB struct {
 
 // NewBolt is an in-memory db that deletes itself when closed, do not use except for testing.
 func NewBolt() (*BoltDB, error) {
-	db, err := bolt.Open(":memory:", 0600, &bolt.Options{
+	db, err := bolt.Open(memoryPath, 0600, &bolt.Options{
 		Timeout:    0,
 		NoGrowSync: false,
 		MemOnly:    true,
@@ -38,11 +40,17 @@ func (b BoltDB) Store(bucket string) storage.Interface {
 }
 
 func (b BoltDB) Close() error {
+	dbPath := b.Path()
 	err := b.DB.Close()
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(path.Dir(b.Path()))
+
+	if dbPath != "" && dbPath != memoryPath {
+		return os.RemoveAll(path.Dir(b.Path()))
+	} else {
+		return nil
+	}
 }
 
 func New(diagnostic storage.Diagnostic) *TestStore {
@@ -53,7 +61,7 @@ func New(diagnostic storage.Diagnostic) *TestStore {
 	return &TestStore{
 		db:         db,
 		versions:   storage.NewVersions(db.Store("versions")),
-		registrar:  storage.NewStorageResitrar(),
+		registrar:  storage.NewStorageRegistrar(),
 		diagnostic: diagnostic,
 	}
 }
@@ -70,7 +78,6 @@ func (s *TestStore) Register(name string, store storage.StoreActioner) {
 	s.registrar.Register(name, store)
 }
 
-// TODO(DSB): put this in all tests that use this TestStore
 func (s *TestStore) Close() error {
 	return s.db.Close()
 }

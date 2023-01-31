@@ -480,14 +480,15 @@ func (s *Service) Collect(event alert.Event) error {
 		}
 	}
 
-	if (event.State.Level == alert.OK) && (event.PreviousState().Level != alert.OK) {
-		if err := s.clearHistory(&event); err != nil {
-			s.diag.Error("failed to clear event history", err, keyvalue.T{Key: "topic", Value: event.Topic})
-		}
-	}
 	err := s.topics.Collect(event)
 	if err != nil {
 		return err
+	}
+	// Events with alert.OK status should always only be resets from other statuses.
+	if event.State.Level == alert.OK {
+		if err := s.clearHistory(&event); err != nil {
+			s.diag.Error("failed to clear event history", err, keyvalue.T{Key: "topic", Value: event.Topic})
+		}
 	}
 	return s.persistEventState(event)
 }

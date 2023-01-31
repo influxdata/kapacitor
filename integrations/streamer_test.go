@@ -12036,7 +12036,7 @@ stream
 		t.Fatal(err)
 	}
 	tm.Open()
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	// Create the loopback task
 	taskLoop, err := tm.NewTask("KapacitorLoopback-Loop", scriptLoop, kapacitor.StreamTask, dbrps, 0, nil)
@@ -12168,7 +12168,7 @@ stream
 		t.Fatal(err)
 	}
 	tm.Open()
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	// Create the loopback task
 	taskLoop, err := tm.NewTask("KapacitorLoopback-Loop", scriptLoop, kapacitor.StreamTask, dbrps, 0, nil)
@@ -12610,7 +12610,7 @@ stream
 	}
 
 	t.Log(string(et.Task.Dot()))
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	// Wait till we received a request
 	if e := <-done; e != nil {
@@ -12670,7 +12670,7 @@ stream
 	}
 
 	t.Log(string(et.Task.Dot()))
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	// Wait till we received a request
 	if e := <-done; e != nil {
@@ -13525,7 +13525,7 @@ func testStreamerCardinality(
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	err := fastForwardTask(clock, et, replayErr, tm, 20*time.Second)
 	if err != nil {
@@ -13837,7 +13837,7 @@ func testStreamerNoOutput(
 ) {
 	t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
 		t.Error(err)
@@ -13855,7 +13855,7 @@ func testStreamerWithOutput(
 ) {
 	t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
@@ -13911,7 +13911,7 @@ func testStreamerWithSteppedOutput(
 ) {
 	t.Skip("Test is not deterministic, need a mechanisim to safely step task execution.")
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
-	defer tm.Close()
+	defer checkDeferredErrors(t, tm.Close)()
 
 	for s, step := range steps {
 		// Move time forward
@@ -14027,7 +14027,9 @@ func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
 	tm.DeadmanService = deadman{}
 	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler(), nil, 0)
-	as.StorageService = storagetest.New(diagService.NewStorageHandler())
+	store := storagetest.New(diagService.NewStorageHandler())
+	tm.TestCloser = store
+	as.StorageService = store
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {
 		return nil, err

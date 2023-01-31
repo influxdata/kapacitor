@@ -12,6 +12,8 @@ const (
 	TopicStoreVersion2   = "2"
 )
 
+// MigrateTopicStoreV1V2 - Convert a V1 to a V2 topic store.
+// Also ensures that a topic store has a V2 version number set.
 func (s *Service) MigrateTopicStoreV1V2() error {
 	version, err := s.StorageService.Versions().Get(TopicStoreVersionKey)
 	if err != nil && !errors.Is(err, storage.ErrNoKeyExists) {
