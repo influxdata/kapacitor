@@ -2,13 +2,12 @@ package server_test
 
 import (
 	"fmt"
-	"github.com/influxdata/kapacitor/services/alert"
-	"github.com/influxdata/kapacitor/services/storage"
 	"reflect"
 	"testing"
 
-	_ "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
+	"github.com/influxdata/kapacitor/services/storage"
 )
 
 type testData struct {
@@ -108,6 +107,9 @@ func Test_migrate_topicstore(t *testing.T) {
 			}
 			// Load all the saved topic states (plus one in case of error or duplicates in saving).
 			topicStates, err := TopicStatesDAO.List("", 0, len(tt.topicEventStatesMap)+1)
+			if err != nil {
+				t.Errorf("failed to load saved topic states: %v", err)
+			}
 			count = 0
 			for _, ts := range topicStates {
 				if es, ok := tt.topicEventStatesMap[ts.Topic]; !ok {

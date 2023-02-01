@@ -283,20 +283,6 @@ func (t *Topic) restoreEventStatesNoCopy(eventStates map[string]*EventState) {
 	sort.Sort(sortedStates(t.sorted))
 }
 
-func (t *Topic) restoreEventStates(eventStates map[string]*EventState) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.events = make(map[string]*EventState, len(eventStates))
-	t.sorted = make([]*EventState, 0, len(eventStates))
-	for id, state := range eventStates {
-		e := new(EventState)
-		*e = *state
-		t.events[id] = e
-		t.sorted = append(t.sorted, e)
-	}
-	sort.Sort(sortedStates(t.sorted))
-}
-
 func (t *Topic) EventStates(minLevel Level) map[string]EventState {
 	t.mu.RLock()
 	events := make(map[string]EventState, len(t.sorted))
