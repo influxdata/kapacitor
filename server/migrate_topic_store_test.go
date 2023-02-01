@@ -93,7 +93,7 @@ func Test_migrate_topicstore(t *testing.T) {
 				if esOriginal, ok := tt.topicEventStatesMap[topic]; !ok {
 					return fmt.Errorf("topic %q not found in version two store: %w", topic, alert.ErrNoTopicStateExists)
 				} else if ok, msg := eventStateMapCompare(esOriginal, esStoredV2); !ok {
-					return fmt.Errorf("event states for topic %q differ between V2 storage and original: %s", topic, msg)
+					return fmt.Errorf("event states for topic %q differ between original and V2 storage: %s", topic, msg)
 				}
 				return nil
 			})
@@ -113,9 +113,9 @@ func Test_migrate_topicstore(t *testing.T) {
 			}
 			count = 0
 			for _, ts := range topicStates {
-				if es, ok := tt.topicEventStatesMap[ts.Topic]; !ok {
+				if esOriginal, ok := tt.topicEventStatesMap[ts.Topic]; !ok {
 					t.Errorf("topic %q not found in version one store: %v", ts.Topic, alert.ErrNoTopicStateExists)
-				} else if ok, msg := eventStateMapCompare(es, ts.EventStates); !ok {
+				} else if ok, msg := eventStateMapCompare(esOriginal, ts.EventStates); !ok {
 					t.Errorf("event states for topic %q differ between V2 storage and original: %s", ts.Topic, msg)
 				} else {
 					count++
@@ -136,7 +136,7 @@ func eventStateMapCompare(em1, em2 map[string]alert.EventState) (bool, string) {
 			return match, msg
 		}
 	}
-	for id, _ := range em2 {
+	for id := range em2 {
 		if _, ok := em1[id]; !ok {
 			return false, fmt.Sprintf("first map missing id: %q", id)
 		}
@@ -149,7 +149,8 @@ func eventStateCompare(es1, es2 *alert.EventState) (bool, string) {
 		return false, fmt.Sprintf("EventState.Level differs: %v != %v", es1.Level, es2.Level)
 	} else if es1.Message != es2.Message {
 		return false, fmt.Sprintf("EventState.Message differs: %q != %q", es1.Message, es2.Message)
-	} else if es1.Time != es2.Time {
+	} else if fmt.Sprintf("%v", es1.Time) != fmt.Sprintf("%v", es2.Time) {
+		// This is a hack to avoid JSON loss of precision causing test failures
 		return false, fmt.Sprintf("EventState.Time differs: %v != %v", es1.Time, es2.Time)
 	} else if es1.Duration != es2.Duration {
 		return false, fmt.Sprintf("EventState.Duration differs: %v != %v", es1.Duration, es2.Duration)
