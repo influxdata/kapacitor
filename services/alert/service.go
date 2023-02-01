@@ -546,7 +546,6 @@ func (s *Service) clearHistory(event *alert.Event) error {
 		}
 		return nil
 	})
-	return nil
 }
 
 func (s *Service) restoreClosedTopic(topic string) error {
