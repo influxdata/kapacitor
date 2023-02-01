@@ -23,7 +23,7 @@ func BenchmarkTopicState_MarshalBinary(b *testing.B) {
 			ts.EventStates = alerttest.MakeEventStates(alerttest.EventStateSpec{N: bm.n, Mwc: 5, Dwc: 15})
 
 			totalMarshalBytes := int64(0)
-			for k, _ := range ts.EventStates {
+			for k := range ts.EventStates {
 				data, err := ts.EventStates[k].MarshalJSON()
 				if err != nil {
 					panic(err)
@@ -36,7 +36,7 @@ func BenchmarkTopicState_MarshalBinary(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				for k, _ := range ts.EventStates {
+				for k := range ts.EventStates {
 					_, err := ts.EventStates[k].MarshalJSON()
 					if err != nil {
 						panic(err)
@@ -64,7 +64,7 @@ func BenchmarkTopicState_UnmarshalBinary(b *testing.B) {
 
 			marshaled := make([][]byte, 0, len(ts.EventStates))
 			totalMarshalBytes := int64(0)
-			for k, _ := range ts.EventStates {
+			for k := range ts.EventStates {
 				data, err := ts.EventStates[k].MarshalJSON()
 				if err != nil {
 					panic(err)

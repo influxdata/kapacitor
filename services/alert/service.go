@@ -182,8 +182,6 @@ func NewService(d Diagnostic, disabled map[string]struct{}, topicBufLen int) *Se
 const (
 	// Public name of the handler specs store.
 	handlerSpecsAPIName = "handler-specs"
-	// Public name of the handler specs store.
-	topicStatesAPIName = "topic-states"
 	// The storage namespace for all task data.
 	AlertNameSpace = "alert_store"
 	// TopicStatesNameSpace - The storage namespace for topic states

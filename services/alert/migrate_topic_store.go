@@ -105,7 +105,7 @@ func MigrateTopicStoreV2V1(storageService StorageService) error {
 		return err
 	}
 
-	for i, _ := range topics {
+	for i := range topics {
 		if err = topicsDAO.Put(topics[i]); err != nil {
 			return fmt.Errorf("cannot save topic %q: %w", topics[i].Topic, err)
 		}
