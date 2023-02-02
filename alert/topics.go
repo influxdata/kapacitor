@@ -378,13 +378,6 @@ func (t *Topic) updateEvent(state EventState) (EventState, bool) {
 	return prev, hasPrev
 }
 
-func (t *Topic) ClearHistory() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.events = make(map[string]*EventState)
-	t.sorted = t.sorted[:0]
-}
-
 type sortedStates []*EventState
 
 // TODO(docmerlin): replaced sortedStates with a heap or something similar

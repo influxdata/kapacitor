@@ -515,12 +515,7 @@ func (s *Service) persistEventState(event alert.Event) error {
 }
 
 func (s *Service) clearHistory(event *alert.Event) error {
-	// Clear in-memory EventStates
-	t, ok := s.topics.Topic(event.Topic)
-	if ok {
-		t.ClearHistory()
-	}
-	// clear on-disk EventStates
+	// clear on-disk EventStates, but leave the in-memory history
 	return s.topicsStore.Update(func(tx storage.Tx) error {
 		tx = tx.Bucket([]byte(event.Topic))
 		if tx == nil {
