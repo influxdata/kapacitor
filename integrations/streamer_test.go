@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"text/template"
@@ -13739,12 +13740,12 @@ stream
 	defer checkDeferredErrors(t, tm.Close)()
 	cleanup()
 	const alertID = "kapacitor/cpu/serverA"
-	kCount1, alertExists1, err := store.BucketEntries("cpu", alertID)
+	keys1, alertExists1, err := store.BucketEntries("cpu", alertID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kCount1 != 2 {
-		t.Fatal("missing some alert history")
+	if len(keys1) != 2 {
+		t.Fatalf("wrong number of keys, expected 2, got %d: %s", len(keys1), strings.Join(keys1, ", "))
 	} else if !alertExists1 {
 		t.Fatalf("missing alert history for %q", alertID)
 	}
@@ -13754,12 +13755,12 @@ stream
 	_, _, cleanup = testStreamerWithInputChannel(t, alertName, script, dataChannel, clck, tm, nil, true)
 	cleanup()
 
-	kCount2, alertExists2, err := store.BucketEntries("cpu", alertID)
+	keys2, alertExists2, err := store.BucketEntries("cpu", alertID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kCount2 != 1 {
-		t.Fatal("extra alert history found")
+	if len(keys2) != 1 {
+		t.Fatalf("wrong number of keys, expected 1, got %d: %s", len(keys2), strings.Join(keys2, ", "))
 	} else if alertExists2 {
 		t.Fatalf("alert history for %q not deleted", alertID)
 	}
@@ -13789,6 +13790,7 @@ func makeAlertResetTestChannel(c clock.Clock, n int, low float64, high float64) 
 				c.Zero().Add(time.Duration(i)*time.Second),
 			)
 		}
+		time.Sleep(5 * time.Second)
 		close(dataChannel)
 	}
 	return dataChannel, f

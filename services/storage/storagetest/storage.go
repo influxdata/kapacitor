@@ -88,7 +88,7 @@ func (s *TestStore) Diagnostic() storage.Diagnostic {
 	return s.diagnostic
 }
 
-func (s *TestStore) BucketEntries(topic string, alertID string) (count int, exists bool, err error) {
+func (s *TestStore) BucketEntries(topic string, alertID string) (keys []string, exists bool, err error) {
 	store := s.db.Store(alert.TopicStatesNameSpace)
 	err = store.View(func(tx storage.ReadOnlyTx) error {
 		bucket := tx.Bucket([]byte(topic))
@@ -98,16 +98,15 @@ func (s *TestStore) BucketEntries(topic string, alertID string) (count int, exis
 		if kvs, err := bucket.List(""); err != nil {
 			return fmt.Errorf("failed to list contents of bucket %q: %w", topic, err)
 		} else {
-			count = len(kvs)
-			exists = false
+			keys = make([]string, 0, len(kvs))
 			for _, aID := range kvs {
+				keys = append(keys, aID.Key)
 				if aID.Key == alertID {
 					exists = true
-					return nil
 				}
 			}
 		}
 		return nil
 	})
-	return count, exists, err
+	return keys, exists, err
 }
