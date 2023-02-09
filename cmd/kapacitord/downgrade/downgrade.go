@@ -17,7 +17,7 @@ import (
 
 const downgradeUsage = `usage: downgrade
 
-	downgrade converts reverts a topic store format upgrade`
+	downgrade reverts a topic store format upgrade`
 
 type Diagnostic interface {
 	Error(msg string, err error)

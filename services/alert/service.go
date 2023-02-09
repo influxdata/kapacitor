@@ -595,7 +595,6 @@ func (s *Service) CloseTopic(topic string) error {
 	s.topics.DeleteTopic(topic)
 	s.closedTopics[topic] = true
 
-	// Save the final topic state
 	return nil
 }
 

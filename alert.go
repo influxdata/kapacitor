@@ -817,7 +817,6 @@ func (n *AlertNode) newAlertState(tags models.Tags) *alertState {
 }
 
 func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
-	//panic("NOT IMPLEMENTED")
 	var topicState, anonTopicState alert.EventState
 	var anonFound, topicFound bool
 	// Check for previous state on anonTopic
