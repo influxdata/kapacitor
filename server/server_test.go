@@ -12160,19 +12160,9 @@ alert,host=serverB value=0 0000000004
 	// Topic should have must recent event
 	l := cli.TopicEventsLink(topic)
 	expTopicEvents := client.TopicEvents{
-		Link:  l,
-		Topic: topic,
-		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
-			ID:   "id",
-			State: client.EventState{
-				Message:  "message",
-				Details:  "details",
-				Time:     time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
-				Duration: client.Duration(time.Second),
-				Level:    "OK",
-			},
-		}},
+		Link:   l,
+		Topic:  topic,
+		Events: []client.TopicEvent{ /* Level OK alerts are not stored any more with the V2 topic store */ },
 	}
 
 	te, err := cli.ListTopicEvents(l, nil)
