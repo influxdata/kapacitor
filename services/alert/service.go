@@ -483,12 +483,15 @@ func (s *Service) Collect(event alert.Event) error {
 		return err
 	}
 	// Events with alert.OK status should always only be resets from other statuses.
-	if event.State.Level == alert.OK {
+	if event.State.Level == alert.OK && s.PersistTopics {
 		if err := s.clearHistory(&event); err != nil {
-			s.diag.Error("failed to clear event history", err, keyvalue.T{Key: "topic", Value: event.Topic})
+			return fmt.Errorf("failed to clear event history for topic %q: %w", event.Topic, err)
+		} else {
+			return nil
 		}
+	} else {
+		return s.persistEventState(event)
 	}
-	return s.persistEventState(event)
 }
 
 func (s *Service) persistEventState(event alert.Event) error {
@@ -521,21 +524,9 @@ func (s *Service) clearHistory(event *alert.Event) error {
 		if tx == nil {
 			return nil
 		}
-		// Clear previous topic state on recovery from an alert.
-		kvs, err := tx.List("")
-		if err != nil {
-			// Log inability to clear history, but do not return an error.
-			s.diag.Error("cannot access prior topic state on reset to OK level", err, keyvalue.T{Key: "topic", Value: event.Topic})
-			return err
-		} else {
-			for _, kv := range kvs {
-				if err = tx.Delete(kv.Key); err != nil {
-					// Log inability to clear history, but do not return an error.
-					s.diag.Error("cannot delete topic state on reset to OK level", err, keyvalue.T{Key: "topic", Value: event.Topic}, keyvalue.T{Key: "event", Value: kv.Key})
-					// Give up on deletions
-					return err
-				}
-			}
+		// Clear previous alert on recovery reset/recovery.
+		if err := tx.Delete(event.State.ID); err != nil {
+			return fmt.Errorf("cannot delete alert %q in topic %q on reset: %w", event.State.ID, event.Topic, err)
 		}
 		return nil
 	})

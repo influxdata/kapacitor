@@ -104,7 +104,9 @@ func init() {
 		out = os.Stderr
 	}
 	diagService = diagnostic.NewService(diagnostic.NewConfig(), out, out)
-	diagService.Open()
+	if err := diagService.Open(); err != nil {
+		panic(err)
+	}
 }
 
 type testCtxStr string
@@ -1620,7 +1622,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Data", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Data", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -1729,7 +1732,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -1837,7 +1841,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Idle", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Idle", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -1944,7 +1949,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -2030,7 +2036,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Data", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Data", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -2140,7 +2147,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -2248,7 +2256,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Idle", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Idle", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -2355,7 +2364,8 @@ stream
 `
 
 	dataChannel := make(chan edge.PointMessage)
-	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil)
+	tm, _, cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil, nil, false)
+	defer checkDeferredErrors(t, tm.Close)()
 	defer func() {
 		cleanupTest()
 
@@ -11975,7 +11985,7 @@ stream
 `
 
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12031,7 +12041,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12163,7 +12173,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12590,7 +12600,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12650,7 +12660,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13681,10 +13691,113 @@ data
 	testStreamerWithOutput(t, "TestStream_StateTracking", script, 4*time.Second, er, false, nil)
 }
 
+func TestStream_AlertReset(t *testing.T) {
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+	}))
+	defer ts.Close()
+
+	var script = `
+var critThreshold = 80.0
+
+var critResetThreshold = 70.0
+
+stream
+	|from()
+		.measurement('cpu')
+		.groupBy('host')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.details('details')
+		.idField('id')
+		.idTag('id')
+		.levelField('level')
+		.levelTag('level')
+		.crit(lambda: "value" > critThreshold)
+		.critReset(lambda: "value" < critResetThreshold)
+		.topic('cpu')
+		|httpPost('` + ts.URL + `')
+`
+	const count = 5
+	const alertName = "TestStream_Alert"
+
+	// Create a clock with a Zero point twice the number of
+	clck := clock.New(time.Now().UTC().Add(time.Duration(count*-2) * time.Second))
+	clck.Set(time.Now().UTC())
+
+	dataChannel, fillFunc := makeAlertResetTestChannel(clck, count, 85.0, 100.0)
+	go fillFunc()
+	tm, store, cleanup := testStreamerWithInputChannel(t, alertName, script, dataChannel, clck, nil, nil, true)
+	defer checkDeferredErrors(t, tm.Close)()
+	cleanup()
+	const alertID = "kapacitor/cpu/serverA"
+	kCount1, alertExists1, err := store.BucketEntries("cpu", alertID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kCount1 != 2 {
+		t.Fatal("missing some alert history")
+	} else if !alertExists1 {
+		t.Fatalf("missing alert history for %q", alertID)
+	}
+
+	dataChannel, fillFunc = makeAlertResetTestChannel(clck, 1, 23.0, 36.0)
+	go fillFunc()
+	_, _, cleanup = testStreamerWithInputChannel(t, alertName, script, dataChannel, clck, tm, nil, true)
+	cleanup()
+
+	kCount2, alertExists2, err := store.BucketEntries("cpu", alertID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kCount2 != 1 {
+		t.Fatal("extra alert history found")
+	} else if alertExists2 {
+		t.Fatalf("alert history for %q not deleted", alertID)
+	}
+	if rc := atomic.LoadInt32(&requestCount); rc != count+1 {
+		t.Errorf("got %v exp %v", rc, count+1)
+	}
+}
+
+func makeAlertResetTestChannel(c clock.Clock, n int, low float64, high float64) (<-chan edge.PointMessage, func()) {
+	dataChannel := make(chan edge.PointMessage)
+
+	f := func() {
+		for i := 0; i < n; i++ {
+			var host string
+			if i%2 == 0 {
+				host = "serverA"
+			} else {
+				host = "serverB"
+			}
+			dataChannel <- edge.NewPointMessage(
+				"cpu",
+				"dbname",
+				"rpname",
+				models.Dimensions{},
+				models.Fields{"value": rand.Float64()*(high-low) + low},
+				models.Tags{"host": host, "type": "idle"},
+				c.Zero().Add(time.Duration(i)*time.Second),
+			)
+		}
+		close(dataChannel)
+	}
+	return dataChannel, f
+}
+
 // Helper test function for streamer
 func testStreamer(
 	t *testing.T,
-	name,
+	name string,
 	script string,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) (
@@ -13701,15 +13814,16 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
+	tm, _, err := createTaskMaster("testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if tmInit != nil {
 		tmInit(tm)
 	}
-	tm.Open()
-
+	if err = tm.Open(); err != nil {
+		t.Fatal(err)
+	}
 	//Create the task
 	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
 	if err != nil {
@@ -13773,24 +13887,35 @@ func testStreamerWithInputChannel(
 	script string,
 	points <-chan edge.PointMessage,
 	clck clock.Clock,
+	tm *kapacitor.TaskMaster,
 	tmInit func(tm *kapacitor.TaskMaster),
-) (cleanup func()) {
+	persistTopic bool,
+) (
+	taskMaster *kapacitor.TaskMaster,
+	store *storagetest.TestStore,
+	cleanup func(),
+) {
 	if testing.Verbose() {
 		wlog.SetLevel(wlog.DEBUG)
 	} else {
 		wlog.SetLevel(wlog.OFF)
 	}
 
-	// Create a new execution env
-	tm, err := createTaskMaster("testStreamer")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tmInit != nil {
-		tmInit(tm)
-	}
-	tm.Open()
+	var err error
 
+	if tm == nil {
+		// Create a new execution env
+		tm, store, err = createTaskMaster("testStreamer", persistTopic)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tmInit != nil {
+			tmInit(tm)
+		}
+		if err = tm.Open(); err != nil {
+			t.Fatal(err)
+		}
+	}
 	//Create the task
 	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
 	if err != nil {
@@ -13822,10 +13947,9 @@ func testStreamerWithInputChannel(
 		if err := et.Wait(); err != nil {
 			t.Error(err)
 		}
-
 		t.Log(string(et.Task.Dot()))
 	}
-	return
+	return tm, store, cleanup
 }
 
 func testStreamerNoOutput(
@@ -14018,7 +14142,7 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 	return nil
 }
 
-func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
+func createTaskMaster(name string, persistTopics bool) (*kapacitor.TaskMaster, *storagetest.TestStore, error) {
 	d := diagService.NewKapacitorHandler()
 	tm := kapacitor.NewTaskMaster(name, newServerInfo(), d)
 	httpdService := newHTTPDService()
@@ -14027,13 +14151,14 @@ func createTaskMaster(name string) (*kapacitor.TaskMaster, error) {
 	tm.DeadmanService = deadman{}
 	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler(), nil, 0)
+	as.PersistTopics = persistTopics
 	store := storagetest.New(diagService.NewStorageHandler())
 	tm.TestCloser = store
 	as.StorageService = store
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tm.AlertService = as
-	return tm, nil
+	return tm, store, nil
 }

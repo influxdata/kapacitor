@@ -1,9 +1,11 @@
 package storagetest
 
 import (
+	"fmt"
 	"os"
 	"path"
 
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/storage"
 	bolt "go.etcd.io/bbolt"
 )
@@ -84,4 +86,28 @@ func (s *TestStore) Close() error {
 
 func (s *TestStore) Diagnostic() storage.Diagnostic {
 	return s.diagnostic
+}
+
+func (s *TestStore) BucketEntries(topic string, alertID string) (count int, exists bool, err error) {
+	store := s.db.Store(alert.TopicStatesNameSpace)
+	err = store.View(func(tx storage.ReadOnlyTx) error {
+		bucket := tx.Bucket([]byte(topic))
+		if bucket == nil {
+			return fmt.Errorf("%q: %w", topic, bolt.ErrBucketNotFound)
+		}
+		if kvs, err := bucket.List(""); err != nil {
+			return fmt.Errorf("failed to list contents of bucket %q: %w", topic, err)
+		} else {
+			count = len(kvs)
+			exists = false
+			for _, aID := range kvs {
+				if aID.Key == alertID {
+					exists = true
+					return nil
+				}
+			}
+		}
+		return nil
+	})
+	return count, exists, nil
 }
