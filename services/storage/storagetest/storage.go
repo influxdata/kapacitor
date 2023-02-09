@@ -109,5 +109,5 @@ func (s *TestStore) BucketEntries(topic string, alertID string) (count int, exis
 		}
 		return nil
 	})
-	return count, exists, nil
+	return count, exists, err
 }
