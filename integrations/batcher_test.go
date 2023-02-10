@@ -3764,7 +3764,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testBatcher", false)
+	tm, _, err := createTaskMaster(t, "testBatcher", false)
 	if err != nil {
 		t.Fatal(err)
 	}

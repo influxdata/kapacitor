@@ -11986,7 +11986,7 @@ stream
 `
 
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12042,7 +12042,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12174,7 +12174,7 @@ stream
 		},
 	}
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12601,7 +12601,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -12661,7 +12661,7 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13816,7 +13816,7 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm, _, err := createTaskMaster("testStreamer", false)
+	tm, _, err := createTaskMaster(t, "testStreamer", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -13907,7 +13907,7 @@ func testStreamerWithInputChannel(
 
 	if tm == nil {
 		// Create a new execution env
-		tm, store, err = createTaskMaster("testStreamer", persistTopic)
+		tm, store, err = createTaskMaster(t, "testStreamer", persistTopic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -14144,7 +14144,7 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 	return nil
 }
 
-func createTaskMaster(name string, persistTopics bool) (*kapacitor.TaskMaster, *storagetest.TestStore, error) {
+func createTaskMaster(t storagetest.CleanedTest, name string, persistTopics bool) (*kapacitor.TaskMaster, *storagetest.TestStore, error) {
 	d := diagService.NewKapacitorHandler()
 	tm := kapacitor.NewTaskMaster(name, newServerInfo(), d)
 	httpdService := newHTTPDService()
@@ -14154,7 +14154,7 @@ func createTaskMaster(name string, persistTopics bool) (*kapacitor.TaskMaster, *
 	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler(), nil, 0)
 	as.PersistTopics = persistTopics
-	store := storagetest.New(diagService.NewStorageHandler())
+	store := storagetest.New(t, diagService.NewStorageHandler())
 	tm.TestCloser = store
 	as.StorageService = store
 	as.HTTPDService = httpdService

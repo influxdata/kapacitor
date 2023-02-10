@@ -10,6 +10,10 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
+type CleanedTest interface {
+	TempDir() string
+}
+
 type TestStore struct {
 	db         *BoltDB
 	versions   storage.Versions
@@ -17,19 +21,25 @@ type TestStore struct {
 	diagnostic storage.Diagnostic
 }
 
-const memoryPath = ":memory:"
-
 // BoltDB is a database that deletes itself when closed
 type BoltDB struct {
 	*bolt.DB
 }
 
 // NewBolt is an in-memory db that deletes itself when closed, do not use except for testing.
-func NewBolt() (*BoltDB, error) {
-	db, err := bolt.Open(memoryPath, 0600, &bolt.Options{
+func NewBolt(t CleanedTest) (*BoltDB, error) {
+	dir := t.TempDir()
+	f, err := os.CreateTemp(dir, "boltDB*.db")
+	if err != nil {
+		return nil, err
+	}
+	dbName := f.Name()
+	if err = f.Close(); err != nil {
+		return nil, err
+	}
+	db, err := bolt.Open(dbName, 0600, &bolt.Options{
 		Timeout:    0,
 		NoGrowSync: false,
-		MemOnly:    true,
 	})
 	if err != nil {
 		return nil, err
@@ -47,16 +57,11 @@ func (b BoltDB) Close() error {
 	if err != nil {
 		return err
 	}
-
-	if dbPath != "" && dbPath != memoryPath {
-		return os.RemoveAll(path.Dir(b.Path()))
-	} else {
-		return nil
-	}
+	return os.RemoveAll(path.Dir(dbPath))
 }
 
-func New(diagnostic storage.Diagnostic) *TestStore {
-	db, err := NewBolt()
+func New(t CleanedTest, diagnostic storage.Diagnostic) *TestStore {
+	db, err := NewBolt(t)
 	if err != nil {
 		panic(err)
 	}

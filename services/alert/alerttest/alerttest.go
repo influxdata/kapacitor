@@ -173,22 +173,23 @@ type EventStateSpec struct {
 	Dwc int // details word count
 }
 
-func makeSentence(n int) string {
+func makeSentence(seededRand *rand.Rand, n int) string {
 	s := make([]string, n)
 	for i := 0; i < n; i++ {
-		s[i] = words[rand.Int31n(int32(len(words)))]
+		s[i] = words[seededRand.Int31n(int32(len(words)))]
 	}
 	return strings.Join(s, " ")
 }
 
 func MakeEventStates(s EventStateSpec) map[string]salert.EventState {
-	rand.Seed(int64(s.N)) // force `n` to be deterministic
+	// Force rand sequence to be deterministic.
+	seededRand := rand.New(rand.NewSource(int64(s.N)))
 
 	es := make(map[string]salert.EventState, s.N)
 	for i := 0; i < s.N; i++ {
 		es[fmt.Sprintf("event_state_id_%d", i)] = salert.EventState{
-			Message:  makeSentence(s.Mwc),
-			Details:  makeSentence(s.Dwc),
+			Message:  makeSentence(seededRand, s.Mwc),
+			Details:  makeSentence(seededRand, s.Dwc),
 			Time:     time.Unix(0, int64(i*1e9)),
 			Duration: time.Duration((i * int(time.Millisecond)) % 10 * int(time.Second)),
 			Level:    alert.Level(i % 0x3), // assumes levels 0-3

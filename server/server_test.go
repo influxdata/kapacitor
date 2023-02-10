@@ -12004,8 +12004,6 @@ stream
 	s.MustWrite("mydb", "myrp", point, v)
 	time.Sleep(15 * time.Second)
 
-	q, _ := s.AlertService.EventStates("tcp", -1)
-	_ = q
 	s.Restart()
 
 	// Check TCP handler got event

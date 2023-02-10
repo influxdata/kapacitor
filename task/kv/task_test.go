@@ -29,7 +29,7 @@ func TestKvTaskService(t *testing.T) {
 	servicetest.TestTaskService(
 		t,
 		func(t *testing.T) (*servicetest.System, context.CancelFunc) {
-			service := kv.New(storagetest.New(diagService.NewStorageHandler()))
+			service := kv.New(storagetest.New(t, diagService.NewStorageHandler()))
 			service.Open()
 			ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -64,7 +64,7 @@ func newService(t *testing.T, ctx context.Context, c clock.Clock) *testService {
 		c = clock.New()
 	}
 
-	service := kv.New(storagetest.New(diagService.NewStorageHandler()), kv.WithClock(c))
+	service := kv.New(storagetest.New(t, diagService.NewStorageHandler()), kv.WithClock(c))
 	service.Open()
 
 	return &testService{

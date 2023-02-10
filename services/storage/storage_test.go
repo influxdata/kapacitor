@@ -13,43 +13,9 @@ import (
 // Error used to specifically trigger a rollback for tests.
 var rollbackErr = errors.New("rollback")
 
-//type storeCloser interface {
-//	Store(namespace string) storage.Interface
-//	Close() error
-//}
-
-//type boltDB struct {
-//	db  *bolt.db
-//	dir string
-//}
-//
-//func (b boltDB) Close() error {
-//	_ = b.db.Close() // we don't need to worry about this error
-//	return os.RemoveAll(b.dir)
-//}
-//
-//func newBolt() (storeCloser, error) {
-//	tmpDir, err := os.MkdirTemp("", "storage-bolt")
-//	if err != nil {
-//		return nil, fmt.Errorf("failed to create temp directory: %v", err)
-//	}
-//	db, err := bolt.Open(filepath.Join(tmpDir, "bolt.db"), 0600, nil)
-//	if err != nil {
-//		return boltDB{}, err
-//	}
-//	return boltDB{
-//		db:  db,
-//		dir: tmpDir,
-//	}, nil
-//}
-//
-//func (b boltDB) Store(bucket string) storage.Interface {
-//	return storage.NewBolt(b.db, []byte(bucket))
-//}
-
 func TestStorage_CRUD(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
-		db, err := storagetest.NewBolt()
+		db, err := storagetest.NewBolt(t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +65,7 @@ func TestStorage_CRUD(t *testing.T) {
 
 func TestStorage_Update(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
-		db, err := storagetest.NewBolt()
+		db, err := storagetest.NewBolt(t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +97,7 @@ func TestStorage_Update(t *testing.T) {
 
 func TestStorage_Update_Rollback(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
-		db, err := storagetest.NewBolt()
+		db, err := storagetest.NewBolt(t)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,7 +144,7 @@ func TestStorage_Update_Rollback(t *testing.T) {
 
 func TestStorage_Update_Concurrent(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
-		db, err := storagetest.NewBolt()
+		db, err := storagetest.NewBolt(t)
 		if err != nil {
 			t.Fatal(err)
 		}

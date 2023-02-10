@@ -46,8 +46,7 @@ func Test_migrate_topicstore(t *testing.T) {
 			// Force this for the test.
 			c.Alert.PersistTopics = true
 			s := OpenServer(c)
-			cli := Client(s)
-			_ = cli
+			Client(s)
 			defer s.Close()
 			// Create V1 topic store.
 			TopicStatesDAO, err := alert.NewTopicStateKV(s.AlertService.StorageService.Store(alert.AlertNameSpace))

@@ -79,7 +79,6 @@ type TxOperator interface {
 }
 
 // Common interface for interacting with a simple Key/Value storage
-// Yes, I realize this is a bad name.
 type Interface interface {
 
 	// View creates a new read only transaction and always rolls it back.

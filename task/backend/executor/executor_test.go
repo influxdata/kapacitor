@@ -59,7 +59,7 @@ func taskExecutorSystem(t *testing.T) tes {
 		qs = newFakeQueryService()
 	)
 
-	taskStore := kv.New(storagetest.New(diagService.NewStorageHandler()))
+	taskStore := kv.New(storagetest.New(t, diagService.NewStorageHandler()))
 	require.NoError(t, taskStore.Open())
 	var (
 		tcs         = &taskControlService{TaskControlService: taskStore}

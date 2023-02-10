@@ -32,7 +32,7 @@ func (o *object) UnmarshalBinary(data []byte) error {
 
 func TestIndexedStore_CRUD(t *testing.T) {
 	t.Run("bolt", func(t *testing.T) {
-		db, err := storagetest.NewBolt()
+		db, err := storagetest.NewBolt(t)
 		if err != nil {
 			t.Fatal(err)
 		}
