@@ -115,3 +115,11 @@ func (s *TestStore) BucketEntries(topic string, alertID string) (keys []string, 
 	})
 	return keys, exists, err
 }
+
+func (s *TestStore) CloseBolt() error {
+	return s.db.DB.Close()
+}
+
+func (s *TestStore) Path() string {
+	return s.db.DB.Path()
+}

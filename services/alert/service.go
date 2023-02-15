@@ -60,12 +60,16 @@ type StorageService interface {
 	Register(name string, store storage.StoreActioner)
 	Versions() storage.Versions
 	Diagnostic() storage.Diagnostic
+	Path() string
+	CloseBolt() error
 }
 
 type Service struct {
-	mu            sync.RWMutex
-	disabled      map[string]struct{}
-	specsDAO      HandlerSpecDAO
+	mu       sync.RWMutex
+	disabled map[string]struct{}
+	// Handler store API
+	specsDAO HandlerSpecDAO
+	// V2 topic store
 	topicsStore   storage.Interface
 	PersistTopics bool
 
@@ -182,9 +186,10 @@ func NewService(d Diagnostic, disabled map[string]struct{}, topicBufLen int) *Se
 const (
 	// Public name of the handler specs store.
 	handlerSpecsAPIName = "handler-specs"
-	// The storage namespace for all task data.
+	// The storage namespace V1 topic store and task data.
+	// In V2, still stores handlers
 	AlertNameSpace = "alert_store"
-	// TopicStatesNameSpace - The storage namespace for topic states
+	// TopicStatesNameSpace - The storage namespace for the V2 topic store and nothing else
 	TopicStatesNameSpace = "topic_states_store"
 )
 

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"sync"
@@ -92,6 +93,17 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) CloseBolt() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.boltdb != nil {
+		if err := s.boltdb.Close(); err != nil {
+			return fmt.Errorf("cannot close BoltDB: %w", err)
+		}
+	}
+	return nil
+}
+
 // Return a namespaced store.
 // Calling Store with the same namespace returns the same Store.
 func (s *Service) Store(name string) Interface {
@@ -120,4 +132,8 @@ func (s *Service) Register(name string, store StoreActioner) {
 
 func (s *Service) Diagnostic() Diagnostic {
 	return s.diag
+}
+
+func (s *Service) Path() string {
+	return s.dbpath
 }

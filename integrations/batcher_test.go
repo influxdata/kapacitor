@@ -3851,9 +3851,11 @@ func testBatcherWithOutput(
 }
 
 func checkDeferredErrors(t *testing.T, cleanup func() error) func() {
+	t.Helper()
 	return func() {
+		t.Helper()
 		if err := cleanup(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}
 }
