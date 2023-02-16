@@ -182,6 +182,10 @@ func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 	Err(h.L, msg, err, ctx)
 }
 
+func (h *AlertServiceHandler) Info(msg string, ctx ...keyvalue.T) {
+	Info(h.L, msg, ctx)
+}
+
 // Kapcitor Handler
 
 type KapacitorHandler struct {
@@ -663,6 +667,11 @@ type StorageHandler struct {
 
 func (h *StorageHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
+}
+
+func (h *StorageHandler) Info(msg string, ctx ...keyvalue.T) {
+	fields := logFieldsFromContext(ctx)
+	h.l.Info(msg, fields...)
 }
 
 // TaskStore Handler

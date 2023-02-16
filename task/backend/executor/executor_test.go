@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/influxdata/influxdb/v2/kit/prom"
 	"github.com/influxdata/influxdb/v2/kit/prom/promtest"
 	tracetest "github.com/influxdata/influxdb/v2/kit/tracing/testing"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/kapacitor/task/backend"
 	"github.com/influxdata/kapacitor/task/backend/scheduler"
@@ -26,6 +28,13 @@ import (
 	"github.com/uber/jaeger-client-go"
 	"go.uber.org/zap/zaptest"
 )
+
+var diagService *diagnostic.Service
+
+func init() {
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
+	diagService.Open()
+}
 
 func TestMain(m *testing.M) {
 	var code int
@@ -50,7 +59,7 @@ func taskExecutorSystem(t *testing.T) tes {
 		qs = newFakeQueryService()
 	)
 
-	taskStore := kv.New(storagetest.New())
+	taskStore := kv.New(storagetest.New(t, diagService.NewStorageHandler()))
 	require.NoError(t, taskStore.Open())
 	var (
 		tcs         = &taskControlService{TaskControlService: taskStore}

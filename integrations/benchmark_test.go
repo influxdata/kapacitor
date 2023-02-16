@@ -187,7 +187,7 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	for i := 0; i < b.N; i++ {
 		// Do not time setup
 		b.StopTimer()
-		tm, err := createTaskMaster("testStreamer")
+		tm, _, err := createTaskMaster(b, "testStreamer", false)
 		if err != nil {
 			b.Fatal(err)
 		}

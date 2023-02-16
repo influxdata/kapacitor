@@ -37,6 +37,7 @@ The commands are:
     config               display the default configuration
     run                  run node with existing configuration
     version              displays the Kapacitor version
+    downgrade            reverts a topic store format upgrade
 
 "run" is the default command.
 

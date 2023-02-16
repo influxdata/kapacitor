@@ -48,6 +48,7 @@ func (s *Topics) Close() error {
 	return nil
 }
 
+// Topic returns the topic with the given id, and if it exists or not
 func (s *Topics) Topic(id string) (*Topic, bool) {
 	s.mu.RLock()
 	t, ok := s.topics[id]
@@ -55,24 +56,29 @@ func (s *Topics) Topic(id string) (*Topic, bool) {
 	return t, ok
 }
 
-func (s *Topics) RestoreTopic(id string, eventStates map[string]EventState) {
+func (s *Topics) RestoreTopicNoCopy(topic string, eventStates map[string]*EventState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	t, ok := s.topics[id]
-	if !ok {
-		t = s.newTopic(id)
-		s.topics[id] = t
-	}
-	t.restoreEventStates(eventStates)
+	t := s.ensureTopic(topic)
+	t.restoreEventStatesNoCopy(eventStates)
 }
 
-func (s *Topics) UpdateEvent(id string, event EventState) {
+func (s *Topics) ensureTopic(topic string) *Topic {
+	t, ok := s.topics[topic]
+	if !ok {
+		t = s.newTopic(topic)
+		s.topics[topic] = t
+	}
+	return t
+}
+
+func (s *Topics) UpdateEvent(topicID string, event EventState) {
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	t, ok := s.topics[id]
+	t, ok := s.topics[topicID]
 	if !ok {
-		t = s.newTopic(id)
-		s.topics[id] = t
+		s.topics[topicID] = s.newTopic(topicID)
 	}
 	t.updateEvent(event)
 }
@@ -104,7 +110,6 @@ func (s *Topics) Collect(event Event) error {
 		}
 		s.mu.Unlock()
 	}
-
 	return topic.collect(event)
 }
 
@@ -266,16 +271,14 @@ func (t *Topic) removeHandler(h Handler) {
 	}
 }
 
-func (t *Topic) restoreEventStates(eventStates map[string]EventState) {
+func (t *Topic) restoreEventStatesNoCopy(eventStates map[string]*EventState) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.events = make(map[string]*EventState, len(eventStates))
 	t.sorted = make([]*EventState, 0, len(eventStates))
 	for id, state := range eventStates {
-		e := new(EventState)
-		*e = state
-		t.events[id] = e
-		t.sorted = append(t.sorted, e)
+		t.events[id] = state
+		t.sorted = append(t.sorted, state)
 	}
 	sort.Sort(sortedStates(t.sorted))
 }
@@ -315,16 +318,19 @@ func (t *Topic) close() {
 }
 
 func (t *Topic) collect(event Event) error {
+
 	prev, ok := t.updateEvent(event.State)
 	if ok {
 		event.previousState = prev
 	}
 
 	t.collected.Add(1)
+
 	return t.handleEvent(event)
 }
 
 func (t *Topic) handleEvent(event Event) error {
+
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -374,6 +380,7 @@ func (t *Topic) updateEvent(state EventState) (EventState, bool) {
 
 type sortedStates []*EventState
 
+// TODO(docmerlin): replaced sortedStates with a heap or something similar
 func (e sortedStates) Len() int          { return len(e) }
 func (e sortedStates) Swap(i int, j int) { e[i], e[j] = e[j], e[i] }
 func (e sortedStates) Less(i int, j int) bool {

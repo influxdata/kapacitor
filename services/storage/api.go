@@ -24,7 +24,7 @@ const (
 )
 
 type APIServer struct {
-	Registrar StoreActionerRegistrar
+	Registrar *StoreActionerRegistrar
 	DB        *bolt.DB
 	routes    []httpd.Route
 	diag      Diagnostic

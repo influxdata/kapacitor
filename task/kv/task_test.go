@@ -2,11 +2,13 @@ package kv_test
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/benbjohnson/clock"
 	"github.com/google/go-cmp/cmp"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/kapacitor/task/kv"
 	"github.com/influxdata/kapacitor/task/options"
@@ -16,11 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var diagService *diagnostic.Service
+
+func init() {
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), io.Discard, io.Discard)
+	diagService.Open()
+}
+
 func TestKvTaskService(t *testing.T) {
 	servicetest.TestTaskService(
 		t,
 		func(t *testing.T) (*servicetest.System, context.CancelFunc) {
-			service := kv.New(storagetest.New())
+			service := kv.New(storagetest.New(t, diagService.NewStorageHandler()))
 			service.Open()
 			ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -55,7 +64,7 @@ func newService(t *testing.T, ctx context.Context, c clock.Clock) *testService {
 		c = clock.New()
 	}
 
-	service := kv.New(storagetest.New(), kv.WithClock(c))
+	service := kv.New(storagetest.New(t, diagService.NewStorageHandler()), kv.WithClock(c))
 	service.Open()
 
 	return &testService{

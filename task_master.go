@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -267,6 +268,8 @@ type TaskMaster struct {
 	drained bool
 	mu      sync.RWMutex
 	wg      sync.WaitGroup
+
+	TestCloser io.Closer
 }
 
 func (tm *TaskMaster) WritePointsPrivileged(ctx tsdb.WriteContext, database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
@@ -294,6 +297,9 @@ func NewTaskMaster(id string, info vars.Infoer, d Diagnostic) *TaskMaster {
 
 		closed:        true,
 		TimingService: noOpTimingService{},
+
+		// Any cleanup/close function for test purposes. Not to be used in production
+		TestCloser: nil,
 	}
 }
 
@@ -332,6 +338,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TeamsService = tm.TeamsService
 	n.ServiceNowService = tm.ServiceNowService
 	n.ZenossService = tm.ZenossService
+	n.TestCloser = tm.TestCloser
 	return n
 }
 
@@ -382,6 +389,9 @@ func (tm *TaskMaster) Close() error {
 		_ = tm.stopTask(et.Task.ID)
 	}
 	tm.diag.TaskMasterClosed()
+	if tm.TestCloser != nil {
+		return tm.TestCloser.Close()
+	}
 	return nil
 }
 

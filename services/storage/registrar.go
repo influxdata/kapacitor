@@ -8,24 +8,18 @@ type StoreActioner interface {
 	Rebuild() error
 }
 
-type StoreActionerRegistrar interface {
-	List() []string
-	Register(name string, store StoreActioner)
-	Get(name string) (StoreActioner, bool)
-}
-
-func NewStorageResitrar() StoreActionerRegistrar {
-	return &storeActionerRegistrar{
+func NewStorageRegistrar() *StoreActionerRegistrar {
+	return &StoreActionerRegistrar{
 		stores: make(map[string]StoreActioner),
 	}
 }
 
-type storeActionerRegistrar struct {
+type StoreActionerRegistrar struct {
 	mu     sync.RWMutex
 	stores map[string]StoreActioner
 }
 
-func (sr *storeActionerRegistrar) List() []string {
+func (sr *StoreActionerRegistrar) List() []string {
 	sr.mu.RLock()
 	defer sr.mu.RUnlock()
 	list := make([]string, 0, len(sr.stores))
@@ -35,13 +29,13 @@ func (sr *storeActionerRegistrar) List() []string {
 	return list
 }
 
-func (sr *storeActionerRegistrar) Register(name string, store StoreActioner) {
+func (sr *StoreActionerRegistrar) Register(name string, store StoreActioner) {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()
 	sr.stores[name] = store
 }
 
-func (sr *storeActionerRegistrar) Get(name string) (store StoreActioner, ok bool) {
+func (sr *StoreActionerRegistrar) Get(name string) (store StoreActioner, ok bool) {
 	sr.mu.RLock()
 	defer sr.mu.RUnlock()
 	store, ok = sr.stores[name]

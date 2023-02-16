@@ -1,10 +1,12 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"sync"
 
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
@@ -12,6 +14,7 @@ import (
 
 type Diagnostic interface {
 	Error(msg string, err error)
+	Info(msg string, ctx ...keyvalue.T)
 }
 
 type Service struct {
@@ -21,7 +24,7 @@ type Service struct {
 	stores map[string]Interface
 	mu     sync.Mutex
 
-	registrar StoreActionerRegistrar
+	registrar *StoreActionerRegistrar
 	apiServer *APIServer
 
 	versions Versions
@@ -59,7 +62,7 @@ func (s *Service) Open() error {
 	}
 	s.boltdb = db
 
-	s.registrar = NewStorageResitrar()
+	s.registrar = NewStorageRegistrar()
 	s.apiServer = &APIServer{
 		DB:           s.boltdb,
 		Registrar:    s.registrar,
@@ -90,6 +93,17 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) CloseBolt() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.boltdb != nil {
+		if err := s.boltdb.Close(); err != nil {
+			return fmt.Errorf("cannot close BoltDB: %w", err)
+		}
+	}
+	return nil
+}
+
 // Return a namespaced store.
 // Calling Store with the same namespace returns the same Store.
 func (s *Service) Store(name string) Interface {
@@ -102,7 +116,7 @@ func (s *Service) store(name string) Interface {
 	if store, ok := s.stores[name]; ok {
 		return store
 	} else {
-		store = NewBolt(s.boltdb, name)
+		store = NewBolt(s.boltdb, []byte(name))
 		s.stores[name] = store
 		return store
 	}
@@ -114,4 +128,12 @@ func (s *Service) Versions() Versions {
 
 func (s *Service) Register(name string, store StoreActioner) {
 	s.registrar.Register(name, store)
+}
+
+func (s *Service) Diagnostic() Diagnostic {
+	return s.diag
+}
+
+func (s *Service) Path() string {
+	return s.dbpath
 }

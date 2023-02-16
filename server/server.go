@@ -1135,7 +1135,6 @@ func (s *Server) startServices() error {
 			return fmt.Errorf("open service %T: %s", service, err)
 		}
 		s.Diag.Debug("opened service", keyvalue.KV("service", fmt.Sprintf("%T", service)))
-
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
 		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides && s.config.ConfigOverride.Enabled {
 			// Apply initial config updates

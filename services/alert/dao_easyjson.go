@@ -168,29 +168,50 @@ func easyjson7be57abeEncodeGithubComInfluxdataKapacitorServicesAlert1(out *jwrit
 	out.RawByte('{')
 	first := true
 	_ = first
-	{
+	if in.Message != "" {
 		const prefix string = ",\"message\":"
+		first = false
 		out.RawString(prefix[1:])
 		out.String(string(in.Message))
 	}
-	{
+	if in.Details != "" {
 		const prefix string = ",\"details\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.String(string(in.Details))
 	}
-	{
+	if true {
 		const prefix string = ",\"time\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Raw((in.Time).MarshalJSON())
 	}
-	{
+	if in.Duration != 0 {
 		const prefix string = ",\"duration\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Int64(int64(in.Duration))
 	}
 	{
 		const prefix string = ",\"level\":"
-		out.RawString(prefix)
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.RawText((in.Level).MarshalText())
 	}
 	out.RawByte('}')
