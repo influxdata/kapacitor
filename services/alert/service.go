@@ -558,16 +558,18 @@ func (s *Service) restoreTopic(topic string) error {
 	err := s.topicsStore.View(func(tx storage.ReadOnlyTx) error {
 		q, err := tx.Bucket([]byte(topic)).List("")
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot open database bucket for topic %q: %w", topic, err)
 		}
 		eventStates := make(map[string]*alert.EventState, len(q))
-		lex := jlexer.Lexer{}
 		es := &EventState{} //create a buffer to hold the unmarshalled EventState
 		for _, b := range q {
-			lex.Data = b.Value
+			lex := jlexer.Lexer{
+				Data:              b.Value,
+				UseMultipleErrors: false,
+			}
 			es.UnmarshalEasyJSON(&lex)
 			if err := lex.Error(); err != nil {
-				return err
+				return fmt.Errorf("failed to unmarshal event for topic %q: %w", topic, err)
 			}
 			eventStates[b.Key] = es.AlertEventState(b.Key)
 			es.Reset()
