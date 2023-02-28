@@ -52,7 +52,7 @@ require (
 	github.com/zeebo/mwc v0.0.4
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.16.0
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/crypto v0.1.0
 	golang.org/x/tools v0.1.12
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
