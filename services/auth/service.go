@@ -72,7 +72,23 @@ type authCred struct {
 	expires time.Time
 }
 
-func NewService(c Config, d Diagnostic) (*Service, error) {
+type ServiceOption func(*Service) error
+
+func NewService(c Config, d Diagnostic, opts ...interface{}) (*Service, error) {
+	// Separate the opts into meta.ClientOption and ServiceOption
+	var serviceOpts []ServiceOption
+	var metaClientOpts []meta.ClientOption
+	for _, abstractOpt := range opts {
+		switch opt := abstractOpt.(type) {
+		case ServiceOption:
+			serviceOpts = append(serviceOpts, opt)
+		case meta.ClientOption:
+			metaClientOpts = append(metaClientOpts, opt)
+		default:
+			return nil, fmt.Errorf("NewService: unexpected opt type (%T)", opt)
+		}
+	}
+
 	var pmClient *meta.Client
 	if c.MetaAddr != "" {
 		tlsConfig, err := tlsconfig.Create(c.MetaCA, c.MetaCert, c.MetaKey, c.MetaInsecureSkipVerify)
@@ -82,22 +98,33 @@ func NewService(c Config, d Diagnostic) (*Service, error) {
 		pmOpts := []meta.ClientOption{
 			meta.WithTLS(tlsConfig, c.MetaUseTLS, c.MetaInsecureSkipVerify),
 		}
-		if c.MetaUsername != "" {
+		if c.MetaInternalSharedSecret != "" {
+			pmOpts = append(pmOpts, meta.UseAuth(meta.BearerAuth, "", "", c.MetaInternalSharedSecret))
+		} else if c.MetaUsername != "" {
 			pmOpts = append(pmOpts, meta.UseAuth(meta.BasicAuth, c.MetaUsername, c.MetaPassword, ""))
 		}
+		pmOpts = append(pmOpts, metaClientOpts...)
 		//TODO: when the meta client can accept an interface, pass in a logger
 		pmClient = meta.NewClient(c.MetaAddr, pmOpts...)
 	} else {
 		d.Debug("not using meta service for users, no address given")
 	}
 
-	return &Service{
+	srv := &Service{
 		diag:            d,
 		authCache:       make(map[string]authCred),
 		cacheExpiration: time.Duration(c.CacheExpiration),
 		bcryptCost:      c.BcryptCost,
 		pmClient:        pmClient,
-	}, nil
+	}
+
+	for _, opt := range serviceOpts {
+		if err := opt(srv); err != nil {
+			return nil, err
+		}
+	}
+
+	return srv, nil
 }
 
 const userNamespace = "user_store"
