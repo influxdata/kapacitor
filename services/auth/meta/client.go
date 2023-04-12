@@ -119,6 +119,14 @@ var WithTimeout = func(d time.Duration) ClientOption {
 	}
 }
 
+type ClientHTTPOption func(client *http.Client) error
+
+func WithHTTPOption(opt ClientHTTPOption) ClientOption {
+	return func(c *Client) {
+		opt(c.client)
+	}
+}
+
 // NewClient returns a new Client, which will make requests to the Meta
 // node listening on addr. New accepts zero or more functional options
 // for configuring aspects of the returned Client.
