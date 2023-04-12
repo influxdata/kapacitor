@@ -15,17 +15,18 @@ const (
 )
 
 type Config struct {
-	Enabled                bool          `toml:"enabled"`
-	CacheExpiration        toml.Duration `toml:"cache-expiration"`
-	BcryptCost             int           `toml:"bcrypt-cost"`
-	MetaAddr               string        `toml:"meta-addr"`
-	MetaUsername           string        `toml:"meta-username"`
-	MetaPassword           string        `toml:"meta-password"`
-	MetaUseTLS             bool          `toml:"meta-use-tls"`
-	MetaCA                 string        `toml:"meta-ca"`
-	MetaCert               string        `toml:"meta-cert"`
-	MetaKey                string        `toml:"meta-key"`
-	MetaInsecureSkipVerify bool          `toml:"meta-insecure-skip-verify"`
+	Enabled                  bool          `toml:"enabled"`
+	CacheExpiration          toml.Duration `toml:"cache-expiration"`
+	BcryptCost               int           `toml:"bcrypt-cost"`
+	MetaAddr                 string        `toml:"meta-addr"`
+	MetaUsername             string        `toml:"meta-username"`
+	MetaPassword             string        `toml:"meta-password"`
+	MetaInternalSharedSecret string        `toml:"meta-internal-shared-secret"`
+	MetaUseTLS               bool          `toml:"meta-use-tls"`
+	MetaCA                   string        `toml:"meta-ca"`
+	MetaCert                 string        `toml:"meta-cert"`
+	MetaKey                  string        `toml:"meta-key"`
+	MetaInsecureSkipVerify   bool          `toml:"meta-insecure-skip-verify"`
 }
 
 func NewDisabledConfig() Config {
