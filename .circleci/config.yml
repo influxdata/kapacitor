@@ -58,49 +58,12 @@ commands:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
-      - run:
-          name: Import GPG key
-          command: |
-            echo -e "$GPG_1X_PRIVATE_KEY" | gpg --batch --import --
-      - when:
-          condition:
-            and:
-              - << pipeline.git.tag >>
-              - not:
-                  matches:
-                    pattern: "(.*rc[0-9]+)|(.*test)$"
-                    value: << pipeline.git.tag >>
-          steps:
-            - run:
-                name: Import GPG key
-                command: |
-                  echo -e "$GPG_1X_PRIVATE_KEY" | gpg --import --
-            - run:
-                name: Deploy Release Packages
-                command:  |
-                  ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum --sign
-      - when:
-          condition:
-            or:
-              - not: << pipeline.git.tag >>
-              - matches:
-                  pattern: ".*rc[0-9]+$"
-                  value: << pipeline.git.tag >>
-          steps:
-            - run:
-                name: Deploy Release Packages
-                command:  |
-                  ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release --checksum
-      - when:
-          condition:
-            matches:
-              pattern: "^.*test$"
-              value: << pipeline.git.tag >>
-          steps:
-            - run:
-                name: Deploy Non-Release Packages
-                command:  |
-                  ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --sign
+      - run: |
+          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build
       - store_artifacts:
           path: ./build
 
@@ -158,6 +121,29 @@ jobs:
       - install_dependencies
       - deploy_release_packages
 
+  release-sign:
+    circleci_ip_ranges: true
+    docker:
+      - image: quay.io/influxdb/rsign:latest
+        auth:
+          username: $QUAY_RSIGN_USERNAME
+          password: $QUAY_RSIGN_PASSWORD
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - d6:7d:a0:50:12:3c:de:70:1d:7e:ed:d7:37:81:f9:b8
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          find /tmp/workspace/build -type f -exec rsign "{}" \;
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+            - build
+      - store_artifacts:
+          path: /tmp/workspace/build
+
+
   nightly-build:
     executor: cross-builder
     working_directory: ~/kapacitor
@@ -187,9 +173,32 @@ jobs:
           paths:
             - changelog_artifacts
 
+  release-upload:
+    parameters:
+      release_type:
+        type: string
+    docker:
+      - image: ubuntu:latest
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install --yes awscli
+
+          case "<< parameters.release_type >>" in
+            nightly)
+              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/nightlies/ \;
+              ;;
+            release)
+              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/releases/ \;
+              ;;
+          esac
+
   s3-publish-changelog:
     parameters:
-      build_type:
+      release_type:
         type: string
     docker:
       - image: ubuntu:latest
@@ -202,14 +211,13 @@ jobs:
           command: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
-            apt-get install -y awscli
+            apt-get install --yes awscli
 
             pushd /tmp/workspace/changelog_artifacts/
 
-            case "<< parameters.build_type >>"
-            in
+            case "<< parameters.release_type >>" in
               nightly)
-                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/releases/nightly/CHANGELOG.md"
+                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/nightlies/CHANGELOG.md"
                 ;;
               release)
                 aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/releases/CHANGELOG.<< pipeline.git.tag >>.md"
@@ -240,15 +248,24 @@ workflows:
           <<: *any_filter
       - release:
           <<: *release_filter
+      - release-sign:
+          <<: *release_filter
+          requires:
+            - release
+      - release-upload:
+          <<: *release_filter
+          release_type: release
           requires:
             - build
+            - release
+            - release-sign
       - static_code_checks:
           <<: *any_filter
       - changelog:
           <<: *any_filter
       - s3-publish-changelog:
           <<: *release_filter
-          build_type: release
+          release_type: release
           requires:
             - changelog
   nightly:
@@ -263,6 +280,6 @@ workflows:
       - nightly-build
       - changelog
       - s3-publish-changelog:
-          build_type: nightly
+          release_type: nightly
           requires:
             - changelog
