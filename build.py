@@ -541,7 +541,7 @@ def build(version=None,
         if static:
             build_command +="-s "
         if platform == "linux":
-            build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  '
+            build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608,--allow-multiple-definition\"  '
         build_command += '-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
                                                                                                             get_current_branch(),
                                                                                                             get_current_commit())

@@ -1,4 +1,4 @@
-FROM quay.io/influxdb/cross-builder:go1.19.9-7c590f0858eb4ba112f4523c5e67e0ff7ebefcfd
+FROM quay.io/influxdb/cross-builder:go1.20.4-147b512cba0dbd7ea86df9d4e3c288e36c11e05a
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
@@ -42,6 +42,7 @@ RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
 
 # Configure local git
+RUN git config --global --add safe.directory $PROJECT_DIR
 RUN git config --global user.email "support@influxdb.com"
 RUN git config --global user.Name "Docker Builder"
 
