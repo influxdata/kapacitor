@@ -84,7 +84,7 @@ func (s *setter) Set(v int64) {
 func TestSampling(t *testing.T) {
 	sr := 0.1
 	size := 10000
-	rand.Seed(0)
+	rand.New(rand.NewSource(0))
 
 	s := &setter{}
 	tmr := New(sr, size, s).(*timer)
