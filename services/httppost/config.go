@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -70,7 +70,7 @@ func (c Config) Validate() error {
 		return errors.New("must specify only one of alert-template and alert-template-file")
 	}
 
-	if c.AlertTemplateFile != "" && !path.IsAbs(c.AlertTemplateFile) {
+	if c.AlertTemplateFile != "" && !filepath.IsAbs(c.AlertTemplateFile) {
 		return errors.New("must use an absolute path for alert-template-file")
 	}
 
@@ -78,7 +78,7 @@ func (c Config) Validate() error {
 		return errors.New("must specify only one of row-template and row-template-file")
 	}
 
-	if c.RowTemplateFile != "" && !path.IsAbs(c.RowTemplateFile) {
+	if c.RowTemplateFile != "" && !filepath.IsAbs(c.RowTemplateFile) {
 		return errors.New("must use an absolute path for row-template-file")
 	}
 
