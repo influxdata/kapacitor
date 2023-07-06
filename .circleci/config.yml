@@ -135,7 +135,12 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          find /tmp/workspace/build -type f -exec rsign "{}" \;
+          find /tmp/workspace/build -type f -exec rsign '{}' \; -exec sh -c '
+            # Since all artifacts are present, sign them here. This saves Circle
+            # credits over spinning up another instance just to separate out the
+            # checksum job.
+            sha256sum "{}" >> "/tmp/workspace/build/kapacitor.${CIRCLE_TAG}.digests"
+          ' \;
       - persist_to_workspace:
           root: /tmp/workspace
           paths:
