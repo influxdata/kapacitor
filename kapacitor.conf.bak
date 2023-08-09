@@ -1,0 +1,365 @@
+hostname = "b1eb7ec67dc0"
+data_dir = "/root/.kapacitor"
+skip-config-overrides = false
+default-retention-policy = ""
+
+[alert]
+  persist-topics = true
+  topic-buffer-length = 5000
+
+[auth]
+  enabled = false
+  cache-expiration = "0s"
+  bcrypt-cost = 0
+  meta-addr = ""
+  meta-username = ""
+  meta-password = ""
+  meta-internal-shared-secret = ""
+  meta-use-tls = false
+  meta-ca = ""
+  meta-cert = ""
+  meta-key = ""
+  meta-insecure-skip-verify = false
+
+[http]
+  bind-address = ":9092"
+  auth-enabled = false
+  log-enabled = true
+  write-tracing = false
+  pprof-enabled = false
+  https-enabled = false
+  https-certificate = "/etc/ssl/kapacitor.pem"
+  https-private-key = ""
+  shutdown-timeout = "10s"
+  shared-secret = ""
+
+[replay]
+  dir = "/root/.kapacitor/replay"
+
+[storage]
+  boltdb = "/root/.kapacitor/kapacitor.db"
+
+[task]
+  dir = "/root/.kapacitor/tasks"
+  snapshot-interval = "1m0s"
+
+[fluxtask]
+  enabled = false
+  task-run-influxdb = ""
+  task-run-bucket = "kapacitor_fluxtask_logs"
+  task-run-org = ""
+  task-run-orgid = ""
+  task-run-measurement = "runs"
+  default-influxdb = ""
+
+[load]
+  enabled = false
+  dir = "/root/.kapacitor/load"
+
+[[influxdb]]
+  enabled = true
+  name = "default"
+  default = false
+  urls = ["http://localhost:8086"]
+  username = ""
+  password = ""
+  token = ""
+  http-shared-secret = false
+  ssl-ca = ""
+  ssl-cert = ""
+  ssl-key = ""
+  insecure-skip-verify = false
+  timeout = "0s"
+  disable-subscriptions = false
+  subscription-protocol = "http"
+  subscription-mode = "cluster"
+  kapacitor-hostname = ""
+  http-port = 0
+  udp-bind = ""
+  udp-buffer = 1000
+  udp-read-buffer = 0
+  startup-timeout = "5m0s"
+  subscriptions-sync-interval = "1m0s"
+  subscription-path = ""
+  compression = "gzip"
+  [influxdb.excluded-subscriptions]
+    _kapacitor = ["autogen"]
+
+[logging]
+  file = "STDERR"
+  level = "DEBUG"
+
+[config-override]
+  enabled = true
+
+[tls]
+  min-version = ""
+  max-version = ""
+
+[collectd]
+  enabled = false
+  bind-address = ":25826"
+  database = "collectd"
+  retention-policy = ""
+  batch-size = 5000
+  batch-pending = 10
+  batch-timeout = "10s"
+  read-buffer = 0
+  typesdb = "/usr/share/collectd/types.db"
+  security-level = "none"
+  auth-file = "/etc/collectd/auth_file"
+  parse-multivalue-plugin = "split"
+
+[opentsdb]
+  enabled = false
+  bind-address = ":4242"
+  database = "opentsdb"
+  retention-policy = ""
+  consistency-level = "one"
+  tls-enabled = false
+  certificate = "/etc/ssl/influxdb.pem"
+  batch-size = 1000
+  batch-pending = 5
+  batch-timeout = "1s"
+  log-point-errors = true
+
+[alerta]
+  enabled = false
+  url = ""
+  insecure-skip-verify = false
+  token = ""
+  token-prefix = ""
+  environment = ""
+  origin = ""
+  timeout = "0s"
+
+[bigpanda]
+  enabled = false
+  global = false
+  app-key = ""
+  token = ""
+  state-changes-only = false
+  insecure-skip-verify = false
+  url = "https://api.bigpanda.io/data/v2/alerts"
+  auto-attributes = "tags,fields"
+
+[[discord]]
+  enabled = false
+  default = true
+  workspace = ""
+  url = ""
+  timestamp = false
+  username = ""
+  avatar-url = ""
+  embed-title = ""
+  global = false
+  state-changes-only = false
+  ssl-ca = ""
+  ssl-cert = ""
+  ssl-key = ""
+  insecure-skip-verify = false
+
+[hipchat]
+  enabled = false
+  url = ""
+  token = ""
+  room = ""
+  global = false
+  state-changes-only = false
+
+[[kafka]]
+  enabled = false
+  id = "default"
+  timeout = "0s"
+  batch-size = 0
+  batch-timeout = "0s"
+  use-ssl = false
+  ssl-ca = ""
+  ssl-cert = ""
+  ssl-key = ""
+  insecure-skip-verify = false
+  sasl-username = ""
+  sasl-password = ""
+  sasl-mechanism = ""
+  sasl-gssapi-service-name = ""
+  sasl-gssapi-auth-type = ""
+  sasl-gssapi-disable-pafxfast = false
+  sasl-gssapi-kerberos-config-path = ""
+  sasl-gssapi-key-tab-path = ""
+  sasl-gssapi-realm = ""
+  sasl-access-token = ""
+
+[[mqtt]]
+  enabled = false
+  name = "default"
+  default = false
+  url = ""
+  ssl-ca = ""
+  ssl-cert = ""
+  ssl-key = ""
+  insecure-skip-verify = false
+  client-id = ""
+  username = ""
+  password = ""
+
+[opsgenie]
+  enabled = false
+  api-key = ""
+  url = "https://api.opsgenie.com/v1/json/alert"
+  recovery_url = "https://api.opsgenie.com/v1/json/alert/note"
+  global = false
+
+[opsgenie2]
+  enabled = false
+  api-key = ""
+  url = "https://api.opsgenie.com/v2/alerts"
+  recovery_action = "notes"
+  global = false
+  details = false
+
+[pagerduty]
+  enabled = false
+  url = "https://events.pagerduty.com/generic/2010-04-15/create_event.json"
+  service-key = ""
+  global = false
+
+[pagerduty2]
+  enabled = false
+  url = "https://events.pagerduty.com/v2/enqueue"
+  routing-key = ""
+  global = false
+
+[pushover]
+  enabled = false
+  token = ""
+  user-key = ""
+  url = "https://api.pushover.net/1/messages.json"
+
+[[httppost]]
+  endpoint = "example"
+  url = "http://example.com"
+  alert-template = ""
+  alert-template-file = ""
+  row-template = ""
+  row-template-file = ""
+  [httppost.basic-auth]
+    username = ""
+    password = ""
+
+[smtp]
+  enabled = false
+  host = "localhost"
+  port = 25
+  username = ""
+  password = ""
+  no-verify = false
+  global = false
+  state-changes-only = false
+  from = ""
+  idle-timeout = "30s"
+
+[snmptrap]
+  enabled = false
+  addr = "localhost:162"
+  community = "kapacitor"
+  retries = 1
+
+[sensu]
+  enabled = false
+  addr = ""
+  source = "Kapacitor"
+
+[servicenow]
+  enabled = false
+  url = "https://instance.service-now.com/api/global/em/jsonv2"
+  source = ""
+  username = ""
+  password = ""
+  global = false
+  state-changes-only = false
+
+[[slack]]
+  enabled = false
+  default = true
+  workspace = ""
+  url = ""
+  token = ""
+  channel = ""
+  username = "kapacitor"
+  icon-emoji = ""
+  global = false
+  state-changes-only = false
+  ssl-ca = ""
+  ssl-cert = ""
+  ssl-key = ""
+  insecure-skip-verify = false
+
+[talk]
+  enabled = false
+  url = ""
+  author_name = ""
+
+[teams]
+  enabled = false
+  channel-url = ""
+  global = false
+  state-changes-only = false
+
+[telegram]
+  enabled = false
+  url = "https://api.telegram.org/bot"
+  token = ""
+  chat-id = ""
+  parse-mode = ""
+  disable-web-page-preview = false
+  disable-notification = false
+  global = false
+  state-changes-only = false
+
+[victorops]
+  enabled = false
+  api-key = ""
+  routing-key = ""
+  url = "https://alert.victorops.com/integrations/generic/20131114/alert"
+  global = false
+  json-data = false
+
+[zenoss]
+  enabled = false
+  url = "https://tenant.zenoss.io:8080/zport/dmd/evconsole_router"
+  username = ""
+  password = ""
+  action = "EventsRouter"
+  method = "add_event"
+  type = "rpc"
+  tid = 1
+  collector = "Kapacitor"
+  global = false
+  state-changes-only = false
+  [zenoss.severity-map]
+    OK = "Clear"
+    Info = "Info"
+    Warning = "Warning"
+    Critical = "Critical"
+
+[reporting]
+  enabled = true
+  url = "https://usage.influxdata.com"
+
+[stats]
+  enabled = true
+  stats-interval = "10s"
+  database = "_kapacitor"
+  retention-policy = "autogen"
+  timing-sample-rate = 0.1
+  timing-movavg-size = 1000
+
+[udf]
+
+[deadman]
+  interval = "10s"
+  threshold = 0.0
+  id = "{{ .Group }}:NODE_NAME for task '{{ .TaskName }}'"
+  message = "{{ .ID }} is {{ if eq .Level \"OK\" }}alive{{ else }}dead{{ end }}: {{ index .Fields \"emitted\" | printf \"%0.3f\" }} points/INTERVAL."
+  global = false
+

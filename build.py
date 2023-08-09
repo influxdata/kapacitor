@@ -26,6 +26,10 @@ INSTALL_ROOT_DIR = "/usr/bin"
 LOG_DIR = "/var/log/kapacitor"
 DATA_DIR = "/var/lib/kapacitor"
 SCRIPT_DIR = "/usr/lib/kapacitor/scripts"
+LIB_DIR="/usr/local/lib"
+LIB64_DIR="/usr/local/lib64"
+DEF_LIB_DIR="/usr/lib"
+FLUX_DIR="/usr/local/bin"
 
 INIT_SCRIPT = "scripts/init.sh"
 SYSTEMD_SCRIPT = "scripts/kapacitor.service"
@@ -78,6 +82,10 @@ fpm_common_args = "-f -s dir --log error \
                          LOG_DIR[1:],
                          DATA_DIR[1:],
                          SCRIPT_DIR[1:],
+                         LIB_DIR[1:],
+                         LIB64_DIR[1:],
+                         DEF_LIB_DIR[1:],
+                         os.path.dirname(DEF_LIB_DIR[1:]),
                          os.path.dirname(SCRIPT_DIR[1:]),
                          os.path.dirname(DEFAULT_CONFIG),
                     ]),
@@ -93,7 +101,7 @@ targets = {
 
 supported_builds = {
     'darwin': [ "amd64" ],
-    'linux': [ "arm64", "amd64" ],
+    'linux': [ "arm64", "amd64","loongarch64" ],
     'windows': [ "amd64" ]
 }
 
@@ -132,6 +140,10 @@ def create_package_fs(build_root):
     os.makedirs(os.path.join(build_root, LOG_DIR[1:]))
     os.makedirs(os.path.join(build_root, DATA_DIR[1:]))
     os.makedirs(os.path.join(build_root, SCRIPT_DIR[1:]))
+    os.makedirs(os.path.join(build_root, FLUX_DIR[1:]))
+    #os.makedirs(os.path.join(build_root, DEF_LIB_DIR[1:]))
+    os.makedirs(os.path.join(build_root, LIB_DIR[1:]))
+    os.makedirs(os.path.join(build_root, LIB64_DIR[1:]))
     os.makedirs(os.path.join(build_root, os.path.dirname(DEFAULT_CONFIG)))
     os.makedirs(os.path.join(build_root, os.path.dirname(LOGROTATE_CONFIG)))
     os.makedirs(os.path.join(build_root, os.path.dirname(BASH_COMPLETION_SH)))
@@ -377,6 +389,8 @@ def get_system_arch():
         arch = "amd64"
     elif arch == "aarch64":
         arch = "arm64"
+    elif arch == "loongarch64":
+        arch = "loongarch64"
     elif 'arm' in arch:
         # Prevent uname from reporting full ARM arch (eg 'armv7l')
         arch = "arm64"
@@ -488,70 +502,70 @@ def build(version=None,
         logging.info("Using build tags: {}".format(','.join(tags)))
 
     logging.info("Sending build output to: {}".format(outdir))
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    elif clean and outdir != '/' and outdir != ".":
-        logging.info("Cleaning build directory '{}' before building.".format(outdir))
-        shutil.rmtree(outdir)
-        os.makedirs(outdir)
+    #if not os.path.exists(outdir):
+    #    os.makedirs(outdir)
+    #elif clean and outdir != '/' and outdir != ".":
+    #    logging.info("Cleaning build directory '{}' before building.".format(outdir))
+    #    shutil.rmtree(outdir)
+    #    os.makedirs(outdir)
 
     logging.info("Using version '{}' for build.".format(version))
 
-    tmp_build_dir = create_temp_dir()
-    for target, path in targets.items():
-        logging.info("Building target: {}".format(target))
-        build_command = ". /root/.cargo/env && "
+    #tmp_build_dir = create_temp_dir()
+    #for target, path in targets.items():
+    #logging.info("Building target: {}".format(target))
+    #    build_command = ". /root/.cargo/env && "
 
-        build_command += "CGO_ENABLED=1 "
+    #    build_command += "CGO_ENABLED=1 "
 
         # Handle variations in architecture output
-        fullarch = arch
-        if  arch == "aarch64" or arch == "arm64":
-            arch = "arm64"
-
-        if platform == "linux":
-            if arch == "amd64":
-                tags += ["netgo", "osusergo", "static_build"]
-            if arch == "arm64":
-                cc = "/musl/aarch64/bin/musl-gcc"
-                tags += ["netgo", "osusergo", "static_build", "noasm"]
-        elif platform == "darwin" and arch == "amd64":
-            cc = "x86_64-apple-darwin18-clang"
-            tags += [ "netgo", "osusergo"]
-        elif  platform == "windows" and arch == "amd64":
-            cc = "x86_64-w64-mingw32-gcc"
-        build_command += "CC={} GOOS={} GOARCH={} ".format(cc, platform, arch)
-
-        if "arm" in fullarch:
-            if  fullarch != "arm64":
-                logging.error("Invalid ARM architecture specified: {} only arm64 is supported".format(arch))
-                return False
-        if platform == 'windows':
-            target = target + '.exe'
-            build_command += "go build -buildmode=exe -o {} ".format(os.path.join(outdir, target))
-        else:
-            build_command += "go build -o {} ".format(os.path.join(outdir, target))
-        if race:
-            build_command += "-race "
-        if len(tags) > 0:
-            build_command += "-tags \"{}\" ".format(' '.join(tags))
+    #    fullarch = arch
+    #    if  arch == "aarch64" or arch == "arm64":
+    #        arch = "arm64"
+    #    elif arch == "loongarch64":
+    #        arch = "loong64" 
+    #    if platform == "linux":
+    #        if arch == "amd64":
+    #            tags += ["netgo", "osusergo", "static_build"]
+    #        if arch == "arm64":
+    #            cc = "/musl/aarch64/bin/musl-gcc"
+    #            tags += ["netgo", "osusergo", "static_build", "noasm"]
+    #    elif platform == "darwin" and arch == "amd64":
+    #        cc = "x86_64-apple-darwin18-clang"
+    #        tags += [ "netgo", "osusergo"]
+    #    elif  platform == "windows" and arch == "amd64":
+    #        cc = "x86_64-w64-mingw32-gcc"
+    #    build_command += "CC={} GOOS={} GOARCH={} ".format(cc, platform, arch)
+#
+    #    if "arm" in fullarch:
+    #        if  fullarch != "arm64":
+    #            logging.error("Invalid ARM architecture specified: {} only arm64 is supported".format(arch))
+    #           return False
+    #   if platform == 'windows':
+    #        target = target + '.exe'
+    #       build_command += "go build -buildmode=exe -o {} ".format(os.path.join(outdir, target))
+    #    else:
+    #        build_command += "go build -o {} ".format(os.path.join(outdir, target))
+    #    if race:
+    #        build_command += "-race "
+    #    if len(tags) > 0:
+    #        build_command += "-tags \"{}\" ".format(' '.join(tags))
 
             # Starting with Go 1.5, the linker flag arguments changed to 'name=value' from 'name value'
-        build_command += "-ldflags=\""
-        if static:
-            build_command +="-s "
-        if platform == "linux":
-            build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  '
-        build_command += '-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
-                                                                                                            get_current_branch(),
-                                                                                                            get_current_commit())
-        if static:
-            build_command += "-a -installsuffix cgo "
-        build_command += path
-        start_time = datetime.utcnow()
-        run(build_command, shell=True)
-        end_time = datetime.utcnow()
-        logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
+    #   build_command += "-ldflags=\""
+    #   if static:
+    #        build_command +="-s "
+    #    if platform == "linux":
+    #        build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608\"  '
+    #    build_command += '-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
+    #get_current_branch(),get_current_commit())
+    #    if static:
+    #        build_command += "-a -installsuffix cgo "
+    #    build_command += path
+    start_time = datetime.utcnow()
+    #    run(build_command, shell=True)
+    end_time = datetime.utcnow()
+    logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
     return True
 
 def generate_sha256_from_file(path):
@@ -583,23 +597,26 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
     outfiles = []
     tmp_build_dir = create_temp_dir()
     logging.debug("Packaging for build output: {}".format(build_output))
+    logging.info("当前仍在打包阶段!".format(pkg_name))
     logging.info("Using temporary directory: {}".format(tmp_build_dir))
     try:
         for platform in build_output:
             # Create top-level folder displaying which platform (linux, etc)
             os.makedirs(os.path.join(tmp_build_dir, platform))
             for arch in build_output[platform]:
+                #logging.debug("进入595行".format(pkg_name))
                 logging.info("Creating packages for {}/{}".format(platform, arch))
                 # Create second-level directory displaying the architecture (amd64, etc)
                 current_location = build_output[platform][arch]
-
+                logging.info("给出当前安装的位置 {}".format(current_location))
+                #logging.debug("进入595行".format(current_location))
                 # Create directory tree to mimic file system of package
                 build_root = os.path.join(tmp_build_dir,
                                           platform,
                                           arch,
                                           '{}-{}-{}'.format(PACKAGE_NAME, version, iteration))
                 os.makedirs(build_root)
-
+                logging.info("built_root={}".format(build_root))
                 # Copy packaging scripts to build directory
                 if platform == "windows" or static or "static_" in arch:
                     # For windows and static builds, just copy
@@ -609,7 +626,7 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                 else:
                     create_package_fs(build_root)
                     package_scripts(build_root)
-
+                
                 for binary in targets:
                     # Copy newly-built binaries to packaging directory
                     if platform == 'windows':
@@ -624,7 +641,26 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                         fr = os.path.join(current_location, binary)
                         # Where the binary should go in the package filesystem
                         to = os.path.join(build_root, INSTALL_ROOT_DIR[1:], binary)
+                        logging.info("fr={} to= {}".format(fr,to))
                     shutil.copy(fr, to)
+                #将依赖软件fluxc的二进制复制
+                #fr = os.path.join("/",FLUX_DIR[1:], "fluxc")
+                #to = os.path.join(build_root, FLUX_DIR[1:], "fluxc")
+                #logging.info("fr={},to= {}".format(fr,to))
+                #shutil.copy(fr, to)
+                #将依赖库文件libflux.so复制
+                fr = os.path.join("/",LIB_DIR[1:], "libflux.so")
+                to = os.path.join(build_root, DEF_LIB_DIR[1:], "libflux.so")
+                #to = os.path.join(build_root, LIB_DIR[1:], "libflux.so")
+                logging.info("fr={},to= {}".format(fr,to))
+                shutil.copy(fr, to)
+                
+                to = os.path.join(build_root, LIB_DIR[1:], "libflux.so")
+                logging.info("fr={},to= {}".format(fr,to))
+                shutil.copy(fr, to)
+                
+                to = os.path.join(build_root, LIB64_DIR[1:], "libflux.so")
+                shutil.copy(fr, to)
 
                 for package_type in supported_packages[platform]:
                     # Package the directory structure for each package type for the platform
@@ -672,6 +708,7 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                                                             platform,
                                                             package_arch)
                         current_location = os.path.join(os.getcwd(), current_location)
+                        #logging.info("dabaolujing=".format(package_build_root))
                         if package_type == 'tar':
                             tar_command = "cd {} && tar -cvzf {}.tar.gz --owner=root --group=root ./*".format(package_build_root, name)
                             run(tar_command, shell=True)
@@ -697,7 +734,8 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                             package_build_root,
                             current_location)
                         if package_type == "rpm":
-                            fpm_command += "--depends coreutils --depends shadow-utils --rpm-posttrans {}".format(POSTINST_SCRIPT)
+                            fpm_command += " --depends coreutils --depends shadow-utils --rpm-posttrans {}".format(POSTINST_SCRIPT)
+                            #fpm_command += " --rpm-posttrans {}".format(POSTINST_SCRIPT)
                         out = run(fpm_command, shell=True)
                         matches = re.search(':path=>"(.*)"', out)
                         outfile = None
@@ -720,7 +758,7 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
 
 def main(args):
     global PACKAGE_NAME
-
+    #logging.info("标记727行")
     if args.release and args.nightly:
         logging.error("Cannot be both a nightly and a release.")
         return 1
@@ -785,13 +823,14 @@ def main(args):
 
     for platform in platforms:
         build_output.update( { platform : {} } )
+        logging.info("Packaging for build output: {}".format(build_output))
         archs = []
         if args.arch == "all":
             single_build = False
             archs = supported_builds.get(platform)
         else:
             archs = [args.arch]
-
+        #logging.info("还执行到这里才停止")
         for arch in archs:
             od = args.outdir
             if not single_build:
@@ -807,12 +846,15 @@ def main(args):
                          static=args.static):
                 return 1
             build_output.get(platform).update( { arch : od } )
-
+    logging.info("Packaging for build output: {}".format(build_output))
+    #build_output=os.path.join(os.getcwd(), "build")
     # Build packages
     if args.package:
         if not check_path_for("fpm"):
+            logging.info("what?")
             logging.error("FPM ruby gem required for packaging. Stopping.")
             return 1
+        logging.info("packages")
         packages = package(build_output,
                            args.name,
                            args.version,
@@ -820,7 +862,7 @@ def main(args):
                            iteration=args.iteration,
                            static=args.static,
                            release=args.release)
-
+        logging.info("执行完毕！")
         if args.package_udfs:
             packages += package_udfs(args.version, args.outdir)
 
@@ -869,7 +911,7 @@ if __name__ == '__main__':
     log_format = '[%(levelname)s] %(funcName)s: %(message)s'
     logging.basicConfig(level=LOG_LEVEL,
                         format=log_format)
-
+    #logging.info("定位876line")
     parser = argparse.ArgumentParser(description='InfluxDB build and packaging script.')
     parser.add_argument('--verbose','-v','--debug',
                         action='store_true',
@@ -885,15 +927,17 @@ if __name__ == '__main__':
                         type=str,
                         help='Name to use for package name (when package is specified)')
     parser.add_argument('--arch',
-                        metavar='<amd64|arm64|all>',
+                        metavar='<amd64|arm64|loongarch64|all>',
                         type=str,
                         default=get_system_arch(),
                         help='Target architecture for build output')
+    #logging.info(get_system_arch())
     parser.add_argument('--platform',
                         metavar='<linux|darwin|windows|all>',
                         type=str,
                         default=get_system_platform(),
                         help='Target platform for build output')
+    #logging.info(get_system_platform())
     parser.add_argument('--branch',
                         metavar='<branch>',
                         type=str,
@@ -988,4 +1032,5 @@ if __name__ == '__main__':
                         help='Timeout for tests before failing')
     args = parser.parse_args()
     print_banner()
+    #package("",pkg_name="kapacitor-1.6.6", version="1.6.6")
     sys.exit(main(args))

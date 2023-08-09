@@ -1,6 +1,8 @@
 #!/bin/bash
 
 DATA_DIR=/var/lib/kapacitor
+echo "export LD_LIBRARY_PATH=/usr/lib" >> /etc/profile
+source /etc/profile
 
 # create user
 if ! id kapacitor >/dev/null 2>&1; then

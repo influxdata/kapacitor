@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run the build utility via Docker
 
-set -e
+set -eux
 
 # Make sure our working dir is the dir of the script
 DIR=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
@@ -22,7 +22,9 @@ echo "Running build.py"
 docker run \
     --rm \
     -v "$DIR:/kapacitor" \
-    -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
-    -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
-    $imagename \
-    "$@"
+     $imagename \
+     "$@"
+    #-e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+    #-e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+    # $imagename \
+    # "$@"

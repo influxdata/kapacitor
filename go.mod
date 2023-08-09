@@ -21,6 +21,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
+	github.com/h2non/gock v1.2.0
 	github.com/influxdata/cron v0.0.0-20201006132531-4bb0a200dcbe
 	github.com/influxdata/flux v0.171.0
 	github.com/influxdata/httprouter v1.3.1-0.20191122104820-ee83e2772f69
@@ -45,12 +46,12 @@ require (
 	github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.1
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
 	github.com/zeebo/mwc v0.0.4
-	go.etcd.io/bbolt v1.3.5
+	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/tools v0.1.11-0.20220513221640-090b14e8501f
@@ -143,7 +144,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/googleapis/gnostic v0.4.1 // indirect
 	github.com/gophercloud/gophercloud v0.17.0 // indirect
-	github.com/h2non/gock v1.2.0 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/consul/api v1.8.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
@@ -232,7 +232,7 @@ require (
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
