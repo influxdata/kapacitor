@@ -59,7 +59,10 @@ commands:
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
       - run: |
-          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum
+          export CIRCLE_TAG=v1.7.0-rc7
+          export CIRCLE_BRANCH=master
+          git checkout v1.7.0-rc7
+          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --release --version "${CIRCLE_TAG}" --checksum
       - persist_to_workspace:
           root: .
           paths:
@@ -192,14 +195,14 @@ jobs:
           apt-get update
           apt-get install --yes awscli
 
-          case "<< parameters.release_type >>" in
-            nightly)
-              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/nightlies/ \;
-              ;;
-            release)
-              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/releases/ \;
-              ;;
-          esac
+          #case "<< parameters.release_type >>" in
+          #  nightly)
+          #    find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/nightlies/ \;
+          #    ;;
+          #  release)
+          #    find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/releases/ \;
+          #    ;;
+          #esac
 
   s3-publish-changelog:
     parameters:
@@ -251,14 +254,14 @@ workflows:
     jobs:
       - build:
           <<: *any_filter
-      - release:
-          <<: *release_filter
+      - release
+          #<<: *release_filter
       - release-sign:
-          <<: *release_filter
+          #<<: *release_filter
           requires:
             - release
       - release-upload:
-          <<: *release_filter
+          #<<: *release_filter
           release_type: release
           requires:
             - build
