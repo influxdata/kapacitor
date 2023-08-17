@@ -155,7 +155,7 @@ func MigrateTopicStoreV2V1(storageService StorageService) error {
 		return err
 	}
 	if err = storageService.Versions().Set(TopicStoreVersionKey, ""); err != nil {
-		return fmt.Errorf("cannot clear topic store version after upgrade: %w", err)
+		return fmt.Errorf("cannot clear topic store version after downgrade: %w", err)
 	}
 	storageService.Diagnostic().Info("Topic Store downgraded")
 	return nil
