@@ -26,7 +26,7 @@ func (s *Service) MigrateTopicStoreV1V2() (rErr error) {
 		return fmt.Errorf("cannot determine topic store version: %w", err)
 	}
 	if version == TopicStoreVersion2 {
-		s.diag.Info(fmt.Sprintf("Topic Store is already version %s. Cannot upgrade.", TopicStoreVersion2))
+		s.diag.Info(fmt.Sprintf("Topic Store is version %s. Skipping upgrade.", TopicStoreVersion2))
 		return nil
 	}
 
@@ -155,9 +155,9 @@ func MigrateTopicStoreV2V1(storageService StorageService) error {
 		return err
 	}
 	if err = storageService.Versions().Set(TopicStoreVersionKey, ""); err != nil {
-		return fmt.Errorf("cannot set topic store version to %s after upgrade: %w", TopicStoreVersion2, err)
+		return fmt.Errorf("cannot clear topic store version after downgrade: %w", err)
 	}
-	storageService.Diagnostic().Info("Topic Store upgraded", keyvalue.T{Key: "version", Value: TopicStoreVersion2})
+	storageService.Diagnostic().Info("Topic Store downgraded")
 	return nil
 }
 
