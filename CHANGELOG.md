@@ -1,4 +1,22 @@
-CHANGELOG for Kapacitor master commit 4f8a995be494bbca09af981f01ae985e23e98087
+CHANGELOG for Kapacitor master commit 8436c1c3ea022f1102eddab75231df3664f6baf6
+
+## v1.7.0 [2023-08-18]
+----------------------
+
+### Features
+
+1. [dbcc77e3](https://github.com/influxdata/kapacitor/commit/dbcc77e3) Rewrite topic store for incremental update
+
+## v1.6.6 [2023-04-12]
+----------------------
+
+### Features
+
+1. [025c7067](https://github.com/influxdata/kapacitor/commit/025c7067) Add JWT meta API authentication
+
+#### Bug Fixes
+
+1. [3bfeb14a](https://github.com/influxdata/kapacitor/commit/3bfeb14a) Support InfluxDB 1.9.6 and OpenTSB by implementing WritePointsPrivileged
 
 ## v1.6.5 [2021-07-12]
 ----------------------
