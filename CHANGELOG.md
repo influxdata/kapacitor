@@ -7,7 +7,7 @@ CHANGELOG for Kapacitor master commit 8436c1c3ea022f1102eddab75231df3664f6baf6
 
 1. [dbcc77e3](https://github.com/influxdata/kapacitor/commit/dbcc77e3) Rewrite topic store for incremental update
 
-## 1.6.6 [2023-04-12]
+## v1.6.6 [2023-04-12]
 ----------------------
 
 ### Features
