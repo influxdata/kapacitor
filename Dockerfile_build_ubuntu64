@@ -1,4 +1,4 @@
-FROM quay.io/influxdb/cross-builder:go1.20.4-147b512cba0dbd7ea86df9d4e3c288e36c11e05a
+FROM quay.io/influxdb/cross-builder:go1.20.10-latest
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
