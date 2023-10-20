@@ -1,4 +1,12 @@
-CHANGELOG for Kapacitor master commit 8436c1c3ea022f1102eddab75231df3664f6baf6
+CHANGELOG for Kapacitor master commit 957d384bcb7c9dde63409477e202e614323ecbf3
+
+## v1.7.1 [2022-10-20]
+----------------------
+
+### Bug Fixes
+
+1. [2784](https://github.com/influxdata/kapacitor/pull/2784): Security fix (CVE-2023-44487: HTTP/2 Rapid Reset attack)
+1. [2783](https://github.com/influxdata/kapacitor/pull/2783): Security fix (CVE-2023-44487: HTTP/2 Rapid Reset attack)
 
 ## v1.7.0 [2023-08-18]
 ----------------------
