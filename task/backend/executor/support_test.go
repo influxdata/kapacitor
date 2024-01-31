@@ -26,7 +26,7 @@ type fakeQueryService struct {
 }
 
 func makeAST(q string) lang.ASTCompiler {
-	pkg, err := runtime.ParseToJSON(q)
+	pkg, err := runtime.ParseToJSON(context.TODO(), q)
 	if err != nil {
 		panic(err)
 	}
