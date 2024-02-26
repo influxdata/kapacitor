@@ -1,4 +1,13 @@
-CHANGELOG for Kapacitor master commit 957d384bcb7c9dde63409477e202e614323ecbf3
+CHANGELOG for Kapacitor master commit 3dab6b40afe3dc336b7029e0194f1731d30a100a
+
+## v1.7.2 [2024-02-26]
+----------------------
+
+### Other
+
+1. [2787](https://github.com/influxdata/kapacitor/pull/2787): Upgrade google.golang.org/grpc from 1.44.0 to 1.56.3
+1. [2788](https://github.com/influxdata/kapacitor/pull/2788): Upgrade github.com/docker/docker to 24.0.7
+1. [2795](https://github.com/influxdata/kapacitor/pull/2795): Upgrade Go to 1.20.13
 
 ## v1.7.1 [2023-10-20]
 ----------------------
