@@ -5,11 +5,9 @@ CHANGELOG for Kapacitor master commit 3dab6b40afe3dc336b7029e0194f1731d30a100a
 
 ### Other
 
-1. [776043d](https://github.com/influxdata/kapacitor/commit/776043d): Build(deps): bump github.com/docker/docker
-1. [aa657cf](https://github.com/influxdata/kapacitor/commit/aa657cf): Chore(build): upgrade Go to 1.20.11
-1. [761ced2](https://github.com/influxdata/kapacitor/commit/761ced2): Build(deps): bump google.golang.org/grpc from 1.44.0 to 1.56.3
-1. [1ff6a2a](https://github.com/influxdata/kapacitor/commit/1ff6a2a): Chore(build): upgrade Go to 1.20.13
-1. [3dab6b4](https://github.com/influxdata/kapacitor/commit/3dab6b4): Build(ci): use compatible dependencies with Ruby v
+1. [2787](https://github.com/influxdata/kapacitor/pull/2787): Upgrade google.golang.org/grpc from 1.44.0 to 1.56.3
+1. [2788](https://github.com/influxdata/kapacitor/pull/2788): Upgrade github.com/docker/docker to 24.0.7
+1. [2795](https://github.com/influxdata/kapacitor/pull/2795): Upgrade Go to 1.20.13
 
 ## v1.7.1 [2023-10-20]
 ----------------------
