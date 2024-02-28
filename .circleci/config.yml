@@ -63,7 +63,7 @@ commands:
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
       - run: |
-          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG}"
+          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG#v}"
       - persist_to_workspace:
           root: .
           paths:
