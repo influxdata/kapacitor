@@ -60,10 +60,14 @@ commands:
             rm -rf protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
   deploy_release_packages:
     description:  >
-      This will build and publish release packages for tag "$CIRCLE_TAG"
+      This will build and publish release packages for tag v1.7.2
     steps:
       - run: |
-          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG}"
+          git checkout v1.7.2
+          export CIRCLE_SHA1=78802f57a96f8223f93a46cb82e8f1ec9c3ada4a
+          export CIRCLE_BRANCH=master
+          export CIRCLE_TAG=v1.7.2
+          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "1.7.2"
       - persist_to_workspace:
           root: .
           paths:
@@ -143,7 +147,7 @@ jobs:
             # Since all artifacts are present, sign them here. This saves Circle
             # credits over spinning up another instance just to separate out the
             # checksum job.
-            sha256sum "{}" >> "/tmp/workspace/build/kapacitor.${CIRCLE_TAG}.digests"
+            sha256sum "{}" >> "/tmp/workspace/build/kapacitor.v1.7.2.digests"
           ' \;
       - persist_to_workspace:
           root: /tmp/workspace
@@ -256,13 +260,16 @@ workflows:
       - build:
           <<: *any_filter
       - release:
-          <<: *release_filter
+          <<: *any_filter
+          #<<: *release_filter
       - release-sign:
-          <<: *release_filter
+          <<: *any_filter
+          #<<: *release_filter
           requires:
             - release
       - release-upload:
-          <<: *release_filter
+          <<: *any_filter
+          #<<: *release_filter
           release_type: release
           requires:
             - build
