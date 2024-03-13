@@ -55,7 +55,7 @@ require (
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/tools v0.6.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	honnef.co/go/tools v0.4.3
 )
