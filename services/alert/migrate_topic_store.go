@@ -70,6 +70,12 @@ func (s *Service) MigrateTopicStoreV1V2() (rErr error) {
 					if err != nil {
 						return fmt.Errorf("error converting event %q in topic %q to JSON: %w", id, ts.Topic, err)
 					}
+					if id == "" {
+						s.diag.Info("event with empty ID not migrated",
+							keyvalue.T{Key: "topic", Value: ts.Topic},
+							keyvalue.T{Key: "event", Value: string(data)})
+						continue
+					}
 					if err = txBucket.Put(id, data); err != nil {
 						return fmt.Errorf("cannot store event %q in topic %q: %w", id, ts.Topic, err)
 					}
