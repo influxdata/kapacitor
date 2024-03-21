@@ -9,6 +9,7 @@ function check_changes () {
   if [ -n "$changes" ] ; then
     echo $1
     echo "$changes"
+    git diff
     exit 1
   fi
 }
