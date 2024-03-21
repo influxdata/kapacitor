@@ -1,4 +1,16 @@
-CHANGELOG for Kapacitor master commit 3dab6b40afe3dc336b7029e0194f1731d30a100a
+CHANGELOG for Kapacitor master commit dcbf27b7ddbc29a6e457d1428cf6b960e50e8859
+
+## v1.7.3 [2024-03-22]
+----------------------
+
+### Bug Fixes
+
+1. [2803](https://github.com/influxdata/kapacitor/pull/2803): Do not migrate events with empty ID
+
+### Other
+
+1. [2804](https://github.com/influxdata/kapacitor/pull/2804): Upgrade Go to 1.21.8
+1. [2799](https://github.com/influxdata/kapacitor/pull/2799): Remove "v" prefix from package version
 
 ## v1.7.2 [2024-02-26]
 ----------------------
