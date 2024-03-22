@@ -1,4 +1,18 @@
-CHANGELOG for Kapacitor master commit 3dab6b40afe3dc336b7029e0194f1731d30a100a
+CHANGELOG for Kapacitor master commit b42ba36255672f703d3b53b7af18da57ada15ee8
+
+## v1.7.3 [2024-03-22]
+----------------------
+
+### Bug Fixes
+
+1. [2803](https://github.com/influxdata/kapacitor/pull/2803): Do not migrate events with empty ID
+
+### Other
+
+1. [2804](https://github.com/influxdata/kapacitor/pull/2804): Upgrade Go to 1.21.8
+1. [2799](https://github.com/influxdata/kapacitor/pull/2799): Remove "v" prefix from package version
+1. [2805](https://github.com/influxdata/kapacitor/pull/2805): Upgrade github.com/docker/docker from 24.0.7 to 24.0.9
+1. [2801](https://github.com/influxdata/kapacitor/pull/2801): Upgrade google.golang.org/protobuf from 1.30.0 to 1.33.0
 
 ## v1.7.2 [2024-02-26]
 ----------------------
