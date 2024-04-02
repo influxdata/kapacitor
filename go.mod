@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/BurntSushi/toml v1.2.1
 	github.com/Shopify/sarama v1.34.0
-	github.com/aws/aws-sdk-go v1.38.3
+	github.com/aws/aws-sdk-go v1.51.12
 	github.com/benbjohnson/clock v1.1.0
 	github.com/benbjohnson/tmpl v1.0.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
