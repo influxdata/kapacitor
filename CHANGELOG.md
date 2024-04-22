@@ -5,7 +5,7 @@ CHANGELOG for Kapacitor master commit 8e2395d251fa1d1322fc546315762177501a28db
 
 ### Other
 
-1. [2806](https://github.com/influxdata/kapacitor/pull/2806): Add SECURITY.md
+1. [2808](https://github.com/influxdata/kapacitor/pull/2808): Add SECURITY.md
 1. [2810](https://github.com/influxdata/kapacitor/pull/2810): Upgrade aws-sdk-go to 1.51.12
 1. [2812](https://github.com/influxdata/kapacitor/pull/2812): Upgrade Go to 1.21.9
 1. [2813](https://github.com/influxdata/kapacitor/pull/2813): Upgrade golang.org/x/net from 0.17.0 to 0.23.0
