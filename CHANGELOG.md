@@ -1,4 +1,14 @@
-CHANGELOG for Kapacitor master commit b42ba36255672f703d3b53b7af18da57ada15ee8
+CHANGELOG for Kapacitor master commit 8e2395d251fa1d1322fc546315762177501a28db
+
+## v1.7.4 [2024-04-22]
+----------------------
+
+### Other
+
+1. [2808](https://github.com/influxdata/kapacitor/pull/2808): Add SECURITY.md
+1. [2810](https://github.com/influxdata/kapacitor/pull/2810): Upgrade aws-sdk-go to 1.51.12
+1. [2812](https://github.com/influxdata/kapacitor/pull/2812): Upgrade Go to 1.21.9
+1. [2813](https://github.com/influxdata/kapacitor/pull/2813): Upgrade golang.org/x/net from 0.17.0 to 0.23.0
 
 ## v1.7.3 [2024-03-22]
 ----------------------
