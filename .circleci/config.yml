@@ -51,13 +51,13 @@ commands:
             gem install fpm
 
             # Protobuf
-            wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
-            tar -xf protobuf-python-${PROTO_VERSION}.tar.gz --no-same-owner
-            cd protobuf-${PROTO_VERSION}/python
+            wget -q https://github.com/protocolbuffers/protobuf/releases/download/v${PROTO_VERSION}/protobuf-${PROTO_VERSION}.tar.gz
+            tar -xf protobuf-${PROTO_VERSION}.tar.gz --no-same-owner
+            cd protobuf-${PROTO_VERSION}/python/protobuf_distutils
             python2 setup.py install
             python3 setup.py install
-            cd ../../
-            rm -rf protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
+            cd ../../../
+            rm -rf /protobuf-${PROTO_VERSION} protobuf-${PROTO_VERSION}.tar.gz
   deploy_release_packages:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
