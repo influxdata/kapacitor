@@ -37,7 +37,7 @@ HOME_DIR=/root
 # GOPATH
 GOPATH=/go
 # PROTO VERSION
-PROTO_VERSION=3.18.3
+PROTO_VERSION=5.26.1
 
 no_uncomitted_arg="$no_uncommitted_arg"
 if [ ! $NO_UNCOMMITTED ]

@@ -19,23 +19,24 @@ RUN apt-get -qq update && apt-get -qq install -y \
     python3 \
     python3-setuptools \
     python3-boto \
+    python3-dev \
     autoconf \
     automake \
     libtool
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
+RUN gem install dotenv -v 2.8.1
 RUN gem install fpm
 
-# Install protobuf3 python library
+# Install protobuf5 python library
 # NOTE: PROTO_VERSION env var is inherited from the cross-builder image.
-RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
-    && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
-    && cd protobuf-${PROTO_VERSION}/python \
-    && python2 setup.py install \
+RUN wget -q https://pypi.io/packages/source/p/protobuf/protobuf-5.${PROTO_VERSION}.tar.gz \
+    && tar -xf protobuf-5.${PROTO_VERSION}.tar.gz \
+    && cd protobuf-5.${PROTO_VERSION} \
     && python3 setup.py install \
-    && cd ../../ \
-    && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
+    && cd ../ \
+    && rm -rf /protobuf-5.${PROTO_VERSION} protobuf-${PROTO_VERSION}.tar.gz
 
 ENV PROJECT_DIR /kapacitor
 RUN mkdir -p $PROJECT_DIR

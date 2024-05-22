@@ -13,7 +13,7 @@ BUILD_NUM=${BUILD_NUM-$RANDOM}
 HOME_DIR=/root
 
 imagename=kapacitor-builder-img-$BUILD_NUM
-PROTO_VERSION=3.18.3
+PROTO_VERSION=5.26.1
 
 # Build new docker image
 docker build -f Dockerfile_build_ubuntu64 --build-arg PROTO_VERSION=$PROTO_VERSION -t $imagename $DIR
