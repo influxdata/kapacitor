@@ -1,34 +1,12 @@
-FROM quay.io/influxdb/cross-builder:go1.21.9-latest
+FROM quay.io/influxdb/builder:kapacitor-20240527
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
 
 MAINTAINER support@influxdb.com
 
-RUN apt-get -qq update && apt-get -qq install -y \
-    software-properties-common \
-    unzip \
-    mercurial \
-    make \
-    ruby \
-    ruby-dev \
-    rpm \
-    zip \
-    python \
-    python-setuptools \
-    python3 \
-    python3-setuptools \
-    python3-boto \
-    autoconf \
-    automake \
-    libtool
-
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
-
-RUN gem install fpm
-
 # Install protobuf3 python library
-# NOTE: PROTO_VERSION env var is inherited from the cross-builder image.
+# NOTE: PROTO_VERSION env var is inherited from the parent builder image.
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
     && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
     && cd protobuf-${PROTO_VERSION}/python \

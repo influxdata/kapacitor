@@ -1,0 +1,116 @@
+FROM ubuntu:20.04
+
+# This builder image is base image for building Kapacitor binaries.
+# It is used by the CI/CD pipeline to use same version of Go, Protobuf and other dependencies.
+
+MAINTAINER support@influxdb.com
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update && apt-get -qq install -y \
+    software-properties-common \
+    unzip \
+    mercurial \
+    make \
+    ruby \
+    ruby-dev \
+    rpm \
+    zip \
+    python \
+    python-setuptools \
+    python3 \
+    python3-setuptools \
+    python3-boto \
+    autoconf \
+    automake \
+    libtool \
+    wget \
+    git \
+    pkg-config
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+
+# Remove `gem install dotenv -v 2.8.1` once the base image will support Ruby v3.
+RUN gem install dotenv -v 2.8.1
+RUN gem install fpm
+
+#
+# Install go
+#
+ENV GOPATH /root/go
+ENV GO_VERSION 1.21.10
+ENV GO_ARCH amd64
+ENV GO111MODULES ON
+RUN wget https://golang.org/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
+    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
+    rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+ENV PATH /usr/local/go/bin:$PATH
+ENV PATH $GOPATH/bin:$PATH
+
+#
+# Install Rust
+#
+# flux is on this version: https://github.com/influxdata/flux/blob/ac7d2b9c028485368447a42b9965b3e14e30c7aa/.circleci/config.yml#L90
+ENV RUST_LATEST_VERSION=1.63.0
+# For security, we specify a particular rustup version and a SHA256 hash, computed
+# ourselves and hardcoded here. When updating `RUSTUP_LATEST_VERSION`:
+#   1. Download the new rustup script from https://github.com/rust-lang/rustup/releases.
+#   2. Audit the script and changes to it. You might want to grep for strange URLs...
+#   3. Update `OUR_RUSTUP_SHA` with the result of running `sha256sum rustup-init.sh`.
+ENV RUSTUP_LATEST_VERSION=1.25.1
+ENV OUR_RUSTUP_SHA="173f4881e2de99ba9ad1acb59e65be01b2a44979d83b6ec648d0d22f8654cbce"
+# Download rustup script
+RUN wget https://raw.githubusercontent.com/rust-lang/rustup/${RUSTUP_LATEST_VERSION}/rustup-init.sh
+# Verify checksum of rustup script. Exit with error if check fails.
+RUN echo "${OUR_RUSTUP_SHA} rustup-init.sh" | sha256sum --check -- \
+    || { echo "Checksum problem!"; exit 1; }
+# Run rustup
+RUN sh rustup-init.sh --default-toolchain "$RUST_LATEST_VERSION" -y
+# Ensure cargo is runnable
+RUN . $HOME/.cargo/env && cargo help
+RUN . $HOME/.cargo/env && rustup target add \
+        aarch64-unknown-linux-musl \
+        x86_64-apple-darwin \
+        x86_64-pc-windows-gnu \
+        x86_64-unknown-linux-musl
+ENV PATH=/root/.cargo/bin:${PATH}
+
+#
+# Install protobuf3 runtime and protoc binary
+#
+# NOTE: PROTO_VERSION env var can be overridden to install a different version
+ARG PROTO_VERSION=3.17.3
+ENV PROTO_VERSION=${PROTO_VERSION}
+ENV PROTO_BUILD_TIME=2021100120071633118879
+RUN PROTO_ARCHIVE=protoc-${PROTO_VERSION}-${PROTO_BUILD_TIME}.tar.gz && \
+    wget https://edge-xcc-archives.s3-us-west-2.amazonaws.com/${PROTO_ARCHIVE} && \
+    tar xzf ${PROTO_ARCHIVE} -C /usr && \
+    rm ${PROTO_ARCHIVE}
+
+# Make sure we have the newer version of pkg-config that works with windows,
+# and install go-junit-report for unit tests
+RUN go install github.com/jstemmer/go-junit-report@v0.9.1
+RUN go install github.com/influxdata/pkg-config@v0.2.11
+
+# Install some necessary Go programs for formatting and generation checks
+# Update these env variables to update the tooling versions
+#ENV PROTOC_GEN_GO_VER=v1.27.1
+#ENV TMPL_VER=v1.0.0
+#ENV EASYJSON_VER=v0.7.7
+#ENV STRINGER_VER=latest
+#ENV GOIMPORTS_VER=latest
+#RUN #go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VER} && \
+#    go install github.com/benbjohnson/tmpl@${TMPL_VER} && \
+#    go install github.com/mailru/easyjson/easyjson@${EASYJSON_VER} && \
+#    go install golang.org/x/tools/cmd/stringer@${STRINGER_VER} && \
+#    go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VER}
+
+#ENV PROJECT_DIR /kapacitor
+#RUN mkdir -p $PROJECT_DIR
+#WORKDIR $PROJECT_DIR
+
+# Configure local git
+#RUN #git config --global --add safe.directory $PROJECT_DIR
+RUN git config --global user.email "support@influxdb.com"
+RUN git config --global user.Name "Docker Builder"
+
