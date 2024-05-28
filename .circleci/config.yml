@@ -4,8 +4,6 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      # NOTE: Remove `gem install dotenv -v 2.8.1` from the `install_dependencies` step once
-      # the builder supports Ruby v3.
       - image: quay.io/influxdb/builder:kapacitor-20240528
     resource_class: large
   linux-amd64:
