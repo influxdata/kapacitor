@@ -35,7 +35,9 @@ RUN gem install dotenv -v 2.8.1
 RUN gem install fpm
 
 #
-# Install go
+# Install GoLang
+#
+# src: https://github.com/influxdata/chronograf/blob/9c4b1aa1a458ed86716985ed93783c35cc6411a7/etc/Dockerfile_build#L35
 #
 ENV GOPATH /root/go
 ENV GO_VERSION 1.21.10
@@ -50,7 +52,8 @@ ENV PATH $GOPATH/bin:$PATH
 #
 # Install Rust
 #
-# flux is on this version: https://github.com/influxdata/flux/blob/ac7d2b9c028485368447a42b9965b3e14e30c7aa/.circleci/config.yml#L90
+# src: https://github.com/influxdata/edge/blob/4677c285014ac27727e5a1ae9bf2c1633afc6ea6/dockerfiles/cross-builder/install-rust.sh#L7
+#
 ENV RUST_LATEST_VERSION=1.63.0
 # For security, we specify a particular rustup version and a SHA256 hash, computed
 # ourselves and hardcoded here. When updating `RUSTUP_LATEST_VERSION`:
@@ -78,6 +81,8 @@ ENV PATH=/root/.cargo/bin:${PATH}
 #
 # Install protobuf3 runtime and protoc binary
 #
+# src: https://github.com/influxdata/edge/blob/cb1343dd74ecba8ec07fe810195530a0b9055aa9/dockerfiles/cross-builder/Dockerfile#L93
+#
 # NOTE: PROTO_VERSION env var can be overridden to install a different version
 ARG PROTO_VERSION=3.17.3
 ENV PROTO_VERSION=${PROTO_VERSION}
@@ -87,30 +92,14 @@ RUN PROTO_ARCHIVE=protoc-${PROTO_VERSION}-${PROTO_BUILD_TIME}.tar.gz && \
     tar xzf ${PROTO_ARCHIVE} -C /usr && \
     rm ${PROTO_ARCHIVE}
 
-# Make sure we have the newer version of pkg-config that works with windows,
-# and install go-junit-report for unit tests
-RUN go install github.com/jstemmer/go-junit-report@v0.9.1
+#
+# Install pkg-config
+#
+# src: https://github.com/influxdata/edge/blob/4677c285014ac27727e5a1ae9bf2c1633afc6ea6/dockerfiles/cross-builder/Dockerfile#L104
+#
 RUN go install github.com/influxdata/pkg-config@v0.2.11
 
-# Install some necessary Go programs for formatting and generation checks
-# Update these env variables to update the tooling versions
-#ENV PROTOC_GEN_GO_VER=v1.27.1
-#ENV TMPL_VER=v1.0.0
-#ENV EASYJSON_VER=v0.7.7
-#ENV STRINGER_VER=latest
-#ENV GOIMPORTS_VER=latest
-#RUN #go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VER} && \
-#    go install github.com/benbjohnson/tmpl@${TMPL_VER} && \
-#    go install github.com/mailru/easyjson/easyjson@${EASYJSON_VER} && \
-#    go install golang.org/x/tools/cmd/stringer@${STRINGER_VER} && \
-#    go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VER}
-
-#ENV PROJECT_DIR /kapacitor
-#RUN mkdir -p $PROJECT_DIR
-#WORKDIR $PROJECT_DIR
-
 # Configure local git
-#RUN #git config --global --add safe.directory $PROJECT_DIR
 RUN git config --global user.email "support@influxdb.com"
 RUN git config --global user.Name "Docker Builder"
 
