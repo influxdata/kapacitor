@@ -1,4 +1,4 @@
-FROM quay.io/influxdb/builder:kapacitor-20240528
+FROM quay.io/influxdb/builder:kapacitor-20240531
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.

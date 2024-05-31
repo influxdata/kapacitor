@@ -54,7 +54,7 @@ ENV PATH $GOPATH/bin:$PATH
 #
 # src: https://github.com/influxdata/edge/blob/4677c285014ac27727e5a1ae9bf2c1633afc6ea6/dockerfiles/cross-builder/install-rust.sh#L7
 #
-ENV RUST_LATEST_VERSION=1.63.0
+ENV RUST_LATEST_VERSION=1.78.0
 # For security, we specify a particular rustup version and a SHA256 hash, computed
 # ourselves and hardcoded here. When updating `RUSTUP_LATEST_VERSION`:
 #   1. Download the new rustup script from https://github.com/rust-lang/rustup/releases.

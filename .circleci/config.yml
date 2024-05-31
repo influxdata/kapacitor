@@ -4,7 +4,7 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/builder:kapacitor-20240528
+      - image: quay.io/influxdb/builder:kapacitor-20240531
     resource_class: large
   linux-amd64:
     machine:
