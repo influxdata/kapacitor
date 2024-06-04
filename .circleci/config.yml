@@ -4,13 +4,7 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      # NOTE: To upgrade the Go version, first push the upgrade to the cross-builder Dockerfile in the edge repo,
-      # then update the version here to match. Until we finish the migration to using the cross-builder image,
-      # you'll also need to update references to `cimg/go` and `GO_VERSION` in this file.
-      #
-      # NOTE 2: Remove `gem install dotenv -v 2.8.1` from the `install_dependencies` step once
-      # the cross-builder supports Ruby v3.
-      - image: quay.io/influxdb/cross-builder:go1.21.9-latest
+      - image: quay.io/influxdb/builder:kapacitor-20240531
     resource_class: large
   linux-amd64:
     machine:
@@ -27,28 +21,6 @@ commands:
           name: Install additional dependencies
           command: |
             set -x
-            # APT packages
-            apt-get -qq update && apt-get -qq install -y \
-                software-properties-common \
-                unzip \
-                mercurial \
-                make \
-                ruby \
-                ruby-dev \
-                rpm \
-                zip \
-                python \
-                python-setuptools \
-                python3 \
-                python3-setuptools \
-                python3-boto \
-                autoconf \
-                automake \
-                libtool
-
-            # Ruby dependencies
-            gem install dotenv -v 2.8.1
-            gem install fpm
 
             # Protobuf
             wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
