@@ -1,4 +1,11 @@
-CHANGELOG for Kapacitor master commit 8e2395d251fa1d1322fc546315762177501a28db
+CHANGELOG for Kapacitor master commit 64e5d1d020157278f40679f4697638dd2797a951
+
+## v1.7.5 [2024-05-04]
+----------------------
+
+### Other
+
+1. [2819](https://github.com/influxdata/kapacitor/pull/2819): Upgrade Go to 1.21.10, use custom builder instead of `cross-builder`
 
 ## v1.7.4 [2024-04-22]
 ----------------------
