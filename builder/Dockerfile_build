@@ -15,6 +15,7 @@ RUN apt-get -qq update && apt-get -qq install -y \
     gcc-aarch64-linux-gnu \
     git \
     libtool \
+    mingw-w64 \
     mercurial \
     make \
     pkg-config \
