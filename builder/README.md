@@ -6,7 +6,7 @@ Our CI/CD pipelines utilize a Docker build image configured with support for GoL
 
 The necessity for a custom builder arises from compatibility issues between the `protobuf` library and Chronograf's Python UDFs. The `cross-builder` was updated to `protobuf` version `26.1` in [PR #669](https://github.com/influxdata/edge/pull/669), introducing breaking changes in the Python protobuf library. Specifically, [protobuf 5.26.1 on PyPI](https://pypi.org/project/protobuf/5.26.1/) does not support Python 2. Consequently, using the newest `cross-builder` would result in the loss of Python v2 support in UDFs.
 
-:warning: **Note:** The custom builder depends on the `MUSL` compiler this. In the current state (`2024-06-11`) the `MUSL` compiler requires Intel hardware to build. This means that the custom builder is not able to __build__ on Apple Silicon hardware.
+:warning: **Note:** The custom builder depends on the `MUSL` compiler. In the current state (`2024-06-11`) the `MUSL` compiler requires Intel processor to build. This means that the custom builder is not able to __build__ on Apple Silicon hardware.
 
 ## Updating Component Versions
 
@@ -14,7 +14,7 @@ To update component versions like GoLang, Rust, and Protobuf, modifications must
 
 ### Rust
 
-The Rust version is defined in the `Dockerfile_build` file. The Rust version should be same as the compile version for `flux` library.
+The Rust version is defined in the `Dockerfile_build` file. The Rust version should be same as the used version for `flux` library.
 
 ### Step 1: Authenticate with Quay.io
 
@@ -36,3 +36,11 @@ cd $KAPACITOR_REPOSITORY_ROOT/builder
 
 1. Update the `cross-builder` tag in `.circleci/config.yml` to the new version.
 2. Update the `quay.io/influxdb/builder` tag in `Dockerfile_build_ubuntu64` to reflect the new version.
+
+### Step 4: Test the New Builder
+
+To test new deployed builder you should run the following command in the root directory to build the `kapacitor`:
+
+```sh
+./build.sh --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum
+```
