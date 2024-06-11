@@ -1,0 +1,21 @@
+This patch was sourced from NVIDIA:
+https://github.com/NVIDIA/enroot/blob/07b2288997a89f0278d049ece3ea3d4323a71abc/deps/musl.patch
+
+index 30492574..7206cb25 100644
+--- a/tools/musl-gcc.specs.sh
++++ b/tools/musl-gcc.specs.sh
+@@ -17,13 +17,13 @@ cat <<EOF
+ libgcc.a%s %:if-exists(libgcc_eh.a%s)
+
+ *startfile:
+-%{!shared: $libdir/Scrt1.o} $libdir/crti.o crtbeginS.o%s
++%{static-pie: $libdir/rcrt1.o} %{!static-pie: %{!shared: $libdir/Scrt1.o}} $libdir/crti.o crtbeginS.o%s
+
+ *endfile:
+ crtendS.o%s $libdir/crtn.o
+
+ *link:
+--dynamic-linker $ldso -nostdlib %{shared:-shared} %{static:-static} %{rdynamic:-export-dynamic}
++%{static-pie:-no-dynamic-linker -static -pie} %{!static-pie:-dynamic-linker $ldso} -nostdlib %{shared:-shared} %{static:-static} %{rdynamic:-export-dynamic}
+
+ *esp_link:
