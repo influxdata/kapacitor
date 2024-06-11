@@ -4,7 +4,7 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/builder:kapacitor-20240531
+      - image: quay.io/influxdb/builder:kapacitor-20240611
     resource_class: large
   linux-amd64:
     machine:
@@ -59,7 +59,7 @@ commands:
       - run:
           name: Deploy Nightly Build
           command:  |
-            ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
+            ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --nightly
 
 jobs:
   build:
@@ -226,6 +226,8 @@ workflows:
   build-and-deploy:
     jobs:
       - build:
+          <<: *any_filter
+      - nightly-build:
           <<: *any_filter
       - release:
           <<: *release_filter

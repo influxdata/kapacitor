@@ -1,0 +1,32 @@
+#!/bin/bash
+set -o errexit \
+    -o nounset \
+    -o pipefail
+
+# ${1} -> platform
+# ${2} -> architecture
+
+case "${1:-}" in
+  linux)
+    case "${2:-}" in
+      x86_64)
+        printf '/musl/x86_64/bin/musl-gcc\n'
+        exit 0
+      ;;
+      aarch64)
+        printf '/musl/aarch64/bin/musl-gcc\n'
+        exit 0
+      ;;
+    esac
+  ;;
+  darwin)
+    printf 'x86_64-apple-darwin18-clang\n'
+    exit 0
+  ;;
+  windows)
+    printf 'x86_64-w64-mingw32-gcc\n'
+    exit 0
+  ;;
+esac
+
+exit 1

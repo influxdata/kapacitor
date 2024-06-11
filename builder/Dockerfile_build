@@ -8,25 +8,28 @@ MAINTAINER support@influxdb.com
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get -qq update && apt-get -qq install -y \
-    software-properties-common \
-    unzip \
+    autoconf \
+    automake \
+    clang \
+    gcc \
+    gcc-aarch64-linux-gnu \
+    git \
+    libtool \
     mercurial \
     make \
-    ruby \
-    ruby-dev \
-    rpm \
-    zip \
+    pkg-config \
     python \
     python-setuptools \
     python3 \
     python3-setuptools \
     python3-boto \
-    autoconf \
-    automake \
-    libtool \
+    ruby \
+    ruby-dev \
+    rpm \
+    software-properties-common \
+    unzip \
     wget \
-    git \
-    pkg-config
+    zip
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
@@ -54,7 +57,7 @@ ENV PATH $GOPATH/bin:$PATH
 #
 # src: https://github.com/influxdata/edge/blob/4677c285014ac27727e5a1ae9bf2c1633afc6ea6/dockerfiles/cross-builder/install-rust.sh#L7
 #
-ENV RUST_LATEST_VERSION=1.78.0
+ENV RUST_LATEST_VERSION=1.63.0
 # For security, we specify a particular rustup version and a SHA256 hash, computed
 # ourselves and hardcoded here. When updating `RUSTUP_LATEST_VERSION`:
 #   1. Download the new rustup script from https://github.com/rust-lang/rustup/releases.
@@ -77,6 +80,52 @@ RUN . $HOME/.cargo/env && rustup target add \
         x86_64-pc-windows-gnu \
         x86_64-unknown-linux-musl
 ENV PATH=/root/.cargo/bin:${PATH}
+
+COPY fs/ /
+
+RUN git clone git://git.musl-libc.org/musl /tmp/musl \
+      --branch v1.2.3 --depth 1
+
+# Enable "-static-pie" Compiler Flag
+RUN patch /tmp/musl/tools/musl-gcc.specs.sh \
+          /usr/local/src/musl-gcc/musl-gcc.specs.sh.patch
+
+# Build MUSL AMD64 Compiler
+RUN cd /tmp/musl                 && \
+    export CC=gcc                && \
+    export AR=ar                 && \
+    export RANLIB=ranlib         && \
+    ./configure                     \
+      --enable-wrapper=gcc          \
+      --prefix=/musl/x86_64         \
+      --target=x86_64-linux-musl && \
+    make -j"$(nprocs)" install   && \
+    make clean
+
+# BUILD MUSL ARM64 Compiler
+RUN cd /tmp/musl                           && \
+    export CC=aarch64-linux-gnu-gcc        && \
+    export AR=aarch64-linux-gnu-ar         && \
+    export RANLIB=aarch64-linux-gnu-ranlib && \
+    ./configure                               \
+      --enable-wrapper=gcc                    \
+      --prefix=/musl/aarch64                  \
+      --target=aarch64-linux-musl          && \
+    make -j"$(nprocs)" install             && \
+    make clean
+
+#
+# Install osxcross
+#
+# src: https://github.com/influxdata/edge/blob/cb1343dd74ecba8ec07fe810195530a0b9055aa9/dockerfiles/cross-builder/Dockerfile#L85
+#
+ENV OSXCROSS_VERSION=5771a847950abefed9a37e2d16ee10e0dd90c641
+ENV OSXCROSS_BUILD_TIME=20220412215428
+RUN OSXCROSS_ARCHIVE=osxcross-${OSXCROSS_VERSION}-${OSXCROSS_BUILD_TIME}.tar.gz && \
+    wget https://edge-xcc-archives.s3-us-west-2.amazonaws.com/${OSXCROSS_ARCHIVE} && \
+    tar xzf ${OSXCROSS_ARCHIVE} -C /usr/local && \
+    rm ${OSXCROSS_ARCHIVE}
+ENV PATH=/usr/local/osxcross/target/bin:${PATH}
 
 #
 # Install protobuf3 runtime and protoc binary
