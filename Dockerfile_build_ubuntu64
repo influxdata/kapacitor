@@ -1,4 +1,4 @@
-FROM quay.io/influxdb/builder:kapacitor-20240611
+FROM quay.io/influxdb/builder:kapacitor-20240806
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
@@ -15,7 +15,7 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
     && cd ../../ \
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
-ENV PROJECT_DIR /kapacitor
+ENV PROJECT_DIR=/kapacitor
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
 
