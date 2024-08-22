@@ -3707,7 +3707,7 @@ func TestServer_BatchTask_Alert(t *testing.T) {
         .id('test-batch-alert')
         .message('{{ .ID }} got: {{ index .Fields "value" }}')
         .crit(lambda: "value" > 40.0)
-		.post('` + as.URL + `')
+        .post('` + as.URL + `')
 `
 
 	task, err := cli.CreateTask(client.CreateTaskOptions{
@@ -3793,6 +3793,9 @@ func TestServer_BatchTask_Alert(t *testing.T) {
 				_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 					Status: client.Disabled,
 				})
+				if err != nil {
+					t.Fatal(err)
+				}
 				run = false
 			}
 		}
