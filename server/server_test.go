@@ -3558,6 +3558,247 @@ func TestServer_InvalidBatchTask(t *testing.T) {
 	}
 }
 
+func TestServer_BatchTask_Alert(t *testing.T) {
+	c := NewConfig(t)
+	c.InfluxDB[0].Enabled = true
+	countQ := 0
+	stopTimeC := make(chan time.Time, 1)
+
+	type response struct {
+		ID      string       `json:"id"`
+		Message string       `json:"message"`
+		Time    time.Time    `json:"time"`
+		Level   string       `json:"level"`
+		Data    query.Result `json:"data"`
+	}
+	type alertInfo struct {
+		Count int
+		Data  response
+	}
+	alertInfoC := make(chan alertInfo, 1)
+	countA := 0
+	as := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		countA++
+		d := json.NewDecoder(r.Body)
+		var rp response
+		err := d.Decode(&rp)
+		if err != nil {
+			t.Error(err)
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			alertInfoC <- alertInfo{Count: countA, Data: rp}
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer as.Close()
+
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		stmt, err := influxql.ParseStatement(q)
+		if err != nil {
+			return &iclient.Response{Err: err.Error()}
+		}
+		slct, ok := stmt.(*influxql.SelectStatement)
+		if !ok {
+			return nil
+		}
+		cond, ok := slct.Condition.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition to be binary expression"}
+		}
+		stopTimeExpr, ok := cond.RHS.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be binary expression"}
+		}
+		stopTL, ok := stopTimeExpr.RHS.(*influxql.StringLiteral)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be string literal"}
+		}
+		countQ++
+		switch countQ {
+		case 1:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []imodels.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+								20.0,
+							},
+						},
+					}},
+				}},
+			}
+		case 2:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []imodels.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+								50.0,
+							},
+						},
+					}},
+				}},
+			}
+		case 3:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []imodels.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+								10.0,
+							},
+						},
+					}},
+				}},
+			}
+		default:
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []imodels.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  [][]interface{}{},
+					}},
+				}},
+			}
+		}
+	})
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testBatchTask_AlertTime"
+	ttype := client.BatchTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(5ms)
+        .every(5ms)
+        .align()
+	|alert()
+        .id('test-batch-alert')
+        .message('{{ .ID }} got: {{ index .Fields "value" }}')
+        .crit(lambda: "value" > 40.0)
+		.post('` + as.URL + `')
+`
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	timeout := time.NewTicker(100 * time.Millisecond)
+	defer timeout.Stop()
+
+	var stopTime time.Time
+	run := true
+	for run {
+		select {
+		case <-timeout.C:
+			t.Fatal("timeout waiting for alert")
+		case stopTime = <-stopTimeC:
+		case alertData := <-alertInfoC:
+			switch alertData.Count {
+			case 1:
+				expTime := stopTime.Add(-2 * time.Millisecond).UTC()
+				exp := response{
+					ID:      "test-batch-alert",
+					Message: "test-batch-alert got: 50",
+					Time:    expTime,
+					Level:   "CRITICAL",
+					Data: query.Result{
+						Series: imodels.Rows{
+							{
+								Name:    "cpu",
+								Columns: []string{"time", "value"},
+								Values: [][]interface{}{
+									{
+										expTime.Format(time.RFC3339Nano),
+										50.0,
+									},
+								},
+							},
+						},
+					},
+				}
+				if !reflect.DeepEqual(exp, alertData.Data) {
+					t.Errorf("unexpected alert data got %v exp %v", alertData.Data, exp)
+				}
+			case 2:
+				expTime := stopTime.UTC()
+				exp := response{
+					ID:      "test-batch-alert",
+					Message: "test-batch-alert got: 10",
+					Time:    expTime,
+					Level:   "OK",
+					Data: query.Result{
+						Series: imodels.Rows{
+							{
+								Name:    "cpu",
+								Columns: []string{"time", "value"},
+								Values: [][]interface{}{
+									{
+										expTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+										10.0,
+									},
+								},
+							},
+						},
+					},
+				}
+				if !reflect.DeepEqual(exp, alertData.Data) {
+					t.Errorf("unexpected alert data got %v exp %v", alertData.Data, exp)
+				}
+				_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+					Status: client.Disabled,
+				})
+				run = false
+			}
+		}
+	}
+}
+
 func TestServer_RecordReplayStream(t *testing.T) {
 	s, cli := OpenDefaultServer(t)
 	defer s.Close()
