@@ -3,7 +3,7 @@ package storagetest
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/storage"
@@ -57,7 +57,7 @@ func (b BoltDB) Close() error {
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(path.Dir(dbPath))
+	return os.RemoveAll(filepath.Dir(dbPath))
 }
 
 func New(t CleanedTest, diagnostic storage.Diagnostic) *TestStore {

@@ -1057,6 +1057,7 @@ func (a *alertState) BufferedBatch(b edge.BufferedBatchMessage) (edge.Message, e
 	if a.n.a.AllFlag || l == alert.OK {
 		t = begin.Time()
 	}
+	t = t.UTC()
 
 	a.addEvent(t, l)
 
