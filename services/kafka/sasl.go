@@ -7,10 +7,11 @@ import (
 )
 
 type SASLAuth struct {
-	SASLUsername  string `toml:"sasl-username" override:"sasl-username"`
-	SASLPassword  string `toml:"sasl-password" override:"sasl-password"`
-	SASLMechanism string `toml:"sasl-mechanism" override:"sasl-mechanism"`
-	SASLVersion   *int   `toml:"sasl-version" override:"sasl-version"`
+	SASLUsername   string            `toml:"sasl-username" override:"sasl-username"`
+	SASLPassword   string            `toml:"sasl-password" override:"sasl-password"`
+	SASLExtensions map[string]string `toml:"sasl_extensions" override:"sasl_extensions"`
+	SASLMechanism  string            `toml:"sasl-mechanism" override:"sasl-mechanism"`
+	SASLVersion    *int              `toml:"sasl-version" override:"sasl-version"`
 
 	// GSSAPI config
 	SASLGSSAPIServiceName        string `toml:"sasl-gssapi-service-name" override:"sasl-gssapi-service-name"`
@@ -76,7 +77,7 @@ func (k *SASLAuth) SetSASLConfig(config *sarama.Config) error {
 func (k *SASLAuth) Token() (*sarama.AccessToken, error) {
 	return &sarama.AccessToken{
 		Token:      k.SASLAccessToken,
-		Extensions: map[string]string{},
+		Extensions: k.SASLExtensions,
 	}, nil
 }
 

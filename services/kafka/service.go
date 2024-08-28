@@ -218,7 +218,7 @@ func configChanged(old, new Config) bool {
 		old.SSLCA != new.SSLCA ||
 		old.SSLCert != new.SSLCert ||
 		old.SSLKey != new.SSLKey ||
-		old.SASLAuth != new.SASLAuth
+		fmt.Sprint(old.SASLAuth) != fmt.Sprint(new.SASLAuth)
 }
 
 func (c *Cluster) clearWriters() {
