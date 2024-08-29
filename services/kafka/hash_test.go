@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 // This tests the nil case of the partitioners to ensure they are randomish.  We aren't testing for cryptografphic

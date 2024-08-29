@@ -3,7 +3,7 @@ package kafka
 import (
 	"errors"
 
-	sarama "github.com/Shopify/sarama"
+	sarama "github.com/IBM/sarama"
 )
 
 type SASLAuth struct {

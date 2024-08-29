@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/kafka/kafkatest"

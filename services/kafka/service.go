@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"text/template"
 
-	kafka "github.com/Shopify/sarama"
+	kafka "github.com/IBM/sarama"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
