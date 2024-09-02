@@ -188,10 +188,7 @@ func (k *SASLAuth) Equals(other *SASLAuth) bool {
 			return false
 		}
 	}
-	if k.SASLOAUTHExpiryMargin != other.SASLOAUTHExpiryMargin {
-		return false
-	}
-	return true
+	return k.SASLOAUTHExpiryMargin == other.SASLOAUTHExpiryMargin
 }
 
 func SASLVersion(kafkaVersion sarama.KafkaVersion, saslVersion *int) (int16, error) {
