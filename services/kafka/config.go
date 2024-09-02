@@ -49,7 +49,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{ID: DefaultID}
+	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: 1 * time.Second}}
 }
 
 func (c Config) Validate() error {
