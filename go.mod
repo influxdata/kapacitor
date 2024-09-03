@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/BurntSushi/toml v1.2.1
-	github.com/IBM/sarama v1.41.3
+	github.com/IBM/sarama v1.40.1
 	github.com/aws/aws-sdk-go v1.51.12
 	github.com/benbjohnson/clock v1.1.0
 	github.com/benbjohnson/tmpl v1.0.0
@@ -46,7 +46,7 @@ require (
 	github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
@@ -119,7 +119,7 @@ require (
 	github.com/dimchansky/utfbom v1.1.0 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/eapache/go-resiliency v1.4.0 // indirect
+	github.com/eapache/go-resiliency v1.6.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/editorconfig-checker/editorconfig-checker v0.0.0-20190819115812-1474bdeaf2a2 // indirect
@@ -186,7 +186,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kevinburke/go-bindata v3.11.0+incompatible // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
+	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
@@ -212,7 +212,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
-	github.com/pierrec/lz4/v4 v4.1.18 // indirect
+	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
