@@ -135,19 +135,21 @@ func (s *Server) run(l net.Listener) {
 func (s *Server) handle(c net.Conn) error {
 	var size int32
 	err := binary.Read(c, binary.BigEndian, &size)
-
 	if err != nil {
 		return err
 	}
+
 	buf := make([]byte, int(size))
-	io.ReadFull(c, buf)
 
+	_, err = io.ReadFull(c, buf)
 	if err != nil {
 		return err
 	}
+
 	// ApiKey indicated the type of request
 	apiKey := int16(binary.BigEndian.Uint16(buf[:2]))
-	// skip apiVersion
+	// Version indicates the protocol version
+	version := int16(binary.BigEndian.Uint16(buf[2:4]))
 	// skip correlation id
 	_, n := readStr(buf[8:]) //ClientID
 	request := buf[8+n:]
@@ -174,6 +176,9 @@ func (s *Server) handle(c net.Conn) error {
 			response = writeInt16(response, 0) // Error Code
 			response = writeInt64(response, r.offset)
 			response = writeInt64(response, 0) //log_append_time_ms
+			if version >= 5 {
+				response = writeInt64(response, 0) // log_start_offset
+			}
 		}
 		response = writeInt32(response, 0) //throttle_time_ms
 
@@ -208,6 +213,10 @@ func (s *Server) handle(c net.Conn) error {
 				response = writeInt32(response, i+1)
 				// Write leader ID
 				response = writeInt32(response, s.nodeID)
+				if version >= 7 {
+					// write Leader Epoch
+					response = writeInt32(response, 0)
+				}
 				// Write 0 len replicas
 				response = writeArrayHeader(response, 0)
 				// Write 0 len Isr
