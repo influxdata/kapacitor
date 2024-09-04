@@ -10,7 +10,9 @@ import (
 	"sync/atomic"
 	"text/template"
 
-	kafka "github.com/Shopify/sarama"
+	"github.com/google/go-cmp/cmp"
+
+	kafka "github.com/IBM/sarama"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
@@ -218,7 +220,7 @@ func configChanged(old, new Config) bool {
 		old.SSLCA != new.SSLCA ||
 		old.SSLCert != new.SSLCert ||
 		old.SSLKey != new.SSLKey ||
-		old.SASLAuth != new.SASLAuth
+		!cmp.Equal(old.SASLAuth, new.SASLAuth)
 }
 
 func (c *Cluster) clearWriters() {

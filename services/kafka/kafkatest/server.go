@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 // Provides an incomplete Kafka Server implementation.

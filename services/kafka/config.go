@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	kafka "github.com/Shopify/sarama"
+	kafka "github.com/IBM/sarama"
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
