@@ -140,10 +140,10 @@ func (k *SASLAuth) SetSASLConfig(config *kafka.Config) error {
 			for k, v := range k.SASLOAUTHParams {
 				cfg.EndpointParams.Add(k, v)
 			}
-			ctx, _ := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
 			src := cfg.TokenSource(ctx)
 			source := oauth2.ReuseTokenSourceWithExpiry(nil, src, k.SASLOAUTHExpiryMargin)
-			config.Net.SASL.TokenProvider = NewRefreshingToken(source, k.SASLExtensions)
+			config.Net.SASL.TokenProvider = NewRefreshingToken(source, cancel, k.SASLExtensions)
 
 		case kafka.SASLTypeGSSAPI:
 			config.Net.SASL.GSSAPI.ServiceName = k.SASLGSSAPIServiceName

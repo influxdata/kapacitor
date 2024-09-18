@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 
-	"github.com/IBM/sarama"
+	kafka "github.com/IBM/sarama"
 	"golang.org/x/oauth2"
 )
 
@@ -18,19 +18,20 @@ type StaticToken struct {
 	extensions map[string]string
 }
 
-func NewRefreshingToken(source oauth2.TokenSource, extensions map[string]string) *RefreshingToken {
+func NewRefreshingToken(source oauth2.TokenSource, cancel context.CancelFunc, extensions map[string]string) *RefreshingToken {
 	return &RefreshingToken{
 		source:     source,
+		cancel:     cancel,
 		extensions: extensions,
 	}
 }
 
-func (k *RefreshingToken) Token() (*sarama.AccessToken, error) {
+func (k *RefreshingToken) Token() (*kafka.AccessToken, error) {
 	token, err := k.source.Token()
 	if err != nil {
 		return nil, err
 	}
-	return &sarama.AccessToken{
+	return &kafka.AccessToken{
 		Token:      token.AccessToken,
 		Extensions: k.extensions,
 	}, nil
@@ -43,8 +44,8 @@ func NewStaticToken(token string, extensions map[string]string) *StaticToken {
 	}
 }
 
-func (k *StaticToken) Token() (*sarama.AccessToken, error) {
-	return &sarama.AccessToken{
+func (k *StaticToken) Token() (*kafka.AccessToken, error) {
+	return &kafka.AccessToken{
 		Token:      k.token,
 		Extensions: k.extensions,
 	}, nil
