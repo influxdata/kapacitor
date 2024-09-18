@@ -49,7 +49,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: 1 * time.Second}}
+	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: 10 * time.Second}}
 }
 
 func (c Config) Validate() error {
@@ -63,7 +63,7 @@ func (c Config) Validate() error {
 	if len(c.Brokers) == 0 {
 		return errors.New("no brokers specified, must provide at least one broker URL")
 	}
-	return nil
+	return c.SASLAuth.Validate()
 }
 
 func (c *Config) ApplyConditionalDefaults() {
@@ -84,7 +84,7 @@ type WriteTarget struct {
 	PartitionAlgorithm string
 }
 
-func (c Config) writerConfig(diagnostic Diagnostic, target WriteTarget) (*kafka.Config, error) {
+func (c Config) writerConfig(target WriteTarget) (*kafka.Config, error) {
 	cfg := kafka.NewConfig()
 
 	if target.Topic == "" {

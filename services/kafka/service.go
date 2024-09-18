@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"text/template"
 
-	"github.com/google/go-cmp/cmp"
-
 	kafka "github.com/IBM/sarama"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
-	metrics "github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -162,7 +161,7 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.writerConfig(diagnostic, target)
+			wc, err := c.cfg.writerConfig(target)
 			if err != nil {
 				return nil, err
 			}
@@ -220,7 +219,7 @@ func configChanged(old, new Config) bool {
 		old.SSLCA != new.SSLCA ||
 		old.SSLCert != new.SSLCert ||
 		old.SSLKey != new.SSLKey ||
-		!old.SASLAuth.Equals(&new.SASLAuth)
+		!cmp.Equal(old.SASLAuth, new.SASLAuth)
 }
 
 func (c *Cluster) clearWriters() {
