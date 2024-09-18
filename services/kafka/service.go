@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"text/template"
+
+	"github.com/google/go-cmp/cmp"
 
 	kafka "github.com/IBM/sarama"
 	"github.com/influxdata/kapacitor/alert"

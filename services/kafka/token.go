@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+
 	"github.com/IBM/sarama"
 	"golang.org/x/oauth2"
 )
