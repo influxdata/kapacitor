@@ -6,11 +6,6 @@ executors:
     docker:
       - image: quay.io/influxdb/builder:kapacitor-20240919
     resource_class: large
-  linux-amd64:
-    machine:
-      image: ubuntu-2004:202107-02
-      docker_layer_caching: true
-      resource_class: large
 
 commands:
   install_dependencies:
