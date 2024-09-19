@@ -3,10 +3,11 @@ package kafka
 import (
 	"context"
 	"errors"
-	"golang.org/x/oauth2/endpoints"
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2/endpoints"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
