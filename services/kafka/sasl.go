@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"errors"
+	"golang.org/x/oauth2/endpoints"
 	"net/url"
 	"strings"
 	"time"
@@ -44,11 +45,8 @@ type SASLAuth struct {
 }
 
 func (k *SASLAuth) Validate() error {
-	if k.SASLMechanism == "" {
-		return nil
-	}
 	switch k.SASLMechanism {
-	case kafka.SASLTypeSCRAMSHA256, kafka.SASLTypeSCRAMSHA512, kafka.SASLTypeGSSAPI, kafka.SASLTypePlaintext:
+	case "", kafka.SASLTypeSCRAMSHA256, kafka.SASLTypeSCRAMSHA512, kafka.SASLTypeGSSAPI, kafka.SASLTypePlaintext:
 		return nil
 	case kafka.SASLTypeOAuth:
 		if k.SASLAccessToken != "" && (k.SASLOAUTHService != "" || k.SASLOAUTHTokenURL != "") {
@@ -124,10 +122,7 @@ func (k *SASLAuth) SetSASLConfig(config *kafka.Config) error {
 					AuthStyle: oauth2.AuthStyleInParams,
 				}
 			case "azuread":
-				endpoint = azureAD(k.SASLOAUTHTenant)
-			}
-			if k.SASLOAUTHExpiryMargin == 0 {
-				k.SASLOAUTHExpiryMargin = 10 * time.Second
+				endpoint = endpoints.AzureAD(k.SASLOAUTHTenant)
 			}
 			cfg := &clientcredentials.Config{
 				ClientID:       k.SASLOAUTHClientID,
@@ -198,21 +193,5 @@ func gssapiAuthType(authType string) int {
 		return kafka.KRB5_KEYTAB_AUTH
 	default:
 		return 0
-	}
-}
-
-// azureAD returns a new oauth2.Endpoint for the given tenant at Azure Active Directory.
-// If tenant is empty, it uses the tenant called `common`.
-//
-// For more information see:
-// https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-v2-protocols#endpoints
-func azureAD(tenant string) oauth2.Endpoint {
-	if tenant == "" {
-		tenant = "common"
-	}
-	return oauth2.Endpoint{
-		AuthURL:       "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/authorize",
-		TokenURL:      "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/token",
-		DeviceAuthURL: "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/devicecode",
 	}
 }
