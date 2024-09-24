@@ -83,8 +83,9 @@ type Closer interface {
 }
 
 type WriterConfig struct {
-	Closers []Closer
-	Config  *kafka.Config
+	// additional resource to close
+	Closer Closer
+	Config *kafka.Config
 }
 
 type WriteTarget struct {
@@ -147,7 +148,7 @@ func (c Config) writerConfig(target WriteTarget) (*WriterConfig, error) {
 	if o, err := c.SASLAuth.SetSASLConfig(cfg); err != nil {
 		return nil, err
 	} else {
-		return &WriterConfig{[]Closer{o}, cfg}, cfg.Validate()
+		return &WriterConfig{o, cfg}, cfg.Validate()
 	}
 }
 

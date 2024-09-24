@@ -55,7 +55,7 @@ type writer struct {
 
 	done chan struct{}
 
-	closers []Closer
+	closer Closer
 }
 
 func (w *writer) Open() {
@@ -85,10 +85,8 @@ func (w *writer) Close() {
 
 	close(w.done)
 	vars.DeleteStatistic(w.statsKey)
-	for _, c := range w.closers {
-		if c != nil {
-			c.Close()
-		}
+	if w.closer != nil {
+		w.closer.Close()
 	}
 	err := w.kafka.Close()
 
@@ -186,7 +184,7 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 				cluster:                c.cfg.ID,
 				topic:                  topic,
 				diagnostic:             diagnostic,
-				closers:                wc.Closers,
+				closer:                 wc.Closer,
 			}
 			w.Open()
 			c.writers[topic] = w
