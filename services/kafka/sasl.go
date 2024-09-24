@@ -88,10 +88,11 @@ func (k *SASLAuth) Validate() error {
 // SetSASLConfig configures SASL for kafka (sarama)
 // We mutate instead of returning the appropriate struct, because kafka.NewConfig() already populates certain defaults
 // that we do not want to disrupt.
-func (k *SASLAuth) SetSASLConfig(config *kafka.Config) error {
+func (k *SASLAuth) SetSASLConfig(config *kafka.Config) (Closer, error) {
 
 	config.Net.SASL.User = k.SASLUsername
 	config.Net.SASL.Password = k.SASLPassword
+	var c Closer
 
 	if k.SASLMechanism != "" {
 		config.Net.SASL.Mechanism = kafka.SASLMechanism(k.SASLMechanism)
@@ -139,7 +140,9 @@ func (k *SASLAuth) SetSASLConfig(config *kafka.Config) error {
 			ctx, cancel := context.WithCancel(context.Background())
 			src := cfg.TokenSource(ctx)
 			source := oauth2.ReuseTokenSourceWithExpiry(nil, src, k.SASLOAUTHExpiryMargin)
-			config.Net.SASL.TokenProvider = NewRefreshingToken(source, cancel, k.SASLExtensions)
+			r := NewRefreshingToken(source, cancel, k.SASLExtensions)
+			config.Net.SASL.TokenProvider = r
+			c = r
 
 		case kafka.SASLTypeGSSAPI:
 			config.Net.SASL.GSSAPI.ServiceName = k.SASLGSSAPIServiceName
@@ -161,11 +164,11 @@ func (k *SASLAuth) SetSASLConfig(config *kafka.Config) error {
 
 		version, err := SASLVersion(config.Version, k.SASLVersion)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		config.Net.SASL.Version = version
 	}
-	return nil
+	return c, nil
 }
 
 func SASLVersion(kafkaVersion kafka.KafkaVersion, saslVersion *int) (int16, error) {

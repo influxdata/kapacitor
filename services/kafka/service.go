@@ -54,6 +54,8 @@ type writer struct {
 	statsKey string
 
 	done chan struct{}
+
+	closers []Closer
 }
 
 func (w *writer) Open() {
@@ -83,6 +85,9 @@ func (w *writer) Close() {
 
 	close(w.done)
 	vars.DeleteStatistic(w.statsKey)
+	for _, c := range w.closers {
+		c.Close()
+	}
 	err := w.kafka.Close()
 
 	if err != nil {
@@ -166,7 +171,7 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 			if err != nil {
 				return nil, err
 			}
-			kp, err := kafka.NewAsyncProducer(c.cfg.Brokers, wc)
+			kp, err := kafka.NewAsyncProducer(c.cfg.Brokers, wc.Config)
 
 			if err != nil {
 				return nil, err
@@ -174,11 +179,12 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 
 			// Create new writer
 			w = &writer{
-				requestsInFlightMetric: metrics.GetOrRegisterCounter("requests-in-flight", wc.MetricRegistry),
+				requestsInFlightMetric: metrics.GetOrRegisterCounter("requests-in-flight", wc.Config.MetricRegistry),
 				kafka:                  kp,
 				cluster:                c.cfg.ID,
 				topic:                  topic,
 				diagnostic:             diagnostic,
+				closers:                wc.Closers,
 			}
 			w.Open()
 			c.writers[topic] = w

@@ -37,6 +37,11 @@ func (k *RefreshingToken) Token() (*kafka.AccessToken, error) {
 	}, nil
 }
 
+func (k *RefreshingToken) Close() {
+	// canceling the token refresh
+	k.cancel()
+}
+
 func NewStaticToken(token string, extensions map[string]string) *StaticToken {
 	return &StaticToken{
 		token:      token,
