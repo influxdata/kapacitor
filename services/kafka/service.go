@@ -86,7 +86,9 @@ func (w *writer) Close() {
 	close(w.done)
 	vars.DeleteStatistic(w.statsKey)
 	for _, c := range w.closers {
-		c.Close()
+		if c != nil {
+			c.Close()
+		}
 	}
 	err := w.kafka.Close()
 
