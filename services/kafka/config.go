@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	DefaultTimeout      = 10 * time.Second
-	DefaultBatchSize    = 100
-	DefaultBatchTimeout = 1 * time.Second
-	DefaultID           = "default"
+	DefaultTimeout               = 10 * time.Second
+	DefaultBatchSize             = 100
+	DefaultBatchTimeout          = 1 * time.Second
+	DefaultID                    = "default"
+	DefaultSASLOAUTHExpiryMargin = 10 * time.Second
 )
 
 type Config struct {
@@ -49,7 +50,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: 10 * time.Second}}
+	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: DefaultSASLOAUTHExpiryMargin}}
 }
 
 func (c Config) Validate() error {
