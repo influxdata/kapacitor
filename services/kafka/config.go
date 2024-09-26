@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	DefaultTimeout      = 10 * time.Second
-	DefaultBatchSize    = 100
-	DefaultBatchTimeout = 1 * time.Second
-	DefaultID           = "default"
+	DefaultTimeout               = 10 * time.Second
+	DefaultBatchSize             = 100
+	DefaultBatchTimeout          = 1 * time.Second
+	DefaultID                    = "default"
+	DefaultSASLOAUTHExpiryMargin = 10 * time.Second
 )
 
 type Config struct {
@@ -49,7 +50,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{ID: DefaultID}
+	return Config{ID: DefaultID, SASLAuth: SASLAuth{SASLOAUTHExpiryMargin: DefaultSASLOAUTHExpiryMargin}}
 }
 
 func (c Config) Validate() error {
@@ -63,7 +64,7 @@ func (c Config) Validate() error {
 	if len(c.Brokers) == 0 {
 		return errors.New("no brokers specified, must provide at least one broker URL")
 	}
-	return nil
+	return c.SASLAuth.Validate()
 }
 
 func (c *Config) ApplyConditionalDefaults() {
@@ -78,17 +79,27 @@ func (c *Config) ApplyConditionalDefaults() {
 	}
 }
 
+type Closer interface {
+	Close()
+}
+
+type WriterConfig struct {
+	// additional resource to close
+	Closer Closer
+	Config *kafka.Config
+}
+
 type WriteTarget struct {
 	Topic              string
 	PartitionById      bool
 	PartitionAlgorithm string
 }
 
-func (c Config) writerConfig(diagnostic Diagnostic, target WriteTarget) (*kafka.Config, error) {
+func (c Config) writerConfig(target WriteTarget) (*WriterConfig, error) {
 	cfg := kafka.NewConfig()
 
 	if target.Topic == "" {
-		return cfg, errors.New("topic must not be empty")
+		return &WriterConfig{nil, cfg}, errors.New("topic must not be empty")
 	}
 	var partitioner kafka.PartitionerConstructor
 	if target.PartitionById {
@@ -104,7 +115,7 @@ func (c Config) writerConfig(diagnostic Diagnostic, target WriteTarget) (*kafka.
 		case "fnv-1a":
 			partitioner = kafka.NewHashPartitioner
 		default:
-			return cfg, fmt.Errorf("invalid partition algorithm: %q", target.PartitionAlgorithm)
+			return &WriterConfig{nil, cfg}, fmt.Errorf("invalid partition algorithm: %q", target.PartitionAlgorithm)
 		}
 		cfg.Producer.Partitioner = partitioner
 	}
@@ -135,10 +146,11 @@ func (c Config) writerConfig(diagnostic Diagnostic, target WriteTarget) (*kafka.
 	cfg.Producer.Flush.Frequency = time.Duration(c.BatchTimeout)
 
 	// SASL
-	if err := c.SASLAuth.SetSASLConfig(cfg); err != nil {
+	if o, err := c.SASLAuth.SetSASLConfig(cfg); err != nil {
 		return nil, err
+	} else {
+		return &WriterConfig{o, cfg}, cfg.Validate()
 	}
-	return cfg, cfg.Validate()
 }
 
 type Configs []Config

@@ -17,7 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/pkg/errors"
-	metrics "github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -54,6 +54,8 @@ type writer struct {
 	statsKey string
 
 	done chan struct{}
+
+	closer Closer
 }
 
 func (w *writer) Open() {
@@ -83,6 +85,9 @@ func (w *writer) Close() {
 
 	close(w.done)
 	vars.DeleteStatistic(w.statsKey)
+	if w.closer != nil {
+		w.closer.Close()
+	}
 	err := w.kafka.Close()
 
 	if err != nil {
@@ -162,11 +167,11 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 		defer c.mu.Unlock()
 		w, ok = c.writers[topic]
 		if !ok {
-			wc, err := c.cfg.writerConfig(diagnostic, target)
+			wc, err := c.cfg.writerConfig(target)
 			if err != nil {
 				return nil, err
 			}
-			kp, err := kafka.NewAsyncProducer(c.cfg.Brokers, wc)
+			kp, err := kafka.NewAsyncProducer(c.cfg.Brokers, wc.Config)
 
 			if err != nil {
 				return nil, err
@@ -174,11 +179,12 @@ func (c *Cluster) writer(target WriteTarget, diagnostic Diagnostic) (*writer, er
 
 			// Create new writer
 			w = &writer{
-				requestsInFlightMetric: metrics.GetOrRegisterCounter("requests-in-flight", wc.MetricRegistry),
+				requestsInFlightMetric: metrics.GetOrRegisterCounter("requests-in-flight", wc.Config.MetricRegistry),
 				kafka:                  kp,
 				cluster:                c.cfg.ID,
 				topic:                  topic,
 				diagnostic:             diagnostic,
+				closer:                 wc.Closer,
 			}
 			w.Open()
 			c.writers[topic] = w
