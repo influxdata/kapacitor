@@ -1,4 +1,21 @@
-CHANGELOG for Kapacitor master commit a5105f93afd2475ad7f3dc55eba21a8bfef52ce1
+CHANGELOG for Kapacitor master commit 71a5e1e036b81a2f4cd4de56fdf298090d0ee13a
+
+## v1.7.6 [2024-10-28]
+----------------------
+
+### Features
+
+1. [2834](https://github.com/influxdata/kapacitor/pull/2834): Kafka event handler - add SASL OAUTH token refreshing
+2. [2832](https://github.com/influxdata/kapacitor/pull/2832): Kafka event handler - allow setting and sending SASL extensions
+
+### Bug Fixes
+
+1. [2831](https://github.com/influxdata/kapacitor/pull/2831): Using UTC timezone for alert levels
+1. [2833](https://github.com/influxdata/kapacitor/pull/2833): Fix Kafka mock server
+
+### Other
+
+1. [2835](https://github.com/influxdata/kapacitor/pull/2835): Upgrade Go to 1.22.7
 
 ## v1.7.5 [2024-06-12]
 ----------------------
