@@ -5,8 +5,8 @@ CHANGELOG for Kapacitor master commit 71a5e1e036b81a2f4cd4de56fdf298090d0ee13a
 
 ### Features
 
-1. [2834](https://github.com/influxdata/kapacitor/pull/2834): Kafka Handler SASL OAUTH token refreshing
-2. [2832](https://github.com/influxdata/kapacitor/pull/2832): Kafka Handler set and send SASL extensions
+1. [2834](https://github.com/influxdata/kapacitor/pull/2834): Kafka event handler - add SASL OAUTH token refreshing
+2. [2832](https://github.com/influxdata/kapacitor/pull/2832): Kafka event handler - allow setting and sending SASL extensions
 
 ### Bug Fixes
 
