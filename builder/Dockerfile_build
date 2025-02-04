@@ -46,7 +46,7 @@ RUN gem install fpm
 # src: https://github.com/influxdata/chronograf/blob/9c4b1aa1a458ed86716985ed93783c35cc6411a7/etc/Dockerfile_build#L35
 #
 ENV GOPATH=/root/go
-ENV GO_VERSION=1.22.7
+ENV GO_VERSION=1.22.11
 ENV GO_ARCH=amd64
 ENV GO111MODULES=ON
 RUN wget https://golang.org/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
