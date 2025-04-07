@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 # This builder image is base image for building Kapacitor binaries.
 # It is used by the CI/CD pipeline to use same version of Go, Protobuf and other dependencies.

@@ -4,18 +4,40 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/builder:kapacitor-20250204
+      - image: quay.io/influxdb/cross-builder:go1.23.5-latest
     resource_class: large
 
 commands:
   install_dependencies:
     description: >
-      Install additional dependencies for python script
+      Install additional dependencies
     steps:
       - run:
           name: Install additional dependencies
           command: |
             set -x
+            # APT packages
+            apt-get -qq update && apt-get -qq install -y \
+                software-properties-common \
+                unzip \
+                mercurial \
+                make \
+                ruby \
+                ruby-dev \
+                rpm \
+                zip \
+                python \
+                python-setuptools \
+                python3 \
+                python3-setuptools \
+                python3-boto \
+                autoconf \
+                automake \
+                libtool
+
+            # Ruby dependencies
+            gem install dotenv -v 2.8.1
+            gem install fpm
 
             # Protobuf
             wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
