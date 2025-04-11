@@ -103,6 +103,9 @@ jobs:
           name: generate
           command: ./generate.sh
       - run:
+          name: update rust toolchain
+          command: rustup toolchain install 1.58-x86_64-unknown-linux-gnu
+      - run:
           name: go vet
           command: go vet ./...
       - run:
