@@ -5718,8 +5718,8 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 				},
 			},
 		},
-		// Python 2
-		{
+		// Python 2 - No longer supported
+		/*{
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    Python2Executable,
@@ -5732,7 +5732,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 					),
 				},
 			},
-		},
+		},             */
 	}
 	for _, agent := range agents {
 		err := agent.buildFunc()
@@ -5906,8 +5906,8 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
-		// Python 2
-		{
+		// Python 2 - Python2 no longer supported
+		/*{
 			startFunc: func() *exec.Cmd {
 				cmd := exec.Command(
 					Python2Executable,
@@ -5932,7 +5932,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				Socket:  filepath.Join(tdir, "mirror.py.sock"),
 				Timeout: toml.Duration(time.Minute),
 			},
-		},
+		},*/
 	}
 	for _, agent := range agents {
 		cmd := agent.startFunc()
@@ -6074,8 +6074,8 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 				},
 			},
 		},
-		// Python 2
-		{
+		// Python 2 - Python2 is no longer supported
+		/*{
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    Python2Executable,
@@ -6088,7 +6088,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 					),
 				},
 			},
-		},
+		},*/
 	}
 	for _, agent := range agents {
 		err := agent.buildFunc()
