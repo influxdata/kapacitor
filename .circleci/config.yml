@@ -69,10 +69,6 @@ commands:
       This will run Kapacitor Tests
     steps:
       - run:
-          name: resolve UDF python agent dependencies
-          command: |
-            pip3 install udf/agent/py/
-      - run:
           name: Running Kapacitor Tests
           no_output_timeout: 30m
           command:  |
