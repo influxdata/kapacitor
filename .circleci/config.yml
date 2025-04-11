@@ -39,6 +39,9 @@ commands:
             gem install dotenv -v 2.8.1
             gem install fpm
 
+            # setup rustup toolchain
+            rustup toolchain install 1.58-x86_64-unknown-linux-gnu
+
             # Protobuf
             # wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
             # tar -xf protobuf-python-${PROTO_VERSION}.tar.gz --no-same-owner
