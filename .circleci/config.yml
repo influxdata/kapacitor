@@ -74,6 +74,10 @@ commands:
           command: |
             pip3 install udf/agent/py/
       - run:
+          name: inspect rustup
+          command: |
+            rustup show
+      - run:
           name: Running Kapacitor Tests
           no_output_timeout: 30m
           command:  |
