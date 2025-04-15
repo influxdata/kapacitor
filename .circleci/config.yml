@@ -74,16 +74,6 @@ commands:
           command: |
             pip3 install udf/agent/py/
       - run:
-          name: dust up rustup
-          command: |
-            rustup self uninstall && \
-            apt-get remove rust && \
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rs.rustup.sh && \
-            chmod 774 rs.rustup.sh && \
-            ./rs.rustup.sh -y && \
-            rustc --version && \
-            cargo --version
-      - run:
           name: Running Kapacitor Tests
           no_output_timeout: 30m
           command:  |
