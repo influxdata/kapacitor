@@ -1,9 +1,11 @@
 module github.com/influxdata/kapacitor
 
-go 1.22
+go 1.22.1
+
+toolchain go1.23.5
 
 require (
-	github.com/BurntSushi/toml v1.2.1
+	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c
 	github.com/IBM/sarama v1.43.3
 	github.com/aws/aws-sdk-go v1.51.12
 	github.com/benbjohnson/clock v1.1.0
@@ -55,10 +57,10 @@ require (
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.31.0
 	golang.org/x/oauth2 v0.23.0
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
+	golang.org/x/tools v0.21.1-0.20240531212143-b6235391adb3
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	honnef.co/go/tools v0.4.3
+	honnef.co/go/tools v0.5.1
 )
 
 require (
@@ -239,7 +241,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
+	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
