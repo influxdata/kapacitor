@@ -13,6 +13,16 @@ commands:
       Install additional dependencies
     steps:
       - run:
+          name: upgrade to go v1.23.8
+          command: |
+            set -x
+            go install golang.org/dl/go1.23.8@latest
+            go1.23.8 download
+            go1.23.8 env GOROOT
+            mv /go /go1.23.5
+            ln -s /root/sdk/go1.23.8/ /go
+            go version
+      - run:
           name: Install additional dependencies
           command: |
             set -x
