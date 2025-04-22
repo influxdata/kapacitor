@@ -23,7 +23,7 @@ require (
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/h2non/gock v1.2.0
 	github.com/influxdata/cron v0.0.0-20201006132531-4bb0a200dcbe
-	github.com/influxdata/flux v0.171.0
+	github.com/influxdata/flux v0.191.0
 	github.com/influxdata/httprouter v1.3.1-0.20191122104820-ee83e2772f69
 	github.com/influxdata/influx-cli/v2 v2.0.0-20210526124422-63da8eccbdb7
 	github.com/influxdata/influxdb v1.9.6
@@ -98,7 +98,7 @@ require (
 	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/apache/arrow/go/v12 v12.0.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.0 // indirect
-	github.com/apache/arrow/go/v7 v7.0.0 // indirect
+	github.com/apache/arrow/go/v7 v7.0.1 // indirect
 	github.com/apache/thrift v0.17.0 // indirect
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef // indirect
@@ -181,7 +181,9 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/influxdata/gosnowflake v1.9.0 // indirect
 	github.com/influxdata/influxdb-client-go/v2 v2.3.1-0.20210518120617-5d1fff431040 // indirect
+	github.com/influxdata/influxdb-iox-client-go v1.0.0-beta.1 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 // indirect
+	github.com/influxdata/line-protocol/v2 v2.2.1 // indirect
 	github.com/influxdata/roaring v0.4.13-0.20180809181101-fc520f41fab6 // indirect
 	github.com/influxdata/tdigest v0.0.2-0.20210216194612-fc98d27c9e8b // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
@@ -264,6 +266,7 @@ require (
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	gonum.org/v1/gonum v0.12.0 // indirect
 	google.golang.org/api v0.128.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13 // indirect

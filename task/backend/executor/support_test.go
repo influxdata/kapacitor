@@ -25,8 +25,12 @@ type fakeQueryService struct {
 	mostRecentCtx context.Context
 }
 
-func makeAST(q string) lang.ASTCompiler {
-	pkg, err := runtime.ParseToJSON(q)
+func makeAST(ctx context.Context, q string) lang.ASTCompiler {
+	localCtx := context.Background()
+	if ctx != nil {
+		localCtx = ctx
+	}
+	pkg, err := runtime.ParseToJSON(localCtx, q)
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +84,7 @@ func (s *fakeQueryService) SucceedQuery(script string) {
 	defer s.mu.Unlock()
 
 	// Unblock the flux.
-	ast := makeAST(script)
+	ast := makeAST(s.mostRecentCtx, script)
 	spec := makeASTString(ast)
 	fq, ok := s.queries[spec]
 	if !ok {
@@ -98,7 +102,7 @@ func (s *fakeQueryService) FailQuery(script string, forced error) {
 	defer s.mu.Unlock()
 
 	// Unblock the flux.
-	ast := makeAST(script)
+	ast := makeAST(s.mostRecentCtx, script)
 	spec := makeASTString(ast)
 	fq, ok := s.queries[spec]
 	if !ok {
@@ -123,8 +127,8 @@ func (s *fakeQueryService) WaitForQueryLive(t *testing.T, script string) {
 	t.Helper()
 
 	const attempts = 100
-	ast := makeAST(script)
-	astUTC := makeAST(script)
+	ast := makeAST(s.mostRecentCtx, script)
+	astUTC := makeAST(s.mostRecentCtx, script)
 	astUTC.Now = ast.Now.UTC()
 	spec := makeASTString(ast)
 	specUTC := makeASTString(astUTC)
