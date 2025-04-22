@@ -11,15 +11,15 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cespare/xxhash v1.1.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/docker v24.0.9+incompatible
+	github.com/docker/docker v27.1.1+incompatible
 	github.com/dustin/go-humanize v1.0.1
 	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/btree v1.0.1
-	github.com/google/go-cmp v0.6.0
-	github.com/google/uuid v1.3.1
+	github.com/google/go-cmp v0.7.0
+	github.com/google/uuid v1.6.0
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75
 	github.com/h2non/gock v1.2.0
 	github.com/influxdata/cron v0.0.0-20201006132531-4bb0a200dcbe
@@ -46,7 +46,7 @@ require (
 	github.com/serenize/snaker v0.0.0-20161123064335-543781d2b79b
 	github.com/shurcooL/markdownfmt v0.0.0-20170214213350-10aae0a270ab
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/uber/jaeger-client-go v2.28.0+incompatible
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
@@ -124,6 +124,7 @@ require (
 	github.com/deepmap/oapi-codegen v1.6.0 // indirect
 	github.com/denisenkom/go-mssqldb v0.10.0 // indirect
 	github.com/dimchansky/utfbom v1.1.0 // indirect
+	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
@@ -140,7 +141,7 @@ require (
 	github.com/go-chi/chi v4.1.0+incompatible // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
-	github.com/go-logr/logr v0.4.0 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-openapi/errors v0.19.9 // indirect
 	github.com/go-openapi/strfmt v0.20.0 // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
@@ -212,6 +213,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.0 // indirect
 	github.com/mna/pigeon v1.0.1-0.20180808201053-bb0192cfc2ae // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae // indirect
@@ -248,6 +250,8 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.5.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
@@ -276,7 +280,7 @@ require (
 	k8s.io/api v0.21.0 // indirect
 	k8s.io/apimachinery v0.21.0 // indirect
 	k8s.io/client-go v0.21.0 // indirect
-	k8s.io/klog/v2 v2.8.0 // indirect
+	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.0 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
