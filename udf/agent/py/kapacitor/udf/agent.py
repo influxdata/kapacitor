@@ -27,6 +27,7 @@ import struct
 import logging
 logger = logging.getLogger()
 
+is_python_2 = None
 # Check for python3
 # https://stackoverflow.com/a/38939320/703144
 if sys.version_info >= (3, 0):
@@ -37,6 +38,7 @@ if sys.version_info >= (3, 0):
     defaultIn = sys.stdin.buffer
     defaultOut = sys.stdout.buffer
 elif sys.version_info >= (2, 0):
+    is_python_2 = True
     logger.warning("[WARNING] DEPRECATED VERSION: Python2 version %d.%d.%d detected. "
                    "Support for this version in user defined functions (UDF) is now deprecated "
                    "and will be removed in a future release.",
@@ -80,6 +82,16 @@ class Handler(object):
 # The Agent requires a Handler object in order to fulfill requests.
 class Agent(object):
     def __init__(self, _in=defaultIn, out=defaultOut,handler=None):
+        if is_python_2:
+            import datetime
+            now_utc = datetime.datetime.utcnow()
+            lgr = logging.getLogger("DEPRECATION")
+            dpr_handler = logging.FileHandler("DEPRECATION_WARNING_PYTHON_2.txt")
+            lgr.addHandler(dpr_handler)
+            lgr.setLevel(logging.WARNING)
+            lgr.warning("[DEPRECATION WARNING] - %s - detected python2.  "
+                        "Python 2 support is now deprecated for UDFs and "
+                        "will be removed entirely in a future release.", now_utc)
         self._in = _in
         self._out = out
 
