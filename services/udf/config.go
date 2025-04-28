@@ -3,6 +3,10 @@ package udf
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
@@ -42,6 +46,17 @@ func (c Config) Validate() error {
 func (c FunctionConfig) Validate() error {
 	if time.Duration(c.Timeout) <= time.Millisecond {
 		return fmt.Errorf("timeout is too small: %s", c.Timeout)
+	}
+	// Check for Python2 - which is being removed
+	if strings.Contains(c.Prog, "python") {
+		cmd := exec.Command(c.Prog, "--version")
+		v, _ := cmd.CombinedOutput()
+		if strings.Contains(string(v), "Python 2") {
+			lgr := log.New(os.Stderr, "[DEPRECATION WARNING]", 0)
+			lgr.Printf("\nDetected user defined function using Python 2.  " +
+				"Support for Python 2 UDF processes is being discontinued.  " +
+				"It may be removed in a future release.\n")
+		}
 	}
 	// We have socket config ensure the process config is empty
 	if c.Socket != "" {

@@ -18,12 +18,6 @@ except ImportError:
 defaultIn = sys.stdin
 defaultOut = sys.stdout
 
-# Check for python3
-# https://stackoverflow.com/a/38939320/703144
-if sys.version_info >= (3, 0):
-    defaultIn = sys.stdin.buffer
-    defaultOut = sys.stdout.buffer
-
 import io
 import traceback
 import socket
@@ -33,6 +27,24 @@ import struct
 import logging
 logger = logging.getLogger()
 
+# Check for python3
+# https://stackoverflow.com/a/38939320/703144
+if sys.version_info >= (3, 0):
+    logger.debug("[DEBUG] Python3 version %d.%d.%d detected.",
+                 sys.version_info.major,
+                 sys.version_info.minor,
+                 sys.version_info.minor)
+    defaultIn = sys.stdin.buffer
+    defaultOut = sys.stdout.buffer
+elif sys.version_info >= (2, 0):
+    logger.warning("[WARNING] DEPRECATED VERSION: Python2 version %d.%d.%d detected. "
+                   "Support for this version in user defined functions (UDF) is now deprecated "
+                   "and will be removed in a future release.",
+                   sys.version_info.major,
+                   sys.version_info.minor,
+                   sys.version_info.minor)
+else:
+    logger.error("[ERROR] Unsupported Python version %s detected", sys.version_info)
 
 # The Agent calls the appropriate methods on the Handler as requests are read off STDIN.
 #
