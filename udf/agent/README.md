@@ -60,6 +60,10 @@ For process based UDFs it is expected that the process terminate after STDIN is 
 After STDIN is closed, the agent process can continue to send Responses to Kapacitor as long as a keepalive timeout does not occur.
 Once a keepalive timeout is reached and after a 2*keepalive_time grace period, if the process has not terminated then it will be forcefully terminated.
 
+### Note - Regarding Python 2 Support
+
+As of release v1.7.7 UDFs based on Python2 are deprecated.  Protobuf support for Python 2 was suspended with the 3.18.3 release.  In order to keep UDFs up to date with protobuf, support for Python 2 UDFs will eventually be fully removed.  UDF users still working with Python 2 are encouraged to migrate their UDFs to Python 3.
+
 ## Docker
 
 It is expected that the example can run inside the test suite.
