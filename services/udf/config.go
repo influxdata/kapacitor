@@ -53,9 +53,10 @@ func (c FunctionConfig) Validate() error {
 		v, _ := cmd.CombinedOutput()
 		if strings.Contains(string(v), "Python 2") {
 			lgr := log.New(os.Stderr, "[DEPRECATION WARNING]", 0)
-			lgr.Printf("\nDetected user defined function using Python 2.  " +
-				"Support for Python 2 UDF processes is being discontinued.  " +
-				"It may be removed in a future release.\n")
+			lgr.Printf("\nDetected user defined function using Python 2.  "+
+				"UDF config arguments are %s. "+
+				"Support for Python 2 UDF processes is being discontinued.  "+
+				"It may be removed in a future release.\n", c.Args)
 		}
 	}
 	// We have socket config ensure the process config is empty

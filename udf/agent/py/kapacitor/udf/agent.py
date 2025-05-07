@@ -4,6 +4,7 @@
 #   pip install protobuf==3.11.1
 from __future__ import absolute_import
 
+import inspect
 import sys
 from . import udf_pb2
 from threading import Lock, Thread
@@ -89,9 +90,10 @@ class Agent(object):
             dpr_handler = logging.FileHandler("DEPRECATION_WARNING_PYTHON_2.txt")
             lgr.addHandler(dpr_handler)
             lgr.setLevel(logging.WARNING)
-            lgr.warning("[DEPRECATION WARNING] - %s - detected python2.  "
+            frame = inspect.stack()[1]
+            lgr.warning("[DEPRECATION WARNING] - %s - detected python2 in %s  "
                         "Python 2 support is now deprecated for UDFs and "
-                        "will be removed entirely in a future release.", now_utc)
+                        "will be removed entirely in a future release.", now_utc, frame[0].f_code.co_filename)
         self._in = _in
         self._out = out
 
