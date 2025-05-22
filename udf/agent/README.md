@@ -62,7 +62,7 @@ Once a keepalive timeout is reached and after a 2*keepalive_time grace period, i
 
 ### Note - Regarding Python 2 Support
 
-As of release v1.7.7 UDFs based on Python2 are deprecated.  Protobuf support for Python 2 was suspended with the 3.18.3 release.  In order to keep UDFs up to date with protobuf, support for Python 2 UDFs will eventually be fully removed.  UDF users still working with Python 2 are encouraged to migrate their UDFs to Python 3.
+Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 and will be removed in Kapacitor 1.8.0. Please update your UDFs to be Python 3-compatible before upgrading. This change is part of our effort to follow modern security best practices.
 
 ## Docker
 

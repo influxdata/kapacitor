@@ -52,11 +52,11 @@ func (c FunctionConfig) Validate() error {
 		cmd := exec.Command(c.Prog, "--version")
 		v, _ := cmd.CombinedOutput()
 		if strings.Contains(string(v), "Python 2") {
-			lgr := log.New(os.Stderr, "[DEPRECATION WARNING]", 0)
-			lgr.Printf("\nDetected user defined function using Python 2.  "+
-				"UDF config arguments are %s. "+
-				"Support for Python 2 UDF processes is being discontinued.  "+
-				"It may be removed in a future release.\n", c.Args)
+			lgr := log.New(os.Stderr, "[DEPRECATION WARNING -  Python2]", 0)
+			lgr.Printf("\n(%s) Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 "+
+				"and will be removed in Kapacitor 1.8.0. Please update your UDFs to be Python 3-compatible "+
+				"before upgrading. This change is part of our effort to follow modern security best practices.\n",
+				c.Args)
 		}
 	}
 	// We have socket config ensure the process config is empty

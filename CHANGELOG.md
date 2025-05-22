@@ -1,5 +1,12 @@
 CHANGELOG for Kapacitor master commit 71a5e1e036b81a2f4cd4de56fdf298090d0ee13a
 
+## v1.7.7 [unreleased]
+----------------------
+
+### Other
+
+1. [2850](https://github.com/influxdata/kapacitor/pull/2850) - Python2 UDFs Deprecated - Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 and will be removed in Kapacitor 1.8.0. Please update your UDFs to be Python 3-compatible before upgrading. This change is part of our effort to follow modern security best practices.
+
 ## v1.7.6 [2024-10-28]
 ----------------------
 
