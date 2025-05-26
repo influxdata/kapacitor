@@ -4,6 +4,7 @@
 #   pip install protobuf==3.11.1
 from __future__ import absolute_import
 
+import inspect
 import sys
 from . import udf_pb2
 from threading import Lock, Thread
@@ -18,12 +19,6 @@ except ImportError:
 defaultIn = sys.stdin
 defaultOut = sys.stdout
 
-# Check for python3
-# https://stackoverflow.com/a/38939320/703144
-if sys.version_info >= (3, 0):
-    defaultIn = sys.stdin.buffer
-    defaultOut = sys.stdout.buffer
-
 import io
 import traceback
 import socket
@@ -33,6 +28,22 @@ import struct
 import logging
 logger = logging.getLogger()
 
+# Check for python3
+# https://stackoverflow.com/a/38939320/703144
+if sys.version_info >= (3, 0):
+    defaultIn = sys.stdin.buffer
+    defaultOut = sys.stdout.buffer
+elif sys.version_info >= (2, 0):
+    logger.warning("[WARNING] DEPRECATED VERSION: Python2 version %d.%d.%d detected. "
+                   "Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 and "
+                   "will be removed in Kapacitor 1.8.0. Please update your UDFs to be "
+                   "Python 3-compatible before upgrading. This change is part of our effort to "
+                   "follow modern security best practices.",
+                   sys.version_info.major,
+                   sys.version_info.minor,
+                   sys.version_info.minor)
+else:
+    logger.error("[ERROR] Unsupported Python version %s detected", sys.version_info)
 
 # The Agent calls the appropriate methods on the Handler as requests are read off STDIN.
 #
