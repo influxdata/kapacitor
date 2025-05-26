@@ -31,11 +31,9 @@ logger = logging.getLogger()
 # Check for python3
 # https://stackoverflow.com/a/38939320/703144
 if sys.version_info >= (3, 0):
-    is_python_2 = False
     defaultIn = sys.stdin.buffer
     defaultOut = sys.stdout.buffer
 elif sys.version_info >= (2, 0):
-    is_python_2 = True
     logger.warning("[WARNING] DEPRECATED VERSION: Python2 version %d.%d.%d detected. "
                    "Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 and "
                    "will be removed in Kapacitor 1.8.0. Please update your UDFs to be "
@@ -81,19 +79,6 @@ class Handler(object):
 # The Agent requires a Handler object in order to fulfill requests.
 class Agent(object):
     def __init__(self, _in=defaultIn, out=defaultOut,handler=None):
-        if is_python_2:
-            import datetime
-            now_utc = datetime.datetime.utcnow()
-            lgr = logging.getLogger("DEPRECATION")
-            dpr_handler = logging.FileHandler("DEPRECATION_WARNING_PYTHON_2.txt")
-            lgr.addHandler(dpr_handler)
-            lgr.setLevel(logging.WARNING)
-            frame = inspect.stack()[1]
-            lgr.warning("[DEPRECATION WARNING] - %s - detected python2 in %s  "
-                        "Support for Python 2-based UDFs is deprecated as of Kapacitor 1.7.7 and "
-                        "will be removed in Kapacitor 1.8.0. Please update your UDFs to be "
-                        "Python 3-compatible before upgrading. This change is part of our effort to "
-                        "follow modern security best practices.", now_utc, frame[0].f_code.co_filename)
         self._in = _in
         self._out = out
 
