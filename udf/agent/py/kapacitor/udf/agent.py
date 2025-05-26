@@ -28,10 +28,10 @@ import struct
 import logging
 logger = logging.getLogger()
 
-is_python_2 = None
 # Check for python3
 # https://stackoverflow.com/a/38939320/703144
 if sys.version_info >= (3, 0):
+    is_python_2 = False
     defaultIn = sys.stdin.buffer
     defaultOut = sys.stdout.buffer
 elif sys.version_info >= (2, 0):
