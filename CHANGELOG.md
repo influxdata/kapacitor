@@ -1,6 +1,6 @@
 CHANGELOG for Kapacitor master commit 71a5e1e036b81a2f4cd4de56fdf298090d0ee13a
 
-## v1.7.7 [unreleased]
+## v1.7.7 [2025-05-26]
 ----------------------
 
 ### Other
