@@ -13,16 +13,6 @@ RUN /usr/local/bin/debian-deps.sh
 
  RUN gem install dotenv -v 2.8.1 && gem install fpm
 
-# Install protobuf3 python library
-# NOTE: PROTO_VERSION env var is inherited from the parent builder image.
-#RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
-#    && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
-#    && cd protobuf-${PROTO_VERSION}/python \
-#    && python2 setup.py install \
-#    && python3 setup.py install \
-#    && cd ../../ \
-#    && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
-
 ENV PROJECT_DIR=/kapacitor
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
