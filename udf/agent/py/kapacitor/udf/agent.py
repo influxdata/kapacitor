@@ -16,8 +16,8 @@ except ImportError:
 
 
 # Setup default in/out io
-defaultIn = sys.stdin
-defaultOut = sys.stdout
+defaultIn = sys.stdin.buffer
+defaultOut = sys.stdout.buffer
 
 import io
 import traceback
@@ -27,7 +27,6 @@ import struct
 
 import logging
 logger = logging.getLogger()
-
 
 # The Agent calls the appropriate methods on the Handler as requests are read off STDIN.
 #
