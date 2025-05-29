@@ -334,7 +334,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Update task: just update an option.
 	newStatus = string(taskmodel.TaskActive)
-	newFlux = "option task = {name: \"task-changed #98\", cron: \"* * * * *\", offset: 5s, concurrency: 100}\n\nfrom(bucket: \"b\")\n    |> to(bucket: \"two\", orgID: \"000000000000000\")"
+	newFlux = "option task = {name: \"task-changed #98\", cron: \"* * * * *\", offset: 5s, concurrency: 100}\n\nfrom(bucket: \"b\")\n    |> to(bucket: \"two\", orgID: \"000000000000000\")\n"
 	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Options: options.Options{Name: "task-changed #98"}})
 	if err != nil {
 		t.Fatal(err)
@@ -349,7 +349,7 @@ func testTaskCRUD(t *testing.T, sys *System) {
 
 	// Update task: switch to every.
 	newStatus = string(taskmodel.TaskActive)
-	newFlux = "option task = {name: \"task-changed #98\", every: 30s, offset: 5s, concurrency: 100}\n\nfrom(bucket: \"b\")\n    |> to(bucket: \"two\", orgID: \"000000000000000\")"
+	newFlux = "option task = {name: \"task-changed #98\", every: 30s, offset: 5s, concurrency: 100}\n\nfrom(bucket: \"b\")\n    |> to(bucket: \"two\", orgID: \"000000000000000\")\n"
 	f, err = sys.TaskService.UpdateTask(sys.Ctx, origID, taskmodel.TaskUpdate{Options: options.Options{Every: *(options.MustParseDuration("30s"))}})
 	if err != nil {
 		t.Fatal(err)
@@ -544,7 +544,8 @@ func testTaskOptionsUpdateFull(t *testing.T, sys *System) {
 	script := `option task = {name: "task-Options-Update", cron: "* * * * *", concurrency: 100, offset: 10s}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 
 	user := "user-" + t.Name()
 	ct := taskmodel.TaskCreate{
@@ -560,7 +561,8 @@ from(bucket: "b")
 		expectedFlux := `option task = {name: "task-Options-Update", every: 10s, concurrency: 100}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 		f, err := sys.TaskService.UpdateTask(authorizedCtx, task.ID, taskmodel.TaskUpdate{Options: options.Options{Offset: &options.Duration{}, Every: *(options.MustParseDuration("10s"))}})
 		if err != nil {
 			t.Fatal(err)
@@ -578,7 +580,8 @@ from(bucket: "b")
 		expectedFlux := `option task = {name: "task-Options-Update", every: 10s, concurrency: 100, offset: 10s}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 		f, err := sys.TaskService.UpdateTask(authorizedCtx, task.ID, taskmodel.TaskUpdate{Options: options.Options{Offset: options.MustParseDuration("10s")}})
 		if err != nil {
 			t.Fatal(err)
@@ -595,7 +598,8 @@ from(bucket: "b")
 		withoutOffset := `option task = {name: "task-Options-Update", every: 10s, concurrency: 100}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 		fNoOffset, err := sys.TaskService.UpdateTask(authorizedCtx, task.ID, taskmodel.TaskUpdate{Flux: &withoutOffset})
 		if err != nil {
 			t.Fatal(err)
@@ -1634,12 +1638,14 @@ const (
 	scriptFmt = `option task = {name: "task #%d", cron: "* * * * *", offset: 5s, concurrency: 100}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 
 	scriptDifferentName = `option task = {name: "task-changed #%d", cron: "* * * * *", offset: 5s, concurrency: 100}
 
 from(bucket: "b")
-    |> to(bucket: "two", orgID: "000000000000000")`
+    |> to(bucket: "two", orgID: "000000000000000")
+`
 )
 
 func testTaskType(t *testing.T, sys *System) {
