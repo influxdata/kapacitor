@@ -1,8 +1,10 @@
 ## Python2 UDF support in Kapacitor
 
-For reasons of security maintenance support for Python2 UDF's is ended as of release 1.8.  This directory is added as a courtesy to users who either are unable to upgrade their UDFs to Python3 or have not found time yet to do so.  
+For reasons of security maintenance, support for Python2 UDF's is ended as of release 1.8.  This directory is added as a courtesy to users who either are unable to upgrade their UDFs to Python3 or have not found time yet to do so.
 
 __WE STRONGLY ENCOURAGE USERS TO UPGRADE THEIR UDFs TO PYTHON3.__ 
+
+Please note that this directory may be permanently removed in a future release.
 
 ### To use the contents of this directory. 
 
