@@ -4,27 +4,24 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/builder:kapacitor-20250520
+      - image: quay.io/influxdb/cross-builder:go1.23.9-latest
     resource_class: large
 
 commands:
   install_dependencies:
     description: >
-      Install additional dependencies for python script
+      Install additional dependencies
     steps:
       - run:
           name: Install additional dependencies
           command: |
             set -x
+            scripts/debian-deps.sh
 
-            # Protobuf
-            wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz
-            tar -xf protobuf-python-${PROTO_VERSION}.tar.gz --no-same-owner
-            cd protobuf-${PROTO_VERSION}/python
-            python2 setup.py install
-            python3 setup.py install
-            cd ../../
-            rm -rf protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
+            # Ruby dependencies
+            gem install dotenv -v 2.8.1
+            gem install fpm
+
   deploy_release_packages:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
@@ -77,6 +74,9 @@ jobs:
       - run:
           name: generate
           command: ./generate.sh
+      - run:
+          name: update rust toolchain
+          command: rustup toolchain install 1.58-x86_64-unknown-linux-gnu
       - run:
           name: go vet
           command: go vet ./...

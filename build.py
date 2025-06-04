@@ -192,6 +192,8 @@ def run_tests(race, parallel, timeout, verbose):
         logging.error("Downloading dependencies failed, see logs for details")
         logging.error("{}".format(exc.output))
 
+    preinstall_udf_deps()
+
     logging.info("Starting tests...")
     if race:
         logging.info("Race is enabled.")
@@ -214,6 +216,12 @@ def run_tests(race, parallel, timeout, verbose):
     logging.info("Test command: " + test_command)
     output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
+
+def preinstall_udf_deps():
+    logging.info("Preinstalling udf dependencies in udf/agent/py")
+    result = subprocess.check_call(['pip3', 'install', 'udf/agent/py/'])
+    if result != 0:
+        logging.error(f"Preinstall of python UDF dependencies failed with status code {result}")
 
 def package_udfs(version, dist_dir):
     """

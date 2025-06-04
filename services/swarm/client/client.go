@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/api/types/system"
 	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
@@ -147,7 +148,7 @@ func (c *httpClient) Version() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	info := new(types.Info)
+	info := new(system.Info)
 	if err := c.decodeResponse(resp, info, http.StatusOK); err != nil {
 		return "", err
 	}

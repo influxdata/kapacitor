@@ -14,7 +14,7 @@ setup(name='kapacitor_udf',
         'kapacitor.udf',
     ],
     install_requires=[
-        "protobuf==5.29.2",
+        "protobuf==3.17.3",
     ],
     maintainer_email="support@influxdb.com",
     license="MIT",
