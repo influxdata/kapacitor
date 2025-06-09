@@ -9,9 +9,9 @@ ADD ./scripts/debian-deps.sh /usr/local/bin/debian-deps.sh
 
 RUN /usr/local/bin/debian-deps.sh
 
- RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
- RUN gem install dotenv -v 2.8.1 && gem install fpm
+RUN gem install dotenv -v 2.8.1 && gem install fpm
 
 ENV PROJECT_DIR=/kapacitor
 RUN mkdir -p $PROJECT_DIR
