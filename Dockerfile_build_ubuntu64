@@ -9,6 +9,7 @@ ADD ./scripts/debian-deps.sh /usr/local/bin/debian-deps.sh
 
 RUN /usr/local/bin/debian-deps.sh
 
+# Need to keep this for generators and similar that may reference only `python` and not `python3`
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 RUN gem install dotenv -v 2.8.1 && gem install fpm
