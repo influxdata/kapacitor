@@ -1,23 +1,24 @@
-FROM quay.io/influxdb/builder:kapacitor-20250520
+FROM quay.io/influxdb/cross-builder:go1.23.9-latest
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
 
 MAINTAINER support@influxdb.com
 
-# Install protobuf3 python library
-# NOTE: PROTO_VERSION env var is inherited from the parent builder image.
-RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
-    && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
-    && cd protobuf-${PROTO_VERSION}/python \
-    && python2 setup.py install \
-    && python3 setup.py install \
-    && cd ../../ \
-    && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
+ADD ./scripts/debian-deps.sh /usr/local/bin/debian-deps.sh
+
+RUN /usr/local/bin/debian-deps.sh
+
+# Need to keep this for generators and similar that may reference only `python` and not `python3`
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
+
+RUN gem install dotenv -v 2.8.1 && gem install fpm
 
 ENV PROJECT_DIR=/kapacitor
 RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
+
+RUN rm /usr/local/bin/debian-deps.sh
 
 # Configure local git
 RUN git config --global --add safe.directory $PROJECT_DIR

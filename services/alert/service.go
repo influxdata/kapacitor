@@ -824,7 +824,7 @@ func decodeStringToTextUnmarshaler(f, t reflect.Type, data interface{}) (interfa
 	isPtr := true
 	if t.Kind() != reflect.Ptr {
 		isPtr = false
-		t = reflect.PtrTo(t)
+		t = reflect.PointerTo(t)
 	}
 	if t.Implements(textUnmarshalerType) {
 		value := reflect.New(t.Elem())
