@@ -9,6 +9,7 @@
    1. Internal build image reverted to `cross-builder`
    2. Reference GO version upgraded to 1.23.9
    3. Python based UDFs no longer automatically support Python2. This change is part of our effort to follow modern security best practices. Note that as a courtesy to some users legacy Python2 compatible UDF agent code has been moved to the directory `/udf/agent/py2`. Further details can be found in the `README.md` in that directory.
+2. [2855](https://github.com/influxdata/kapacitor/pull/2855): Upgrade go-lang JWT library to v4 v4.5.2
 
 ## v1.7.7 [2025-05-27]
 ----------------------

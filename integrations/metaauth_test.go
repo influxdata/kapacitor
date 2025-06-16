@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/h2non/gock"
 	"golang.org/x/crypto/bcrypt"
 
