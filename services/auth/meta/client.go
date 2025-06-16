@@ -17,7 +17,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 const controlClientUA = "InfluxDB Cluster Client"

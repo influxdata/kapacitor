@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/flux/fluxinit"
 	iclient "github.com/influxdata/influxdb/client/v2"
