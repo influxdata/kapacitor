@@ -1,4 +1,4 @@
-## v1.8.0 [unreleased]
+## v1.8.0 [2025-06-26]
 ----------------------
 
 ⚠️ Python based UDFs no longer automatically support Python2.  This change is part of our effort to follow modern security best practices. Note that as a courtesy to some users legacy Python2 compatible UDF agent code has been moved to the directory `/udf/agent/py2`. Further details can be found in the `README.md` in that directory.
