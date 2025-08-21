@@ -1,3 +1,10 @@
+## v1.8.1 [unreleased]
+
+### Other
+
+1. [2860](https://github.com/influxdata/kapacitor/pull/2860): Upgrade golang.org/x/oauth2 from 0.23.0 to 0.27.0
+1. [2863](https://github.com/influxdata/kapacitor/pull/2863): Upgrade Go to 1.23.12
+
 ## v1.8.0 [2025-06-26]
 ----------------------
 
