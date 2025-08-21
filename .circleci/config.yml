@@ -4,7 +4,7 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/cross-builder:go1.23.9-latest
+      - image: quay.io/influxdb/cross-builder:go1.24.6-latest
     resource_class: large
 
 commands:
