@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+export GOFLAGS="-x -v"
+
 go install google.golang.org/protobuf/cmd/protoc-gen-go
 go install github.com/benbjohnson/tmpl
 go install github.com/mailru/easyjson/easyjson
