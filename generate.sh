@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+export CARGO_TERM_PROGRESS_WHEN=always
 export GOFLAGS="-x -v"
 
 go install google.golang.org/protobuf/cmd/protoc-gen-go
