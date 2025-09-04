@@ -66,6 +66,9 @@ jobs:
   static_code_checks:
     executor: cross-builder
     working_directory: ~/kapacitor
+    environment:
+      GOPATH: /root/go
+      GOROOT: /go
     steps:
       - checkout
       - run:
