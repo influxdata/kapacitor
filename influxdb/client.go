@@ -634,11 +634,11 @@ type Response struct {
 // Returns nil if no errors occurred on any statements.
 func (r *Response) Error() error {
 	if r.Err != "" {
-		return fmt.Errorf(r.Err)
+		return fmt.Errorf("%s", r.Err)
 	}
 	for _, result := range r.Results {
 		if result.Err != "" {
-			return fmt.Errorf(result.Err)
+			return fmt.Errorf("%s", result.Err)
 		}
 	}
 	return nil
