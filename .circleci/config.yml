@@ -6,6 +6,9 @@ executors:
     docker:
       - image: quay.io/influxdb/cross-builder:go1.24.6-latest
     resource_class: large
+    environment:
+      GOPATH: /root/go
+      GOROOT: /go
 
 commands:
   install_dependencies:
@@ -66,9 +69,6 @@ jobs:
   static_code_checks:
     executor: cross-builder
     working_directory: ~/kapacitor
-    environment:
-      GOPATH: /root/go
-      GOROOT: /go
     steps:
       - checkout
       - run:
