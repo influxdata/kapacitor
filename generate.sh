@@ -16,8 +16,6 @@ function check_changes () {
 
 check_changes "git is dirty before running generate!"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] starting 'go generate'..."
-go generate -x ./...
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] done"
+go generate ./...
 
 check_changes "git is dirty after running generate!"
