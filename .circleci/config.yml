@@ -77,16 +77,18 @@ jobs:
       - run:
           name: generate
           command: ./generate.sh
-          no_output_timeout: 30m
+          no_output_timeout: 20m
       - run:
           name: update rust toolchain
           command: rustup toolchain install 1.58-x86_64-unknown-linux-gnu
       - run:
           name: go vet
           command: go vet ./...
+          no_output_timeout: 20m
       - run:
           name: staticcheck
           command:  go run honnef.co/go/tools/cmd/staticcheck ./...
+          no_output_timeout: 20m
 
   release:
     executor: cross-builder
