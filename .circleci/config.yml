@@ -84,17 +84,9 @@ jobs:
       - run:
           name: go vet
           command: go vet ./...
-          no_output_timeout: 20m
       - run:
           name: staticcheck
-          command:  |
-            echo "Current staticcheck version (if any):"
-            $GOPATH/bin/staticcheck -version 2>/dev/null || echo "staticcheck not found"
-            echo "Installing latest staticcheck compatible with Go 1.24..."
-            go install honnef.co/go/tools/cmd/staticcheck@latest
-            echo "Using staticcheck from: $(which $GOPATH/bin/staticcheck)"
-            $GOPATH/bin/staticcheck ./...
-          no_output_timeout: 20m
+          command:  go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 ./...
 
   release:
     executor: cross-builder
