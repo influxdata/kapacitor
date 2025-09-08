@@ -4,8 +4,11 @@ version:  "2.1"
 executors:
   cross-builder:
     docker:
-      - image: quay.io/influxdb/cross-builder:go1.23.9-latest
+      - image: quay.io/influxdb/cross-builder:go1.24.6-latest
     resource_class: large
+    environment:
+      GOPATH: /root/go
+      GOROOT: /go
 
 commands:
   install_dependencies:
@@ -74,6 +77,7 @@ jobs:
       - run:
           name: generate
           command: ./generate.sh
+          no_output_timeout: 20m
       - run:
           name: update rust toolchain
           command: rustup toolchain install 1.58-x86_64-unknown-linux-gnu
@@ -82,7 +86,7 @@ jobs:
           command: go vet ./...
       - run:
           name: staticcheck
-          command:  go run honnef.co/go/tools/cmd/staticcheck ./...
+          command:  go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 ./...
 
   release:
     executor: cross-builder
