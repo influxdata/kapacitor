@@ -1,12 +1,15 @@
 ## v1.8.2 [unreleased]
 
+### Features
+
+1. [2865](https://github.com/influxdata/kapacitor/pull/2865): Support InfluxDB v3 ping endpoint
+
 ## v1.8.1 [2025-09-08]
 
 ### Other
 
 1. [2860](https://github.com/influxdata/kapacitor/pull/2860): Upgrade golang.org/x/oauth2 from 0.23.0 to 0.27.0
 1. [2864](https://github.com/influxdata/kapacitor/pull/2864): Upgrade Go to 1.24.6
-1. [2865](https://github.com/influxdata/kapacitor/pull/2865): Support InfluxDB v3 ping endpoint
 
 ## v1.8.0 [2025-06-26]
 ----------------------
