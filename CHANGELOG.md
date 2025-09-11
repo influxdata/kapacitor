@@ -1,4 +1,6 @@
-## v1.8.1 [unreleased]
+## v1.8.2 [unreleased]
+
+## v1.8.1 [2025-09-08]
 
 ### Other
 
