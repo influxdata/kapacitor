@@ -411,7 +411,8 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 		return nil, fmt.Errorf("invalid response: code %d", resp.StatusCode)
 	}
 
-	if result != nil {
+	if result != nil && resp.StatusCode != http.StatusNoContent {
+		// Skip response body parsing if the status code is `204 No Content`
 		d := json.NewDecoder(body)
 		d.UseNumber()
 		err = d.Decode(result)
@@ -514,6 +515,12 @@ func (c *HTTPClient) doHttpV2(req *http.Request, codes ...int) (io.ReadCloser, e
 	return reader, nil
 }
 
+// PingResponseV3 represents the ping response body received from an InfluxDB 3 server.
+// e.g.: `{"version":"3.0.2","revision":"d80d6cd600","process_id":"60d49612-f3d9-429d-bbd1-9dc82f57db99"}`
+type PingResponseV3 struct {
+	Version string `json:"version"`
+}
+
 // Ping will check to see if the server is up with an optional timeout on waiting for leader.
 // Ping returns how long the request took, the version of the server it connected to, and an error if one occurred.
 func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
@@ -535,11 +542,15 @@ func (c *HTTPClient) Ping(ctx context.Context) (time.Duration, string, error) {
 	if ctx != nil {
 		req = req.WithContext(ctx)
 	}
-	resp, err := c.do(req, nil, http.StatusNoContent)
+	body := &PingResponseV3{}
+	resp, err := c.do(req, body, http.StatusNoContent, http.StatusOK)
 	if err != nil {
 		return 0, "", err
 	}
 	version := resp.Header.Get("X-Influxdb-Version")
+	if version == "" {
+		version = body.Version
+	}
 	return time.Since(now), version, nil
 }
 

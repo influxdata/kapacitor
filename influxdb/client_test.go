@@ -107,8 +107,10 @@ func TestClient_BasicAuth(t *testing.T) {
 }
 
 func TestClient_Ping(t *testing.T) {
+	version := "1.0.0"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data Response
+		w.Header().Add("X-Influxdb-Version", version)
 		w.WriteHeader(http.StatusNoContent)
 		_ = json.NewEncoder(w).Encode(data)
 	}))
@@ -117,10 +119,30 @@ func TestClient_Ping(t *testing.T) {
 	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
 
-	_, _, err := c.Ping(context.Background())
+	_, ver, err := c.Ping(context.Background())
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
+	assert.Equal(t, version, ver)
+}
+
+func TestClient_PingV3(t *testing.T) {
+	version := "3.0.0"
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data := map[string]string{"version": version}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	config := Config{URLs: []string{ts.URL}}
+	c, _ := NewHTTPClient(config)
+
+	_, ver, err := c.Ping(context.Background())
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+	assert.Equal(t, version, ver)
 }
 
 func TestClient_Update(t *testing.T) {

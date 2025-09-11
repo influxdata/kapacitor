@@ -1,5 +1,9 @@
 ## v1.8.2 [unreleased]
 
+### Features
+
+1. [2865](https://github.com/influxdata/kapacitor/pull/2865): Support InfluxDB v3 ping endpoint
+
 ## v1.8.1 [2025-09-08]
 
 ### Other
