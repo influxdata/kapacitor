@@ -1,5 +1,9 @@
 ## v1.8.3 [unreleased]
 
+### Other
+
+1. [2868](https://github.com/influxdata/kapacitor/pull/2868): Upgreade Go to 1.25.2
+
 ## v1.8.2 [2025-09-29]
 
 ### Features
