@@ -3,6 +3,7 @@
 ### Other
 
 1. [2876](https://github.com/influxdata/kapacitor/pull/2876): Upgrade Go to 1.24.11
+2. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
 
 ## v1.8.2 [2025-09-29]
 
