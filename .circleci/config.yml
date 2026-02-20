@@ -29,7 +29,17 @@ commands:
     description:  >
       This will build and publish release packages for tag "$CIRCLE_TAG"
     steps:
+      - run:
+          command: |
+            apt-get update
+            apt-get install --no-install-recommends --yes python3-venv
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+      - run:
+          command: |
+            python3 -m venv venv
       - run: |
+          source ./venv/bin/activate
           ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG#v}"
       - persist_to_workspace:
           root: .
@@ -43,17 +53,37 @@ commands:
       This will run Kapacitor Tests
     steps:
       - run:
+          command: |
+            apt-get update
+            apt-get install --no-install-recommends --yes python3-venv
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+      - run:
+          command: |
+            python3 -m venv venv
+      - run:
           name: Running Kapacitor Tests
           no_output_timeout: 30m
           command:  |
+            source ./venv/bin/activate
             ./build.py --test --generate --parallel=1 --timeout=1000s --verbose
   deploy_nightly:
     description:  >
       This will build and publish nightly releases
     steps:
       - run:
+          command: |
+            apt-get update
+            apt-get install --no-install-recommends --yes python3-venv
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+      - run:
+          command: |
+            python3 -m venv venv
+      - run:
           name: Deploy Nightly Build
           command:  |
+            source ./venv/bin/activate
             ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
 
 jobs:
