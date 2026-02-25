@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 
 ################
 #### Kapacitor Variables
@@ -580,9 +580,9 @@ def build(version=None,
         build_command += "\" "
 
         build_command += path
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         run(build_command, shell=True)
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
     return True
 
