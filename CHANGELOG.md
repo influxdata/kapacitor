@@ -4,6 +4,11 @@
 
 1. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
 2. [2881](https://github.com/influxdata/kapacitor/pull/2881): Upgrade Go to 1.25.7
+    * Sets the reference go 1.25.7
+    * Updates `build.py` so that...
+        * Linux builds always use static libraries.
+        * Darwin builds always use dynamic libraries.
+        * Windows builds always use dynamic libraries.
 
 ## v1.8.2 [2025-09-29]
 
