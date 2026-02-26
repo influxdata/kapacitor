@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 
 ################
 #### Kapacitor Variables
@@ -265,7 +265,6 @@ def package_python_udf(version, dist_dir):
 
     return [outfile]
 
-
 ################
 #### All Kapacitor-specific content above this line
 ################
@@ -517,17 +516,29 @@ def build(version=None,
         if  arch == "aarch64" or arch == "arm64":
             arch = "arm64"
 
+        # NOTE(bnpfeife): Previously, linux/arm64 was statically built
+        # regardless whether "--static" was passed to this script. Now
+        # darwin builds fail when "--static" is passed (we are missing
+        # some static libraries). So, the following *always* generates
+        # static builds for linux, and *always* generates dynamic
+        # builds for darwin and windows.
+
+        # Linux
         if platform == "linux":
             if arch == "amd64":
+                cc = "/musl/x86_64/bin/musl-gcc"
                 tags += ["netgo", "osusergo", "static_build"]
             if arch == "arm64":
                 cc = "/musl/aarch64/bin/musl-gcc"
-                tags += ["netgo", "osusergo", "static_build", "noasm"]
+                tags += ["netgo", "osusergo", "noasm", "static_build"]
+        # Darwin
         elif platform == "darwin" and arch == "amd64":
-            cc = "x86_64-apple-darwin18-clang"
+            cc = "x86_64-apple-darwin23.5-clang"
             tags += [ "netgo", "osusergo"]
+        # Windows
         elif  platform == "windows" and arch == "amd64":
             cc = "x86_64-w64-mingw32-gcc"
+
         build_command += "CC={} GOOS={} GOARCH={} ".format(cc, platform, arch)
 
         if "arm" in fullarch:
@@ -544,21 +555,34 @@ def build(version=None,
         if len(tags) > 0:
             build_command += "-tags \"{}\" ".format(' '.join(tags))
 
-            # Starting with Go 1.5, the linker flag arguments changed to 'name=value' from 'name value'
-        build_command += "-ldflags=\""
-        if static:
-            build_command +="-s "
+        # "ldflags" start
+        build_command += "-ldflags \""
+
+        # version strings
+        build_command += "-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS ".format(
+            version,
+            get_current_branch(),
+            get_current_commit(),
+        )
+
+        # Linux
         if platform == "linux":
-            build_command += r'-extldflags \"-fno-PIC -Wl,-z,stack-size=8388608,--allow-multiple-definition\"  '
-        build_command += '-X main.version={} -X main.branch={} -X main.commit={} -X main.platform=OSS" '.format(version,
-                                                                                                            get_current_branch(),
-                                                                                                            get_current_commit())
-        if static:
-            build_command += "-a -installsuffix cgo "
+            # "extldflags" start
+            build_command += "-linkmode=external -extldflags \\\"-fno-PIC -Wl,-z,stack-size=8388608,--allow-multiple-definition "
+            if arch == "amd64":
+                build_command += "-L{} -Wl,-lunwind ".format(find_rustlib_path("x86_64-unknown-linux-musl"))
+            if arch == "arm64":
+                build_command += "-L{} -Wl,-lunwind ".format(find_rustlib_path("aarch64-unknown-linux-musl"))
+            # "exdldflags" end
+            build_command += "\\\" "
+
+        # "ldflags" end
+        build_command += "\" "
+
         build_command += path
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         run(build_command, shell=True)
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
     return True
 
@@ -727,6 +751,23 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
     finally:
         # Cleanup
         shutil.rmtree(tmp_build_dir)
+
+def find_rustlib_path(triple):
+    """
+    Retrieves the "rustlib" directory.
+    """
+
+    # "find_rustlib_path" is included within the crossbuilder docker
+    # image. This script retrieves the "rustlib" directory. "rustlib"
+    # contains static libraries which serve as replacements for
+    # various glibc components. This is required for object-files
+    # built by the Rust toolchain to properly link with Go.
+    return subprocess.run(
+        ['find_rustlib_path', triple],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 def main(args):
     global PACKAGE_NAME
