@@ -452,6 +452,10 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
         prefix = '/'.join(bucket_name.split('/')[1:])
 
     # Keep retries at 10 attempts and use path-style addressing for dotted bucket names.
+    # Also ensure robust EC2 instance metadata (IMDS) credential retrieval by setting
+    # botocore's IMDS retry/timeout defaults if they are not already configured.
+    os.environ.setdefault("AWS_EC2_METADATA_SERVICE_NUM_ATTEMPTS", "10")
+    os.environ.setdefault("AWS_EC2_METADATA_SERVICE_TIMEOUT", "1")
     config = Config(retries={'max_attempts': 10}, s3={'addressing_style': 'path'})
     s3 = boto3.client('s3', config=config)
 
