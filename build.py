@@ -433,42 +433,52 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
     """
     logging.debug("Uploading files to bucket '{}': {}".format(bucket_name, packages))
     try:
-        import boto
-        from boto.s3.key import Key
-        from boto.s3.connection import OrdinaryCallingFormat
-        logging.getLogger("boto").setLevel(logging.WARNING)
+        import boto3
+        from botocore.config import Config
+        from botocore.exceptions import ClientError
+        logging.getLogger("boto3").setLevel(logging.WARNING)
     except ImportError:
-        logging.warn("Cannot upload packages without 'boto' Python library!")
+        logging.warn("Cannot upload packages without 'boto3' Python library!")
         return False
     logging.info("Connecting to AWS S3...")
-    # Up the number of attempts to 10 from default of 1
-    boto.config.add_section("Boto")
-    boto.config.set("Boto", "metadata_service_num_attempts", "10")
-    c = boto.connect_s3(calling_format=OrdinaryCallingFormat())
     if bucket_name is None:
         bucket_name = DEFAULT_BUCKET
-    bucket = c.get_bucket(bucket_name.split('/')[0])
+    bucket = bucket_name.split('/')[0]
+    prefix = ''
+    if '/' in bucket_name:
+        # Allow for nested paths within the bucket name (ex:
+        # bucket/folder). Assuming forward-slashes as path
+        # delimiter.
+        prefix = '/'.join(bucket_name.split('/')[1:])
+
+    # Keep retries at 10 attempts and use path-style addressing for dotted bucket names.
+    config = Config(retries={'max_attempts': 10}, s3={'addressing_style': 'path'})
+    s3 = boto3.client('s3', config=config)
+
     for p in packages:
-        if '/' in bucket_name:
-            # Allow for nested paths within the bucket name (ex:
-            # bucket/folder). Assuming forward-slashes as path
-            # delimiter.
-            name = os.path.join('/'.join(bucket_name.split('/')[1:]),
-                                os.path.basename(p))
+        if prefix:
+            name = os.path.join(prefix, os.path.basename(p))
         else:
             name = os.path.basename(p)
         logging.debug("Using key: {}".format(name))
-        if bucket.get_key(name) is None or overwrite:
-            logging.info("Uploading file {}".format(name))
-            k = Key(bucket)
-            k.key = name
-            if overwrite:
-                n = k.set_contents_from_filename(p, replace=True)
-            else:
-                n = k.set_contents_from_filename(p, replace=False)
-            k.make_public()
-        else:
-            logging.warn("Not uploading file {}, as it already exists in the target bucket.".format(name))
+
+        if not overwrite:
+            try:
+                s3.head_object(Bucket=bucket, Key=name)
+                logging.warn("Not uploading file {}, as it already exists in the target bucket.".format(name))
+                continue
+            except ClientError as exc:
+                code = exc.response.get("Error", {}).get("Code", "")
+                if code not in ("404", "NoSuchKey", "NotFound"):
+                    logging.error("Failed checking for existing key '{}': {}".format(name, exc))
+                    return False
+
+        logging.info("Uploading file {}".format(name))
+        try:
+            s3.upload_file(p, bucket, name, ExtraArgs={'ACL': 'public-read'})
+        except ClientError as exc:
+            logging.error("Uploading file '{}' failed: {}".format(name, exc))
+            return False
     return True
 
 def build(version=None,
