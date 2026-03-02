@@ -13,7 +13,7 @@ apt-get -qq update && apt-get -qq install -y \
     zip \
     python3 \
     python3-setuptools \
-    python3-boto \
+    python3-boto3 \
     python3-pip \
     autoconf \
     automake \
