@@ -293,17 +293,3 @@ workflows:
           release_type: nightly
           requires:
             - changelog
-  nightly-manual:
-    jobs:
-      - nightly-approve:
-          type: approval
-      - nightly-build:
-          requires:
-            - nightly-approve
-      - changelog:
-          requires:
-            - nightly-approve
-      - s3-publish-changelog:
-          release_type: nightly
-          requires:
-            - changelog
