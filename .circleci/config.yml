@@ -38,9 +38,12 @@ commands:
       - run:
           command: |
             python3 -m venv venv
-      - run: |
-          source ./venv/bin/activate
-          ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG#v}"
+      - run:
+          name: Deploy Release Build
+          no_output_timeout: 30m
+          command: |  
+            source ./venv/bin/activate
+            ./build.py --debug --clean --generate --package --package-udfs --platform=all --arch=all --checksum --release --version "${CIRCLE_TAG#v}"
       - persist_to_workspace:
           root: .
           paths:
@@ -82,6 +85,7 @@ commands:
             python3 -m venv venv
       - run:
           name: Deploy Nightly Build
+          no_output_timeout: 30m
           command:  |
             source ./venv/bin/activate
             ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
