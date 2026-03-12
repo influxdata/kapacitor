@@ -157,6 +157,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		return nil, err
 	}
 
+	if len(n.TcpHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["tcp"]; disabled {
+			return nil, fmt.Errorf("tcp alert handler is disabled, TICKscripts using .tcp() cannot be enabled")
+		}
+	}
 	for _, tcp := range n.TcpHandlers {
 		c := alertservice.TCPHandlerConfig{
 			Address: tcp.Address,
@@ -165,6 +170,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.EmailHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["smtp"]; disabled {
+			return nil, fmt.Errorf("smtp alert handler is disabled, TICKscripts using .email() cannot be enabled")
+		}
+	}
 	for _, email := range n.EmailHandlers {
 		c := smtp.HandlerConfig{
 			To:          email.ToList,
@@ -173,7 +183,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.SMTPService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["smtp"]; !disabled && len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		c := smtp.HandlerConfig{}
 		h := et.tm.SMTPService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -185,6 +195,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.ExecHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["exec"]; disabled {
+			return nil, fmt.Errorf("exec alert handler is disabled, TICKscripts using .exec() cannot be enabled")
+		}
+	}
 	for _, e := range n.ExecHandlers {
 		c := alertservice.ExecHandlerConfig{
 			Prog:      e.Command[0],
@@ -195,6 +210,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.LogHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["log"]; disabled {
+			return nil, fmt.Errorf("log alert handler is disabled, TICKscripts using .log() cannot be enabled")
+		}
+	}
 	for _, log := range n.LogHandlers {
 		c := alertservice.DefaultLogHandlerConfig()
 		c.Path = log.FilePath
@@ -208,6 +228,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.VictorOpsHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["victorops"]; disabled {
+			return nil, fmt.Errorf("victorops alert handler is disabled, TICKscripts using .victorOps() cannot be enabled")
+		}
+	}
 	for _, vo := range n.VictorOpsHandlers {
 		c := victorops.HandlerConfig{
 			RoutingKey: vo.RoutingKey,
@@ -215,12 +240,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.VictorOpsService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["victorops"]; !disabled && len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		c := victorops.HandlerConfig{}
 		h := et.tm.VictorOpsService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.PagerDutyHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["pagerduty"]; disabled {
+			return nil, fmt.Errorf("pagerduty alert handler is disabled, TICKscripts using .pagerDuty() cannot be enabled")
+		}
+	}
 	for _, pd := range n.PagerDutyHandlers {
 		c := pagerduty.HandlerConfig{
 			ServiceKey: pd.ServiceKey,
@@ -228,12 +258,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.PagerDutyService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["pagerduty"]; !disabled && len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
 		c := pagerduty.HandlerConfig{}
 		h := et.tm.PagerDutyService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.PagerDuty2Handlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["pagerduty2"]; disabled {
+			return nil, fmt.Errorf("pagerduty2 alert handler is disabled, TICKscripts using .pagerDuty2() cannot be enabled")
+		}
+	}
 	for _, pd := range n.PagerDuty2Handlers {
 		links := make([]pagerduty2.LinkTemplate, len(pd.Links))
 		for i, l := range pd.Links {
@@ -252,7 +287,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		}
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["pagerduty2"]; !disabled && len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
 		c := pagerduty2.HandlerConfig{}
 
 		h, err := et.tm.PagerDuty2Service.Handler(c, ctx...)
@@ -262,6 +297,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.SensuHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["sensu"]; disabled {
+			return nil, fmt.Errorf("sensu alert handler is disabled, TICKscripts using .sensu() cannot be enabled")
+		}
+	}
 	for _, s := range n.SensuHandlers {
 		c := sensu.HandlerConfig{
 			Source:   s.Source,
@@ -275,6 +315,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.SlackHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["slack"]; disabled {
+			return nil, fmt.Errorf("slack alert handler is disabled, TICKscripts using .slack() cannot be enabled")
+		}
+	}
 	for _, s := range n.SlackHandlers {
 		c := slack.HandlerConfig{
 			Workspace: s.Workspace,
@@ -285,7 +330,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.SlackService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["slack"]; !disabled && len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
 		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
@@ -296,6 +341,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.TelegramHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["telegram"]; disabled {
+			return nil, fmt.Errorf("telegram alert handler is disabled, TICKscripts using .telegram() cannot be enabled")
+		}
+	}
 	for _, t := range n.TelegramHandlers {
 		c := telegram.HandlerConfig{
 			ChatId:                t.ChatId,
@@ -307,6 +357,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.SNMPTrapHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["snmptrap"]; disabled {
+			return nil, fmt.Errorf("snmptrap alert handler is disabled, TICKscripts using .snmpTrap() cannot be enabled")
+		}
+	}
 	for _, s := range n.SNMPTrapHandlers {
 		dataList := make([]snmptrap.Data, len(s.DataList))
 		for i, d := range s.DataList {
@@ -327,7 +382,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
-	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["telegram"]; !disabled && len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
 		c := telegram.HandlerConfig{}
 		h := et.tm.TelegramService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -339,6 +394,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.HipChatHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["hipchat"]; disabled {
+			return nil, fmt.Errorf("hipchat alert handler is disabled, TICKscripts using .hipChat() cannot be enabled")
+		}
+	}
 	for _, hc := range n.HipChatHandlers {
 		c := hipchat.HandlerConfig{
 			Room:  hc.Room,
@@ -347,7 +407,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.HipChatService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["hipchat"]; !disabled && len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
 		c := hipchat.HandlerConfig{}
 		h := et.tm.HipChatService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -359,6 +419,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.KafkaHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["kafka"]; disabled {
+			return nil, fmt.Errorf("kafka alert handler is disabled, TICKscripts using .kafka() cannot be enabled")
+		}
+	}
 	for _, k := range n.KafkaHandlers {
 		c := kafka.HandlerConfig{
 			Cluster:              k.Cluster,
@@ -374,6 +439,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.AlertaHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["alerta"]; disabled {
+			return nil, fmt.Errorf("alerta alert handler is disabled, TICKscripts using .alerta() cannot be enabled")
+		}
+	}
 	for _, a := range n.AlertaHandlers {
 		c := et.tm.AlertaService.DefaultHandlerConfig()
 		if a.Token != "" {
@@ -416,6 +486,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.PushoverHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["pushover"]; disabled {
+			return nil, fmt.Errorf("pushover alert handler is disabled, TICKscripts using .pushover() cannot be enabled")
+		}
+	}
 	for _, p := range n.PushoverHandlers {
 		c := pushover.HandlerConfig{}
 		if p.Device != "" {
@@ -440,6 +515,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.HTTPPostHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["post"]; disabled {
+			return nil, fmt.Errorf("post alert handler is disabled, TICKscripts using .post() cannot be enabled")
+		}
+	}
 	for _, p := range n.HTTPPostHandlers {
 		if p.Endpoint == "" && p.URL == "" {
 			return nil, errors.New("Either URL or endpoint must be non-empty")
@@ -458,6 +538,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.OpsGenieHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["opsgenie"]; disabled {
+			return nil, fmt.Errorf("opsgenie alert handler is disabled, TICKscripts using .opsGenie() cannot be enabled")
+		}
+	}
 	for _, og := range n.OpsGenieHandlers {
 		c := opsgenie.HandlerConfig{
 			TeamsList:      og.TeamsList,
@@ -466,10 +551,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.OpsGenieService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["opsgenie"]; !disabled && len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
 		c := opsgenie.HandlerConfig{}
 		h := et.tm.OpsGenieService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
+	}
+	if len(n.OpsGenie2Handlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["opsgenie2"]; disabled {
+			return nil, fmt.Errorf("opsgenie2 alert handler is disabled, TICKscripts using .opsGenie2() cannot be enabled")
+		}
 	}
 	for _, og := range n.OpsGenie2Handlers {
 		c := opsgenie2.HandlerConfig{
@@ -480,17 +570,27 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.OpsGenie2Handlers) == 0 && (et.tm.OpsGenie2Service != nil && et.tm.OpsGenie2Service.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["opsgenie2"]; !disabled && len(n.OpsGenie2Handlers) == 0 && (et.tm.OpsGenie2Service != nil && et.tm.OpsGenie2Service.Global()) {
 		c := opsgenie2.HandlerConfig{}
 		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.TalkHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["talk"]; disabled {
+			return nil, fmt.Errorf("talk alert handler is disabled, TICKscripts using .talk() cannot be enabled")
+		}
+	}
 	for range n.TalkHandlers {
 		h := et.tm.TalkService.Handler(ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.MQTTHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["mqtt"]; disabled {
+			return nil, fmt.Errorf("mqtt alert handler is disabled, TICKscripts using .mqtt() cannot be enabled")
+		}
+	}
 	for _, m := range n.MQTTHandlers {
 		c := mqtt.HandlerConfig{
 			BrokerName: m.BrokerName,
@@ -505,6 +605,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.DiscordHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["discord"]; disabled {
+			return nil, fmt.Errorf("discord alert handler is disabled, TICKscripts using .discord() cannot be enabled")
+		}
+	}
 	for _, s := range n.DiscordHandlers {
 		c := discord.HandlerConfig{
 			Workspace:  s.Workspace,
@@ -519,6 +624,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.BigPandaHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["bigpanda"]; disabled {
+			return nil, fmt.Errorf("bigpanda alert handler is disabled, TICKscripts using .bigPanda() cannot be enabled")
+		}
+	}
 	for _, s := range n.BigPandaHandlers {
 		c := bigpanda.HandlerConfig{
 			AppKey:            s.AppKey,
@@ -534,6 +644,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	if len(n.TeamsHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["teams"]; disabled {
+			return nil, fmt.Errorf("teams alert handler is disabled, TICKscripts using .teams() cannot be enabled")
+		}
+	}
 	for _, t := range n.TeamsHandlers {
 		c := teams.HandlerConfig{
 			ChannelURL: t.ChannelURL,
@@ -541,7 +656,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.TeamsService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.TeamsHandlers) == 0 && (et.tm.TeamsService != nil && et.tm.TeamsService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["teams"]; !disabled && len(n.TeamsHandlers) == 0 && (et.tm.TeamsService != nil && et.tm.TeamsService.Global()) {
 		c := teams.HandlerConfig{}
 		h := et.tm.TeamsService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -553,7 +668,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
-	if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["discord"]; !disabled && len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
 		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Discord handler")
@@ -567,6 +682,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.ServiceNowHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["servicenow"]; disabled {
+			return nil, fmt.Errorf("servicenow alert handler is disabled, TICKscripts using .serviceNow() cannot be enabled")
+		}
+	}
 	for _, s := range n.ServiceNowHandlers {
 		c := servicenow.HandlerConfig{
 			URL:            s.URL,
@@ -581,7 +701,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.ServiceNowService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.ServiceNowHandlers) == 0 && (et.tm.ServiceNowService != nil && et.tm.ServiceNowService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["servicenow"]; !disabled && len(n.ServiceNowHandlers) == 0 && (et.tm.ServiceNowService != nil && et.tm.ServiceNowService.Global()) {
 		h := et.tm.ServiceNowService.Handler(servicenow.HandlerConfig{}, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
@@ -592,7 +712,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
-	if len(n.BigPandaHandlers) == 0 && (et.tm.BigPandaService != nil && et.tm.BigPandaService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["bigpanda"]; !disabled && len(n.BigPandaHandlers) == 0 && (et.tm.BigPandaService != nil && et.tm.BigPandaService.Global()) {
 		h, err := et.tm.BigPandaService.Handler(bigpanda.HandlerConfig{}, ctx...)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create BigPanda handler")
@@ -606,6 +726,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	if len(n.ZenossHandlers) > 0 {
+		if _, disabled := et.tm.DisabledHandlers["zenoss"]; disabled {
+			return nil, fmt.Errorf("zenoss alert handler is disabled, TICKscripts using .zenoss() cannot be enabled")
+		}
+	}
 	for _, s := range n.ZenossHandlers {
 		c := zenoss.HandlerConfig{
 			Action:        s.Action,
@@ -624,7 +749,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.ZenossService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
-	if len(n.ZenossHandlers) == 0 && (et.tm.ZenossService != nil && et.tm.ZenossService.Global()) {
+	if _, disabled := et.tm.DisabledHandlers["zenoss"]; !disabled && len(n.ZenossHandlers) == 0 && (et.tm.ZenossService != nil && et.tm.ZenossService.Global()) {
 		h := et.tm.ZenossService.Handler(zenoss.HandlerConfig{}, ctx...)
 		an.handlers = append(an.handlers, h)
 	}

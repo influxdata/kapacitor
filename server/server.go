@@ -232,6 +232,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service, disabl
 	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, kd)
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMaster.Commander = s.Commander
+	s.TaskMaster.DisabledHandlers = disabledAlertHandlers
 	s.TaskMasterLookup.Set(s.TaskMaster)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
