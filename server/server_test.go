@@ -10358,6 +10358,89 @@ stream
 	}
 }
 
+func TestServer_AlertHandlers_disable_tickscript(t *testing.T) {
+	// Test that disabled handlers also block TICKscript-level handler methods
+	// (e.g. .exec(), .log()) — not just topic-handler API registrations.
+	// This is the fix for CSA-H-01.
+	testCases := []struct {
+		name    string
+		disable map[string]struct{}
+		tick    string
+	}{
+		{
+			name:    "exec",
+			disable: map[string]struct{}{"exec": {}},
+			tick: `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+		.exec('/bin/my-script', 'arg1')
+`,
+		},
+		{
+			name:    "log",
+			disable: map[string]struct{}{"log": {}},
+			tick: `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+		.log('/tmp/alerts.log')
+`,
+		},
+		{
+			name:    "tcp",
+			disable: map[string]struct{}{"tcp": {}},
+			tick: `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+		.tcp('localhost:4567')
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := NewConfig(t)
+			s := OpenServerWithDisabledHandlers(c, tc.disable)
+			defer s.Close()
+			cli := Client(s)
+
+			_, err := cli.CreateTask(client.CreateTaskOptions{
+				ID:   "testDisabledTICKscript",
+				Type: client.StreamTask,
+				DBRPs: []client.DBRP{{
+					Database:        "mydb",
+					RetentionPolicy: "myrp",
+				}},
+				TICKscript: tc.tick,
+				Status:     client.Enabled,
+			})
+			if err == nil {
+				t.Fatalf("expected error when creating task with disabled %s handler in TICKscript, got nil", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.name+" alert handler is disabled") {
+				t.Fatalf("expected error about disabled %s handler, got: %v", tc.name, err)
+			}
+		})
+	}
+}
+
 func TestServer_AlertJSON(t *testing.T) {
 	postServer := func(t *testing.T, expected string) *httptest.Server {
 		t.Helper()

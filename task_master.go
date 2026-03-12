@@ -233,6 +233,10 @@ type TaskMaster struct {
 
 	Commander command.Commander
 
+	// DisabledHandlers is the set of alert handler types that are disabled.
+	// Handler types in this map will be rejected when used in TICKscripts.
+	DisabledHandlers map[string]struct{}
+
 	DefaultRetentionPolicy string
 
 	// Incoming streams
@@ -295,8 +299,9 @@ func NewTaskMaster(id string, info vars.Infoer, d Diagnostic) *TaskMaster {
 		ServerInfo:     info,
 		diag:           d.WithTaskMasterContext(id),
 
-		closed:        true,
-		TimingService: noOpTimingService{},
+		closed:           true,
+		TimingService:    noOpTimingService{},
+		DisabledHandlers: make(map[string]struct{}),
 
 		// Any cleanup/close function for test purposes. Not to be used in production
 		TestCloser: nil,
@@ -334,6 +339,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TimingService = tm.TimingService
 	n.K8sService = tm.K8sService
 	n.Commander = tm.Commander
+	n.DisabledHandlers = tm.DisabledHandlers
 	n.SideloadService = tm.SideloadService
 	n.TeamsService = tm.TeamsService
 	n.ServiceNowService = tm.ServiceNowService
