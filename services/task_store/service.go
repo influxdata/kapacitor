@@ -836,8 +836,13 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		// Start task
 		err = ts.startTask(newTask)
 		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-			return
+			// Task was saved but could not be started (e.g., disabled handler).
+			// Set status to Disabled and record the error so the API response
+			// accurately reflects the task state.
+			newTask.Status = Disabled
+			newTask.Error = err.Error()
+			vars.NumEnabledTasksVar.Add(-1)
+			_ = ts.tasks.Replace(newTask)
 		}
 	}
 
@@ -1025,8 +1030,9 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			// Stop task and start it under new name
 			ts.stopTask(original.ID)
 			if err := ts.startTask(updated); err != nil {
-				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-				return
+				updated.Status = Disabled
+				updated.Error = err.Error()
+				_ = ts.tasks.Replace(updated)
 			}
 		}
 	} else {
@@ -1043,8 +1049,12 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			vars.NumEnabledTasksVar.Add(1)
 			err = ts.startTask(updated)
 			if err != nil {
-				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-				return
+				// Task exists but could not be started (e.g., disabled handler).
+				// Set status back to Disabled and record the error.
+				updated.Status = Disabled
+				updated.Error = err.Error()
+				vars.NumEnabledTasksVar.Add(-1)
+				_ = ts.tasks.Replace(updated)
 			}
 		case Disabled:
 			vars.NumEnabledTasksVar.Add(-1)

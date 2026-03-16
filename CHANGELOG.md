@@ -1,5 +1,9 @@
 ## v1.8.3 [unreleased]
 
+### Bug Fixes
+
+1. [#XXXX](https://github.com/influxdata/kapacitor/pull/XXXX): Fix task status reported as `enabled` when task creation fails due to a disabled alert handler. Task is now saved as `disabled` with the error field populated.
+
 ### Other
 
 1. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
