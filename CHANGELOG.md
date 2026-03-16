@@ -1,5 +1,9 @@
 ## v1.8.3 [unreleased]
 
+### Security
+
+1. [2885](https://github.com/influxdata/kapacitor/pull/2885): Enforce `--disable-alert-handlers` for TICKscript alert handler methods (`.exec()`, `.log()`, `.tcp()`, etc.), closing RCE bypass where `-disable-handlers exec` did not block direct `.exec()` calls in TICKscripts.
+
 ### Other
 
 1. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
