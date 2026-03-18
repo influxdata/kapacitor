@@ -10421,7 +10421,7 @@ stream
 			defer s.Close()
 			cli := Client(s)
 
-			_, err := cli.CreateTask(client.CreateTaskOptions{
+			task, err := cli.CreateTask(client.CreateTaskOptions{
 				ID:   "testDisabledTICKscript",
 				Type: client.StreamTask,
 				DBRPs: []client.DBRP{{
@@ -10431,13 +10431,62 @@ stream
 				TICKscript: tc.tick,
 				Status:     client.Enabled,
 			})
-			if err == nil {
-				t.Fatalf("expected error when creating task with disabled %s handler in TICKscript, got nil", tc.name)
+			if err != nil {
+				t.Fatalf("expected task creation to succeed, got error: %v", err)
 			}
-			if !strings.Contains(err.Error(), tc.name+" alert handler is disabled") {
-				t.Fatalf("expected error about disabled %s handler, got: %v", tc.name, err)
+			if task.Status != client.Disabled {
+				t.Fatalf("expected task status to be disabled, got: %v", task.Status)
+			}
+			if !strings.Contains(task.Error, tc.name+" alert handler is disabled") {
+				t.Fatalf("expected error about disabled %s handler, got: %s", tc.name, task.Error)
 			}
 		})
+	}
+}
+
+func TestServer_DisabledHandler_TaskStatus(t *testing.T) {
+	// Verify that when a task with a disabled handler is created with status=enabled,
+	// the task is saved with status=disabled and the error field is populated,
+	// rather than returning an HTTP 500 error.
+	c := NewConfig(t)
+	s := OpenServerWithDisabledHandlers(c, map[string]struct{}{"exec": {}})
+	defer s.Close()
+	cli := Client(s)
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testDisabledStatus",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+		.exec('/bin/my-script')
+`,
+		Status: client.Enabled,
+	})
+	if err != nil {
+		t.Fatalf("expected task creation to succeed, got error: %v", err)
+	}
+	if task.Status != client.Disabled {
+		t.Fatalf("expected task status to be disabled, got: %v", task.Status)
+	}
+	if task.Error == "" {
+		t.Fatal("expected task error field to be populated")
+	}
+	if !strings.Contains(task.Error, "exec alert handler is disabled") {
+		t.Fatalf("expected error about disabled exec handler, got: %s", task.Error)
+	}
+	if task.Executing {
+		t.Fatal("expected task to not be executing")
 	}
 }
 
