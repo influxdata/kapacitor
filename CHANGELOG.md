@@ -4,6 +4,10 @@
 
 1. [2885](https://github.com/influxdata/kapacitor/pull/2885): Enforce `--disable-alert-handlers` for TICKscript alert handler methods (`.exec()`, `.log()`, `.tcp()`, etc.), closing RCE bypass where `-disable-handlers exec` did not block direct `.exec()` calls in TICKscripts.
 
+### Bug Fixes
+
+1. [2886](https://github.com/influxdata/kapacitor/pull/2886): Fix task status reported as `enabled` when task creation fails due to a disabled alert handler. Task is now saved as `disabled` with the error field populated.
+
 ### Other
 
 1. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
