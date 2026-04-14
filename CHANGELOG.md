@@ -10,7 +10,7 @@
 
 ### Other
 
-1. [2880](https://github.com/influxdata/kapacitor/pull/2880): Upgrade Go to 1.24.13
+1. [2892](https://github.com/influxdata/kapacitor/pull/2892): Upgrade Go to 1.25.8
 2. [2881](https://github.com/influxdata/kapacitor/pull/2881): Upgrade Go to 1.25.7
     * Sets the reference go to 1.25.7
     * Updates `build.py` so that...
