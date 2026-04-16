@@ -1,4 +1,4 @@
-## v1.8.3 [unreleased]
+## v1.8.4 [2026-04-16]
 
 ### Security
 
@@ -10,8 +10,14 @@
 
 ### Other
 
-1. [2881](https://github.com/influxdata/kapacitor/pull/2881), [2892](https://github.com/influxdata/kapacitor/pull/2892): Upgrade Go to 1.25.8
-    * Sets the reference go to 1.25.8
+1. [2892](https://github.com/influxdata/kapacitor/pull/2892): Upgrade Go to 1.25.8
+
+## v1.8.3 [2026-03-03]
+
+### Other
+
+1. [2881](https://github.com/influxdata/kapacitor/pull/2881): Upgrade Go to 1.25.7
+    * Sets the reference go to 1.25.7
     * Updates `build.py` so that...
         * Linux builds always use static libraries.
         * Darwin builds always use dynamic libraries.
