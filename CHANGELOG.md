@@ -1,3 +1,9 @@
+## v1.8.5 [2026-05-06]
+
+### Other
+
+1. [2894](https://github.com/influxdata/kapacitor/pull/2894): Upgrade Go to 1.25.9
+
 ## v1.8.4 [2026-04-16]
 
 ### Security
@@ -10,7 +16,7 @@
 
 ### Other
 
-1. [2894](https://github.com/influxdata/kapacitor/pull/2894): Upgrade Go to 1.25.9
+1. [2892](https://github.com/influxdata/kapacitor/pull/2892): Upgrade Go to 1.25.8
 
 ## v1.8.3 [2026-03-03]
 
