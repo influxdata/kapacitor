@@ -1,3 +1,9 @@
+## v1.8.6 [unreleased]
+
+### Other
+
+1. [2897](https://github.com/influxdata/kapacitor/pull/2897): Upgrade `aws-sdk-go-v2` and `smithy-go` versions.
+
 ## v1.8.5 [2026-05-06]
 
 ### Other
