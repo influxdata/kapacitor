@@ -3,6 +3,7 @@
 ### Other
 
 1. [2897](https://github.com/influxdata/kapacitor/pull/2897): Upgrade `aws-sdk-go-v2` and `smithy-go` versions.
+1. [2899](https://github.com/influxdata/kapacitor/pull/2899): Upgrade Go version to 1.25.10
 
 ## v1.8.5 [2026-05-06]
 
