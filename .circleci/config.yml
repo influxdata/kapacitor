@@ -88,7 +88,7 @@ commands:
           no_output_timeout: 30m
           command:  |
             source ./venv/bin/activate
-            ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases/nightly --platform=all --arch=all --nightly
+            ./build.py --debug --clean --generate --package --package-udfs --upload --bucket=dl-influxdata-com/kapacitor/releases/nightly --platform=all --arch=all --nightly
 
 jobs:
   build:
@@ -193,6 +193,8 @@ jobs:
         type: string
     docker:
       - image: debian:latest
+    environment:
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -203,10 +205,10 @@ jobs:
 
           case "<< parameters.release_type >>" in
             nightly)
-              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/nightlies/ \;
+              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl-influxdata-com/kapacitor/nightlies/ --endpoint-url "${AWS_ENDPOINT_URL_S3}" --region auto \;
               ;;
             release)
-              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl.influxdata.com/kapacitor/releases/ \;
+              find /tmp/workspace/build -type f -exec aws s3 cp "{}" s3://dl-influxdata-com/kapacitor/releases/ --endpoint-url "${AWS_ENDPOINT_URL_S3}" --region auto \;
               ;;
           esac
 
@@ -216,12 +218,14 @@ jobs:
         type: string
     docker:
       - image: debian:latest
+    environment:
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
     steps:
       - attach_workspace:
           at: /tmp/workspace
       - checkout
       - run:
-          name: Publish CHANGELOG.md to S3
+          name: Publish CHANGELOG.md to R2
           command: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
@@ -231,10 +235,10 @@ jobs:
 
             case "<< parameters.release_type >>" in
               nightly)
-                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/nightlies/CHANGELOG.md"
+                aws s3 cp CHANGELOG.md "s3://dl-influxdata-com/kapacitor/nightlies/CHANGELOG.md" --endpoint-url "${AWS_ENDPOINT_URL_S3}" --region auto
                 ;;
               release)
-                aws s3 cp CHANGELOG.md "s3://dl.influxdata.com/kapacitor/releases/CHANGELOG.<< pipeline.git.tag >>.md"
+                aws s3 cp CHANGELOG.md "s3://dl-influxdata-com/kapacitor/releases/CHANGELOG.<< pipeline.git.tag >>.md" --endpoint-url "${AWS_ENDPOINT_URL_S3}" --region auto
                 ;;
             esac
 

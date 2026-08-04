@@ -36,8 +36,8 @@ LOGROTATE_CONFIG = "etc/logrotate.d/kapacitor"
 BASH_COMPLETION_SH = "usr/share/bash-completion/completions/kapacitor"
 DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
 
-# Default AWS S3 bucket for uploads
-DEFAULT_BUCKET = "dl.influxdata.com/kapacitor/artifacts"
+# Default S3-compatible bucket for uploads (Cloudflare R2)
+DEFAULT_BUCKET = "dl-influxdata-com/kapacitor/artifacts"
 
 # META-PACKAGE VARIABLES
 PACKAGE_LICENSE = "MIT"
@@ -429,7 +429,7 @@ def check_prereqs():
     return True
 
 def upload_packages(packages, bucket_name=None, overwrite=False):
-    """Upload provided package output to AWS S3.
+    """Upload provided package output to S3-compatible storage.
     """
     logging.debug("Uploading files to bucket '{}': {}".format(bucket_name, packages))
     try:
@@ -440,7 +440,7 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
     except ImportError:
         logging.warn("Cannot upload packages without 'boto3' Python library!")
         return False
-    logging.info("Connecting to AWS S3...")
+    logging.info("Connecting to S3-compatible storage...")
     if bucket_name is None:
         bucket_name = DEFAULT_BUCKET
     bucket = bucket_name.split('/')[0]
@@ -451,13 +451,15 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
         # delimiter.
         prefix = '/'.join(bucket_name.split('/')[1:])
 
-    # Keep retries at 10 attempts and use path-style addressing for dotted bucket names.
-    # Also ensure robust EC2 instance metadata (IMDS) credential retrieval by setting
-    # botocore's IMDS retry/timeout defaults if they are not already configured.
-    os.environ.setdefault("AWS_EC2_METADATA_SERVICE_NUM_ATTEMPTS", "10")
-    os.environ.setdefault("AWS_EC2_METADATA_SERVICE_TIMEOUT", "1")
+    # Cloudflare R2 (or another S3-compatible endpoint) is selected via the
+    # standard AWS_ENDPOINT_URL_S3 environment variable; without it boto3
+    # falls back to plain AWS S3. R2 requires the region to be "auto".
+    endpoint_url = os.environ.get("AWS_ENDPOINT_URL_S3")
     config = Config(retries={'max_attempts': 10}, s3={'addressing_style': 'path'})
-    s3 = boto3.client('s3', config=config)
+    s3 = boto3.client('s3',
+                      endpoint_url=endpoint_url,
+                      region_name="auto" if endpoint_url else None,
+                      config=config)
 
     for p in packages:
         if prefix:
@@ -479,7 +481,7 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
 
         logging.info("Uploading file {}".format(name))
         try:
-            s3.upload_file(p, bucket, name, ExtraArgs={'ACL': 'public-read'})
+            s3.upload_file(p, bucket, name)
         except ClientError as exc:
             logging.error("Uploading file '{}' failed: {}".format(name, exc))
             return False
@@ -1013,10 +1015,10 @@ if __name__ == '__main__':
                         help='Do not retrieve pinned dependencies when building')
     parser.add_argument('--upload',
                         action='store_true',
-                        help='Upload output packages to AWS S3')
+                        help='Upload output packages to S3-compatible storage')
     parser.add_argument('--upload-overwrite','-w',
                         action='store_true',
-                        help='Upload output packages to AWS S3')
+                        help='Overwrite existing packages in S3-compatible storage')
     parser.add_argument('--bucket',
                         metavar='<S3 bucket name>',
                         type=str,
