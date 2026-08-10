@@ -53,7 +53,7 @@ require (
 	github.com/zeebo/mwc v0.0.4
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.16.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/tools v0.44.0
 	google.golang.org/protobuf v1.36.11
