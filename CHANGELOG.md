@@ -2,7 +2,7 @@
 
 ### Other
 
-1. Upgrade Go version to 1.26.5
+1. [2908](https://github.com/influxdata/kapacitor/pull/2908): Upgrade Go version to 1.26.5
 
 ## v1.8.6 [2026-05-26]
 
