@@ -148,7 +148,7 @@ func (m SubscriptionMode) MarshalText() ([]byte, error) {
 	case ServerMode:
 		return []byte("server"), nil
 	default:
-		return nil, fmt.Errorf("unknown subscription mode %q", m)
+		return nil, fmt.Errorf("unknown subscription mode %d", m)
 	}
 }
 func (m *SubscriptionMode) UnmarshalText(text []byte) error {

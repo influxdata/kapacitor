@@ -62,6 +62,18 @@ func testDestinationsWithTokensForCluster(clusterName string) []interface{} {
 	return []interface{}{testDestinationWithTokenForCluster(clusterName)}
 }
 
+func TestSubscriptionModeMarshalTextUnknownValueError(t *testing.T) {
+	_, err := influxdb.SubscriptionMode(42).MarshalText()
+	if err == nil {
+		t.Fatal("expected an error for an unknown subscription mode")
+	}
+
+	const want = "unknown subscription mode 42"
+	if got := err.Error(); got != want {
+		t.Errorf("unexpected error: got %q, want %q", got, want)
+	}
+}
+
 type tokenGrant struct {
 	token string
 	db    string
