@@ -1,3 +1,9 @@
+## Unreleased
+
+### Other
+
+1. [2909](https://github.com/influxdata/kapacitor/pull/2909): Upgrade Go version to 1.26.5
+
 ## v1.8.6 [2026-05-26]
 
 ### Other
