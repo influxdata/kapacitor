@@ -1,3 +1,9 @@
+## Unreleased
+
+### Other
+
+1. Upgrade Go version to 1.26.9
+
 ## v1.8.7 [2026-09-16]
 
 ### Other
