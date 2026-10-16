@@ -611,6 +611,13 @@ func authenticate(inner AuthorizationHandler, h *Handler, requireAuthentication 
 				return
 			}
 		case BearerAuthentication:
+			// An empty shared secret disables bearer authentication,
+			// so reject the request before the token is parsed.
+			if h.sharedSecret == "" {
+				h.statMap.Add(statAuthFail, 1)
+				HttpError(w, "bearer authentication is not enabled", false, http.StatusUnauthorized)
+				return
+			}
 			keyLookupFn := func(token *jwt.Token) (interface{}, error) {
 				// Check for expected signing method.
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
