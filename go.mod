@@ -207,7 +207,7 @@ require (
 	github.com/jsternberg/zap-logfmt v1.2.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kevinburke/go-bindata v3.11.0+incompatible // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
