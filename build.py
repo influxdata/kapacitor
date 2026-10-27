@@ -532,6 +532,9 @@ def build(version=None,
         if  arch == "aarch64" or arch == "arm64":
             arch = "arm64"
 
+        # Common
+        tags += ["flux_nosqlite"]
+
         # NOTE(bnpfeife): Previously, linux/arm64 was statically built
         # regardless whether "--static" was passed to this script. Now
         # darwin builds fail when "--static" is passed (we are missing
