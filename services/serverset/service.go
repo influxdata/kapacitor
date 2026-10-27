@@ -8,7 +8,6 @@ import (
 
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
-	pzookeeper "github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
 type Diagnostic scraper.Diagnostic
@@ -127,7 +126,11 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := pzookeeper.NewServersetDiscovery(sd, s.diag)
+	discoverer, unregister, err := scraper.NewDiscoverer(sd, s.diag)
+	if err != nil {
+		return err
+	}
+	defer unregister()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*targetgroup.Group)

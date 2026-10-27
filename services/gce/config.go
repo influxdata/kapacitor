@@ -44,14 +44,14 @@ func (g Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (g Config) PromConfig() *gce.SDConfig {
-	return &gce.SDConfig{
-		Project:         g.Project,
-		Zone:            g.Zone,
-		Filter:          g.Filter,
-		RefreshInterval: model.Duration(g.RefreshInterval),
-		Port:            g.Port,
-		TagSeparator:    g.TagSeparator,
-	}
+	sd := gce.DefaultSDConfig
+	sd.Project = g.Project
+	sd.Zone = g.Zone
+	sd.Filter = g.Filter
+	sd.RefreshInterval = model.Duration(g.RefreshInterval)
+	sd.Port = g.Port
+	sd.TagSeparator = g.TagSeparator
+	return &sd
 }
 
 // Service return discoverer type

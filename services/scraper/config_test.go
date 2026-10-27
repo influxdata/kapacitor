@@ -41,7 +41,10 @@ func TestConfig_MultiConfig(t *testing.T) {
 		for i := range tt.discoveryConfig {
 			tt.discoveryConfig[i].Init()
 		}
-		registy := scraper.NewService(tt.scraperConfig, diag)
+		registy, err := scraper.NewService(tt.scraperConfig, diag)
+		if err != nil {
+			t.Fatal(err)
+		}
 		registy.Open()
 		svc := file_discovery.NewService(tt.discoveryConfig, registy, diag)
 		svc.Open()

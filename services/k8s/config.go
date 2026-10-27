@@ -115,34 +115,28 @@ func (cs Configs) Validate() error {
 
 // Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (c Config) Prom(conf *config.ScrapeConfig) {
+	newSD := func() *kubernetes.SDConfig {
+		sd := kubernetes.DefaultSDConfig
+		sd.Role = kubernetes.Role(c.Resource)
+		sd.HTTPClientConfig.BearerToken = config2.Secret(c.Token)
+		sd.HTTPClientConfig.TLSConfig = config2.TLSConfig{
+			CAFile: c.CAPath,
+		}
+		return &sd
+	}
+
 	if len(c.APIServers) == 0 {
-		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs, &kubernetes.SDConfig{
-			Role: kubernetes.Role(c.Resource),
-			HTTPClientConfig: config2.HTTPClientConfig{
-				BearerToken: config2.Secret(c.Token),
-				TLSConfig: config2.TLSConfig{
-					CAFile: c.CAPath,
-				},
-			},
-		})
+		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs, newSD())
 		return
 	}
 
 	for _, srv := range c.APIServers {
 		url, _ := url.Parse(srv)
-		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs,
-			&kubernetes.SDConfig{
-				APIServer: config2.URL{
-					URL: url,
-				},
-				Role: kubernetes.Role(c.Resource),
-				HTTPClientConfig: config2.HTTPClientConfig{
-					BearerToken: config2.Secret(c.Token),
-					TLSConfig: config2.TLSConfig{
-						CAFile: c.CAPath,
-					},
-				},
-			})
+		sd := newSD()
+		sd.APIServer = config2.URL{
+			URL: url,
+		}
+		conf.ServiceDiscoveryConfigs = append(conf.ServiceDiscoveryConfigs, sd)
 	}
 }
 

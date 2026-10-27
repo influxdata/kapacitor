@@ -55,21 +55,21 @@ func (t Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (t Config) PromConfig() *triton.SDConfig {
-	return &triton.SDConfig{
-		Account:         t.Account,
-		DNSSuffix:       t.DNSSuffix,
-		Endpoint:        t.Endpoint,
-		Port:            t.Port,
-		RefreshInterval: model.Duration(t.RefreshInterval),
-		Version:         t.Version,
-		TLSConfig: config2.TLSConfig{
-			CAFile:             t.SSLCA,
-			CertFile:           t.SSLCert,
-			KeyFile:            t.SSLKey,
-			ServerName:         t.SSLServerName,
-			InsecureSkipVerify: t.InsecureSkipVerify,
-		},
+	sd := triton.DefaultSDConfig
+	sd.Account = t.Account
+	sd.DNSSuffix = t.DNSSuffix
+	sd.Endpoint = t.Endpoint
+	sd.Port = t.Port
+	sd.RefreshInterval = model.Duration(t.RefreshInterval)
+	sd.Version = t.Version
+	sd.TLSConfig = config2.TLSConfig{
+		CAFile:             t.SSLCA,
+		CertFile:           t.SSLCert,
+		KeyFile:            t.SSLKey,
+		ServerName:         t.SSLServerName,
+		InsecureSkipVerify: t.InsecureSkipVerify,
 	}
+	return &sd
 }
 
 // Service return discoverer type

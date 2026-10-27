@@ -51,20 +51,18 @@ func (m Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (m Config) PromConfig() *marathon.SDConfig {
-	return &marathon.SDConfig{
-		Servers:         m.Servers,
-		RefreshInterval: model.Duration(m.RefreshInterval),
-		HTTPClientConfig: config2.HTTPClientConfig{
-			TLSConfig: config2.TLSConfig{
-				CAFile:             m.SSLCA,
-				CertFile:           m.SSLCert,
-				KeyFile:            m.SSLKey,
-				ServerName:         m.SSLServerName,
-				InsecureSkipVerify: m.InsecureSkipVerify,
-			},
-			BearerToken: config2.Secret(m.BearerToken),
-		},
+	sd := marathon.DefaultSDConfig
+	sd.Servers = m.Servers
+	sd.RefreshInterval = model.Duration(m.RefreshInterval)
+	sd.HTTPClientConfig.TLSConfig = config2.TLSConfig{
+		CAFile:             m.SSLCA,
+		CertFile:           m.SSLCert,
+		KeyFile:            m.SSLKey,
+		ServerName:         m.SSLServerName,
+		InsecureSkipVerify: m.InsecureSkipVerify,
 	}
+	sd.HTTPClientConfig.BearerToken = config2.Secret(m.BearerToken)
+	return &sd
 }
 
 // Service return discoverer type

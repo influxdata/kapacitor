@@ -979,7 +979,10 @@ func (s *Server) appendReportingService() {
 func (s *Server) appendScraperService() error {
 	c := s.config.Scraper
 	d := s.DiagService.NewScraperHandler()
-	srv := scraper.NewService(c, d)
+	srv, err := scraper.NewService(c, d)
+	if err != nil {
+		return err
+	}
 	srv.PointsWriter = s.TaskMaster
 	s.ScraperService = srv
 	s.SetDynamicService("scraper", srv)
