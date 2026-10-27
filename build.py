@@ -202,7 +202,7 @@ def run_tests(race, parallel, timeout, verbose):
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
 
-    test_command = "go test --failfast"
+    test_command = "go test --failfast -tags flux_nosqlite"
     if verbose:
         test_command += " -v"
     if race:
