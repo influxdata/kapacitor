@@ -5,6 +5,7 @@
 1. [2915](https://github.com/influxdata/kapacitor/pull/2915): Require non-empty shared secret with BearerAuthentication
 1. [2917](https://github.com/influxdata/kapacitor/pull/2917): Upgrade golang version to 1.26.10
 1. [2916](https://github.com/influxdata/kapacitor/pull/2916): Upgrade github.com/klauspost/compress from 1.17.9 to 1.18.7
+1. [2918](https://github.com/influxdata/kapacitor/pull/2918): Upgrade flux and use flux_nosqlite flag
 
 ## v1.8.8 [2026-10-14]
 
