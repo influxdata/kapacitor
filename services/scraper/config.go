@@ -84,6 +84,9 @@ func (c *Config) Validate() error {
 	if c.Type != "prometheus" {
 		return fmt.Errorf("Unknown scraper type")
 	}
+	if c.ScrapeTimeout > c.ScrapeInterval {
+		return fmt.Errorf("scraper %q timeout must not be greater than its interval", c.Name)
+	}
 
 	return nil
 }
@@ -97,14 +100,19 @@ func (c *Config) Prom() *config.ScrapeConfig {
 		Params:         c.Params,
 		ScrapeInterval: model.Duration(c.ScrapeInterval),
 		ScrapeTimeout:  model.Duration(c.ScrapeTimeout),
+		// Match the behavior of earlier prometheus versions, which always
+		// requested gzip compressed responses.
+		EnableCompression: true,
 		HTTPClientConfig: config2.HTTPClientConfig{
 			BasicAuth: &config2.BasicAuth{
 				Username: c.Username,
 				Password: config2.Secret(c.Password),
 			},
 			BearerToken: config2.Secret(c.BearerToken),
-			ProxyURL: config2.URL{
-				URL: c.ProxyURL,
+			ProxyConfig: config2.ProxyConfig{
+				ProxyURL: config2.URL{
+					URL: c.ProxyURL,
+				},
 			},
 			TLSConfig: config2.TLSConfig{
 				CAFile:             c.SSLCA,

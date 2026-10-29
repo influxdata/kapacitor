@@ -51,12 +51,12 @@ func (d Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (d Config) PromConfig() *dns.SDConfig {
-	return &dns.SDConfig{
-		Names:           d.RecordNames,
-		RefreshInterval: model.Duration(d.RefreshInterval),
-		Type:            d.Type,
-		Port:            d.Port,
-	}
+	sd := dns.DefaultSDConfig
+	sd.Names = d.RecordNames
+	sd.RefreshInterval = model.Duration(d.RefreshInterval)
+	sd.Type = d.Type
+	sd.Port = d.Port
+	return &sd
 }
 
 // Service return discoverer type

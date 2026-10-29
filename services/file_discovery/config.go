@@ -47,10 +47,10 @@ func (f Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (f Config) PromConfig() *file.SDConfig {
-	return &file.SDConfig{
-		Files:           f.Files,
-		RefreshInterval: model.Duration(f.RefreshInterval),
-	}
+	sd := file.DefaultSDConfig
+	sd.Files = f.Files
+	sd.RefreshInterval = model.Duration(f.RefreshInterval)
+	return &sd
 }
 
 // Service return discoverer type

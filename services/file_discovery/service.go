@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	pfile "github.com/prometheus/prometheus/discovery/file"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -127,13 +126,16 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pfile.NewDiscovery(sd, s.diag)
+	discoverer, unregister, err := scraper.NewDiscoverer(sd, s.diag)
+	if err != nil {
+		return err
+	}
+	defer unregister()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*targetgroup.Group)
 	go discoverer.Run(ctx, updates)
 
-	var err error
 	select {
 	case _, ok := <-updates:
 		// Handle the case that a target provider exits and closes the channel

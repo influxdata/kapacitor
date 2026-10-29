@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	pmarathon "github.com/prometheus/prometheus/discovery/marathon"
 	"github.com/prometheus/prometheus/discovery/targetgroup"
 )
 
@@ -127,10 +126,11 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := pmarathon.NewDiscovery(*sd, s.diag)
+	discoverer, unregister, err := scraper.NewDiscoverer(sd, s.diag)
 	if err != nil {
 		return err
 	}
+	defer unregister()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*targetgroup.Group)

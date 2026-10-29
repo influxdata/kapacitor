@@ -10,12 +10,14 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
-	plog "github.com/prometheus/common/log"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
-	"github.com/prometheus/prometheus/pkg/exemplar"
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/exemplar"
+	"github.com/prometheus/prometheus/model/histogram"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/prometheus/prometheus/model/metadata"
 	"github.com/prometheus/prometheus/scrape"
 	"github.com/prometheus/prometheus/storage"
 )
@@ -25,9 +27,38 @@ var (
 	_ storage.Appender = &ServiceAppenderAdapter{}
 )
 
+// Logger is the leveled logging interface formerly provided by
+// github.com/prometheus/common/log, which was removed upstream.
+type Logger interface {
+	Debug(...interface{})
+	Debugln(...interface{})
+	Debugf(string, ...interface{})
+
+	Info(...interface{})
+	Infoln(...interface{})
+	Infof(string, ...interface{})
+
+	Warn(...interface{})
+	Warnln(...interface{})
+	Warnf(string, ...interface{})
+
+	Error(...interface{})
+	Errorln(...interface{})
+	Errorf(string, ...interface{})
+
+	Fatal(...interface{})
+	Fatalln(...interface{})
+	Fatalf(string, ...interface{})
+
+	With(key string, value interface{}) Logger
+
+	SetFormat(string) error
+	SetLevel(string) error
+}
+
 // Prometheus logger
 type Diagnostic interface {
-	plog.Logger
+	Logger
 	Log(...interface{}) error
 }
 
@@ -71,18 +102,35 @@ func (a *appendable) Appender(ctx context.Context) storage.Appender {
 var scrapemanagerLock = sync.Mutex{} // promethius calling scrape.NewManager is not concurrency safe.
 
 // NewService creates a new scraper service
-func NewService(c []Config, d Diagnostic) *Service {
+func NewService(c []Config, d Diagnostic) (*Service, error) {
 	s := &Service{
 		diag: d,
 	}
 	s.storeConfigs(c)
+
+	// The prometheus managers register their own metrics. Kapacitor does not
+	// expose them, so use a private registry per service.
+	reg := prometheus.NewRegistry()
+	sdMetrics, err := discovery.CreateAndRegisterSDMetrics(reg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register service discovery metrics: %w", err)
+	}
+
 	var ctxScrape context.Context
 	ctxScrape, s.cancelScrape = context.WithCancel(context.Background())
-	s.discoveryManager = discovery.NewManager(ctxScrape, d, discovery.Name("discoveryScrapeManager"))
+	s.discoveryManager = discovery.NewManager(ctxScrape, d, reg, sdMetrics, discovery.Name("discoveryScrapeManager"))
+	if s.discoveryManager == nil {
+		s.cancelScrape()
+		return nil, fmt.Errorf("failed to create discovery manager")
+	}
 	scrapemanagerLock.Lock()
-	s.scrapeManager = scrape.NewManager(d, &appendable{&ServiceAppenderAdapter{s}})
+	s.scrapeManager, err = scrape.NewManager(nil, d, &appendable{&ServiceAppenderAdapter{s}}, reg)
 	scrapemanagerLock.Unlock()
-	return s
+	if err != nil {
+		s.cancelScrape()
+		return nil, fmt.Errorf("failed to create scrape manager: %w", err)
+	}
+	return s, nil
 }
 
 // Open starts the scraper service
@@ -182,12 +230,12 @@ func (s *Service) scrape() {
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
-func (s *ServiceAppenderAdapter) Append(ref uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
+func (s *ServiceAppenderAdapter) Append(ref storage.SeriesRef, labels labels.Labels, timestamp int64, value float64) (storage.SeriesRef, error) {
 	return s.Wrapped.Append(ref, labels, timestamp, value)
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
-func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value float64) (uint64, error) {
+func (s *Service) Append(_ storage.SeriesRef, lbls labels.Labels, timestamp int64, value float64) (storage.SeriesRef, error) {
 	// Remove all NaN values
 	// TODO: Add counter stat for this variable
 	if math.IsNaN(value) {
@@ -200,15 +248,18 @@ func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value 
 	job := ""
 
 	tags := make(models.Tags)
-	for _, kv := range labels {
-		if kv.Name == "job" {
-			db, rp, job, err = decodeJobName(string(kv.Value))
-			if err != nil {
-				return 0, err
-			}
-			continue
+	lbls.Range(func(kv labels.Label) {
+		if err != nil {
+			return
 		}
-		tags[string(kv.Name)] = string(kv.Value)
+		if kv.Name == "job" {
+			db, rp, job, err = decodeJobName(kv.Value)
+			return
+		}
+		tags[kv.Name] = kv.Value
+	})
+	if err != nil {
+		return 0, err
 	}
 
 	// If instance is blacklisted then do not send to PointsWriter
@@ -240,8 +291,26 @@ func (s *Service) Append(_ uint64, labels labels.Labels, timestamp int64, value 
 }
 
 // conforms to Appender interface
-func (s *ServiceAppenderAdapter) AppendExemplar(uint64, labels.Labels, exemplar.Exemplar) (uint64, error) {
+func (s *ServiceAppenderAdapter) AppendExemplar(storage.SeriesRef, labels.Labels, exemplar.Exemplar) (storage.SeriesRef, error) {
 	// We don't support exemplars
+	return 0, nil
+}
+
+// conforms to Appender interface
+func (s *ServiceAppenderAdapter) AppendHistogram(storage.SeriesRef, labels.Labels, int64, *histogram.Histogram, *histogram.FloatHistogram) (storage.SeriesRef, error) {
+	// We don't support native histograms
+	return 0, nil
+}
+
+// conforms to Appender interface
+func (s *ServiceAppenderAdapter) UpdateMetadata(storage.SeriesRef, labels.Labels, metadata.Metadata) (storage.SeriesRef, error) {
+	// We don't support metadata
+	return 0, nil
+}
+
+// conforms to Appender interface
+func (s *ServiceAppenderAdapter) AppendCTZeroSample(storage.SeriesRef, labels.Labels, int64, int64) (storage.SeriesRef, error) {
+	// We don't support created timestamps
 	return 0, nil
 }
 
@@ -305,6 +374,7 @@ func (s *Service) Update(newConfigs []interface{}) error {
 // prom assumes service is locked
 func (s *Service) prom(pairs []Pair) *config.Config {
 	conf := &config.Config{
+		GlobalConfig:  config.DefaultGlobalConfig,
 		ScrapeConfigs: make([]*config.ScrapeConfig, len(pairs)),
 	}
 

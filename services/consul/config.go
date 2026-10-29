@@ -58,23 +58,29 @@ func (c Config) Prom(conf *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (c Config) PromConfig() *consul.SDConfig {
-	return &consul.SDConfig{
-		Server:       c.Address,
-		Token:        config2.Secret(c.Token),
-		Datacenter:   c.Datacenter,
-		TagSeparator: c.TagSeparator,
-		Scheme:       c.Scheme,
-		Username:     c.Username,
-		Password:     config2.Secret(c.Password),
-		Services:     c.Services,
-		TLSConfig: config2.TLSConfig{
-			CAFile:             c.SSLCA,
-			CertFile:           c.SSLCert,
-			KeyFile:            c.SSLKey,
-			ServerName:         c.SSLServerName,
-			InsecureSkipVerify: c.InsecureSkipVerify,
-		},
+	sd := consul.DefaultSDConfig
+	sd.Server = c.Address
+	sd.Token = config2.Secret(c.Token)
+	sd.Datacenter = c.Datacenter
+	sd.TagSeparator = c.TagSeparator
+	sd.Scheme = c.Scheme
+	// Prometheus only honors the consul username and password by converting
+	// them to basic auth while unmarshaling its YAML config, so do the same.
+	if c.Username != "" || c.Password != "" {
+		sd.HTTPClientConfig.BasicAuth = &config2.BasicAuth{
+			Username: c.Username,
+			Password: config2.Secret(c.Password),
+		}
 	}
+	sd.Services = c.Services
+	sd.HTTPClientConfig.TLSConfig = config2.TLSConfig{
+		CAFile:             c.SSLCA,
+		CertFile:           c.SSLCert,
+		KeyFile:            c.SSLKey,
+		ServerName:         c.SSLServerName,
+		InsecureSkipVerify: c.InsecureSkipVerify,
+	}
+	return &sd
 }
 
 // Service return discoverer type

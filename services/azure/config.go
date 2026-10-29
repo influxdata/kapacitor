@@ -44,14 +44,14 @@ func (a Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (a Config) PromConfig() *azure.SDConfig {
-	return &azure.SDConfig{
-		Port:            a.Port,
-		SubscriptionID:  a.SubscriptionID,
-		TenantID:        a.TenantID,
-		ClientID:        a.ClientID,
-		ClientSecret:    config2.Secret(a.ClientSecret),
-		RefreshInterval: model.Duration(a.RefreshInterval),
-	}
+	sd := azure.DefaultSDConfig
+	sd.Port = a.Port
+	sd.SubscriptionID = a.SubscriptionID
+	sd.TenantID = a.TenantID
+	sd.ClientID = a.ClientID
+	sd.ClientSecret = config2.Secret(a.ClientSecret)
+	sd.RefreshInterval = model.Duration(a.RefreshInterval)
+	return &sd
 }
 
 // Service return discoverer type

@@ -202,7 +202,7 @@ def run_tests(race, parallel, timeout, verbose):
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
 
-    test_command = "go test --failfast"
+    test_command = "go test --failfast -tags flux_nosqlite"
     if verbose:
         test_command += " -v"
     if race:
@@ -531,6 +531,9 @@ def build(version=None,
         fullarch = arch
         if  arch == "aarch64" or arch == "arm64":
             arch = "arm64"
+
+        # Common
+        tags += ["flux_nosqlite"]
 
         # NOTE(bnpfeife): Previously, linux/arm64 was statically built
         # regardless whether "--static" was passed to this script. Now

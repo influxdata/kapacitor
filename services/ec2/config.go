@@ -9,7 +9,7 @@ import (
 	config2 "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/discovery/ec2"
+	ec2 "github.com/prometheus/prometheus/discovery/aws"
 )
 
 // Config is EC2 service discovery configuration
@@ -55,15 +55,15 @@ func (c Config) ClientConfig() (client.Config, error) {
 }
 
 // PromConfig returns the prometheus configuration for this discoverer
-func (e Config) PromConfig() *ec2.SDConfig {
-	return &ec2.SDConfig{
-		Region:          e.Region,
-		AccessKey:       e.AccessKey,
-		SecretKey:       config2.Secret(e.SecretKey),
-		Profile:         e.Profile,
-		RefreshInterval: model.Duration(e.RefreshInterval),
-		Port:            e.Port,
-	}
+func (e Config) PromConfig() *ec2.EC2SDConfig {
+	sd := ec2.DefaultEC2SDConfig
+	sd.Region = e.Region
+	sd.AccessKey = e.AccessKey
+	sd.SecretKey = config2.Secret(e.SecretKey)
+	sd.Profile = e.Profile
+	sd.RefreshInterval = model.Duration(e.RefreshInterval)
+	sd.Port = e.Port
+	return &sd
 }
 
 // Service return discoverer type

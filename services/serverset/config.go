@@ -45,11 +45,11 @@ func (s Config) Prom(c *config.ScrapeConfig) {
 
 // PromConfig returns the prometheus configuration for this discoverer
 func (s Config) PromConfig() *zookeeper.ServersetSDConfig {
-	return &zookeeper.ServersetSDConfig{
-		Servers: s.Servers,
-		Paths:   s.Paths,
-		Timeout: model.Duration(s.Timeout),
-	}
+	sd := zookeeper.DefaultServersetSDConfig
+	sd.Servers = s.Servers
+	sd.Paths = s.Paths
+	sd.Timeout = model.Duration(s.Timeout)
+	return &sd
 }
 
 // Service return discoverer type
