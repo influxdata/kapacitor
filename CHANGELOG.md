@@ -1,4 +1,4 @@
-## Unreleased
+## v1.8.9 [2026-11-04]
 
 ### Other
 
@@ -6,6 +6,7 @@
 1. [2917](https://github.com/influxdata/kapacitor/pull/2917): Upgrade golang version to 1.26.10
 1. [2916](https://github.com/influxdata/kapacitor/pull/2916): Upgrade github.com/klauspost/compress from 1.17.9 to 1.18.7
 1. [2918](https://github.com/influxdata/kapacitor/pull/2918): Upgrade flux and use flux_nosqlite flag
+1. [2919](https://github.com/influxdata/kapacitor/pull/2919): Upgrade github.com/go-jose/go-jose/v4 from 4.1.4 to 4.1.6
 
 ## v1.8.8 [2026-10-14]
 
